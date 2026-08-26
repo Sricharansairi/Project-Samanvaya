@@ -104,25 +104,23 @@ To achieve "ultra-intelligent" conversational capabilities while ensuring 100% u
 
 #### 1. The "Ultra-Intelligent Brain" (Complex Reasoning & FHIR Extraction)
 *   **Task:** Understanding messy medical jargon, converting raw speech to strict FHIR JSON, and handling the "Brand-to-Generic" mapping logic.
-*   **Primary Engine:** `meta/llama-3.1-405b-instruct` or `meta/llama-3.1-70b-instruct` (via NVIDIA NIM). These are currently the smartest open-weights models available for reasoning.
-*   **Backup 1 (High Quality):** `google/gemma-2-27b-it` or `mistralai/mixtral-8x22b-instruct-v0.1` (via NVIDIA NIM).
-*   **Backup 2 (FreeLLMAPI Fallback):** Route to the `llama3-70b` endpoint via the FreeLLMAPI router to hit various free-tier providers if NVIDIA rate limits us.
+*   **Primary Engine:** `nvidia/llama-3.1-nemotron-70b-instruct` (via NVIDIA NIM). This is a highly optimized, state-of-the-art model for complex instruction following.
+*   **Backup (High Quality):** `google/gemma-2-27b-it` or `mistralai/mixtral-8x22b-instruct-v0.1` (via NVIDIA NIM).
 
 #### 2. Vision & OCR Scanning (Lab Reports & Prescriptions)
 *   **Task:** "Reading" uploaded lab reports to extract numerical values and powering the "Abnormal Value Visual Highlighter".
-*   **Primary Engine:** `microsoft/phi-3-vision-128k-instruct` or `nvdb/vila-1.5-40b` (via NVIDIA NIM). Phi-3-Vision is exceptionally strong at extracting tables and charts from medical reports.
-*   **Backup 1 (NVIDIA Fallback):** `liuhaotian/llava-v1.6-34b` (via NVIDIA NIM).
-*   **Backup 2 (FreeLLMAPI Fallback):** Route to `qwen-vl-plus` or similar vision models exposed via the FreeLLMAPI unified endpoint.
+*   **Primary Engine:** `meta/llama-3.2-90b-vision-instruct` (via NVIDIA NIM). This massive multimodal model is exceptionally strong at extracting tables and charts from medical reports.
+*   **Backup (NVIDIA Fallback):** `liuhaotian/llava-v1.6-34b` (via NVIDIA NIM).
 
 #### 3. High-Speed Utilities (Patient Prompter & Background Formatting)
 *   **Task:** Generating the fast 2-3 personalized audio prompts ("Patient Question Prompter") and formatting scheme checklist PDFs where latency must be <1 second.
-*   **Primary Engine:** `meta/llama-3.1-8b-instruct` (via NVIDIA NIM).
-*   **Backup:** `qwen-2.5-7b` or `llama3-8b` (via FreeLLMAPI).
+*   **Primary Engine:** `meta/llama-3.2-90b-vision-instruct` (via NVIDIA NIM).
+*   **Backup:** `nemotron-3.5-lightning-30b-a3b` (via NVIDIA NIM) for ultra-low latency.
 
 #### 4. Speech-to-Text (ASR)
 *   **Primary Engine:** **Bhashini API** (AI4Bharat) to handle 22 Indian languages and rural accents (as mandated by SIH).
 *   **Pre-Processing:** Local WebAssembly **RNNoise** to filter out hospital background noise before sending audio.
-*   **Backup (Fallback ASR):** Open-source `Whisper-large-v3` accessed via HuggingFace free endpoints or FreeLLMAPI audio endpoints if Bhashini is down.
+*   **Backup (Fallback ASR):** NVIDIA Riva Translate / Whisper API via NVIDIA NIM if Bhashini is down.
 
 ### C. Backend API Layer (Heavy Lifting)
 *   **Framework:** **Python (FastAPI)**.
@@ -306,14 +304,40 @@ Based on the Deep Research results and advanced architectural requirements, here
 ## 2. LLM Selection & Smart Key Rotator
 
 The research concluded that while free endpoints exist, specialized medical models are rare. Therefore, we rely on high-reasoning general models heavily grounded by our RAG.
-*   **NVIDIA NIM API:** Used for heavy reasoning. Chosen Models: `meta/llama-3.1-70b-instruct` (Primary) and `microsoft/phi-3-vision-128k-instruct` (OCR/Vision).
-*   **FreeLLMAPI Router:** Used for backup/fallback (e.g., Qwen-3, GLM-4).
 
-### The Fail-Safe Key Rotator Pattern
-To prevent rate-limit crashes during the hackathon, we will implement a `Smart Key Rotator`.
-*   We will store multiple API keys for NVIDIA NIM and FreeLLMAPI in our `.env`.
-*   A Python utility will use `random.choice(api_keys)` to randomly select a key for each request, distributing the load and acting as a zero-cost load balancer.
+**Models to Generate Keys For (All via NVIDIA NIM):**
+*   *Ultra-Intelligent Brain (Primary Triage):* `nvidia/llama-3.1-nemotron-70b-instruct`
+*   *Fast Triage (Secondary):* `meta/llama-3.2-11b-vision-instruct`
+*   *OCR / Vision Model:* `meta/llama-3.2-90b-vision-instruct`
+*   *Medical RAG Embedding:* `snowflake/arctic-embed-l`
+*   *RAG Reranking:* `nvidia/llama-nemotron-rerank-vl-1b-v2`
 
+### The Dynamic Fail-Safe Key Rotator Pattern
+To prevent rate-limit crashes during the hackathon, we will implement a dynamic `Smart Key Rotator`:
+*   Instead of comma-separated strings, the `.env` file uses specific line-by-line numbered slots for each model (e.g., `NVIDIA_LLAMA_3_3_70B_KEY_1`, `NVIDIA_LLAMA_3_3_70B_KEY_2`).
+*   The system allows the user to dynamically add as many keys as they want simply by adding a new line with the next number.
+*   A Python utility scans the environment for these prefixes, aggregates them into a list, and uses `random.choice(keys_array)` to randomly select a key for *every single API request*.
+
+### Exact Environment Configuration (`.env`)
+The entire backend relies on these exact environment variables. Note that keys are provided *without* double quotes.
+```env
+# Database configuration
+SUPABASE_URL=https://rdnjnycxooxuolntrpny.supabase.co
+SUPABASE_KEY=your_supabase_anon_key
+
+# NVIDIA Llama 3.3 70B Keys (Primary Triage)
+NVIDIA_LLAMA_3_3_70B_KEY_1=key_1
+NVIDIA_LLAMA_3_3_70B_KEY_2=key_2
+
+# NVIDIA Llama 3.2 90B Vision Keys (Secondary Triage / Multimodal)
+NVIDIA_LLAMA_3_2_90B_KEY_1=key_1
+
+# NVIDIA Phi-4 Multimodal Keys (OCR)
+NVIDIA_PHI_4_KEY_1=key_1
+
+# Bhashini API Key (Voice)
+BHASHINI_API_KEY=your_bhashini_key
+```
 ## 3. Multi-Architectured RAG Module (The Medical Brain)
 
 We are implementing an **Adaptive, Self-Corrective Agentic RAG** system to ensure 0% hallucination on medical data and extreme resilience against prompt injection.
@@ -466,3 +490,26 @@ gantt
     Voice Chip Parameters       :d2, after d1, 1d
     Nearest Hospital Finder     :d3, after d2, 1d
 ```
+
+---
+
+## 6. "Gemini Live-Style" Bidirectional Conversational Loop
+To achieve a highly fluid, intelligent interaction exactly like Gemini Live, we are implementing a continuous voice loop.
+*   **Yes, Bhashini provides Voice Output (TTS):** Bhashini supports high-quality Text-To-Speech (TTS) in multiple Indian languages.
+*   **The Loop:** 
+    1. **Listen:** Patient speaks (RNNoise cleans the audio -> Bhashini ASR converts to text).
+    2. **Think:** Our Adaptive RAG LLM processes the text and decides what question to ask next.
+    3. **Speak:** The LLM's text output is sent to Bhashini TTS, which speaks the question out loud to the patient in their native tongue.
+*   This creates a 100% hands-free, interactive interview that feels just like talking to a real, empathetic human triage nurse.
+
+## 7. Safety, Privacy, and Fail-Safe Architecture
+Project Samanvaya will handle sensitive Protected Health Information (PHI). We are implementing military-grade privacy checks to ensure ABDM (Ayushman Bharat Digital Mission) compliance:
+
+### A. Fail-Safe Operations
+*   **Database Transaction Rollbacks:** Every database write (e.g., saving a patient visit) in FastAPI will be wrapped in SQL transaction blocks. If the server crashes mid-write, the entire transaction rolls back cleanly so no corrupted partial records exist.
+*   **Key Rotator Logging:** If an API key hits a rate limit, the Smart Key Rotator logs the failure, immediately switches to a backup key, and retries the request invisibly to the user.
+
+### B. Privacy & Security (ABDM Compliance)
+*   **Supabase RLS (Row Level Security):** We will enable strict RLS policies. A patient scanning their QR code can *only* read their own `user_id` rows. A hospital terminal can only read patients checked into that specific hospital.
+*   **PII Stripping Before LLM Processing:** Before we send patient symptoms to external LLMs (NVIDIA NIM/FreeLLMAPI), a lightweight Python regex function will strip any names, phone numbers, or Aadhaar numbers. The LLMs will only see the medical symptoms (e.g., "Patient has a headache"), ensuring no private data leaks to third-party AI providers.
+*   **Audit Logging:** Every single action (patient intake, doctor prescription, scheme check) is written to a tamper-proof `audit_logs` table in Supabase.
