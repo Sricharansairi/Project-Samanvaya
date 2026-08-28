@@ -44,12 +44,19 @@ def get_medical_context(query: str, api_key: str) -> str:
         print(f"RAG Error: {e}")
         return ""
 
+from app.services.router import classify_query_semantic
+from app.services.extraordinary_features import translate_to_controlled_vocabulary
+
 def triage_symptoms(symptom_text: str) -> dict:
     """
     Takes patient symptoms and uses NVIDIA NIM Llama 3.1 70B to evaluate
     the urgency, recommend a department, and give preliminary advice,
     augmented by RAG context from Supabase.
     """
+    # 0. Semantic Intent Routing
+    intent_data = classify_query_semantic(symptom_text)
+    print(f"[Phase 6 Router] Intent detected: {intent_data['intent']} with confidence {intent_data['confidence']}")
+    
     # Get a fresh key from the rotator
     api_key = key_rotator.get_llama_3_3_70b_key()
     
@@ -87,6 +94,12 @@ def triage_symptoms(symptom_text: str) -> dict:
         response_text = completion.choices[0].message.content.strip()
         # Ensure we parse JSON properly
         result = json.loads(response_text)
+        
+        # Phase 6: Map patient dialect to FHIR/SNOMED-CT before returning
+        vocab_mapping = translate_to_controlled_vocabulary(symptom_text)
+        result["snomed_mapping"] = vocab_mapping
+        result["confidence"] = intent_data["confidence"]
+        
         return result
     except Exception as e:
         print(f"Error during triage: {e}")

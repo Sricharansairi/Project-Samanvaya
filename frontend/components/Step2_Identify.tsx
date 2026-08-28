@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { QrCode, UserCheck, Users, Shield, ArrowRight, UserPlus, CheckCircle2 } from "lucide-react";
+import { QrCode, UserCheck, Users, Shield, ArrowRight, UserPlus, CheckCircle2, Info } from "lucide-react";
 
 interface Step2Props {
   onIdentify: (patientData: { abhaId: string; name: string; isCaregiver: boolean; caregiverName?: string; familyMembers?: string[] }) => void;
@@ -10,7 +10,7 @@ interface Step2Props {
 }
 
 export default function Step2_Identify({ onIdentify, onNext }: Step2Props) {
-  const [authMode, setAuthMode] = useState<"abha_qr" | "aadhaar_otp" | "new_patient" | "family_batch">("abha_qr");
+  const [authMode, setAuthMode] = useState<"abha_qr" | "aadhaar_otp" | "family_batch" | "new_patient">("aadhaar_otp");
   const [abhaInput, setAbhaInput] = useState("91-4820-1934-8291");
   const [isCaregiver, setIsCaregiver] = useState(false);
   const [caregiverName, setCaregiverName] = useState("");
@@ -31,101 +31,104 @@ export default function Step2_Identify({ onIdentify, onNext }: Step2Props) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="flex flex-col items-center w-full max-w-2xl"
-    >
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-light mb-2">Patient Identification</h2>
-        <p className="text-gray-400 text-sm">Fast-track verification using National Digital Health Mission (ABHA)</p>
+    <div className="w-full space-y-6">
+      
+      {/* Informative Subtext (UIDAI Style) */}
+      <div className="text-xs text-gray-600 leading-relaxed bg-slate-50 border border-slate-200 p-3.5 rounded-lg">
+        Verify patient identity using National Digital Health Mission (ABDM) standards or register a new walk-in patient. 
+        Select your verification method below:
       </div>
 
-      {/* Auth Mode Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full mb-6">
+      {/* Radio Selector Pills (Exact UIDAI Image 4 Style) */}
+      <div className="flex flex-wrap items-center gap-6 text-xs font-semibold text-[#0f2942] py-2 border-b border-gray-200">
         {[
-          { id: "abha_qr", label: "Scan ABHA QR", icon: <QrCode className="w-4 h-4" /> },
-          { id: "aadhaar_otp", label: "Aadhaar OTP", icon: <Shield className="w-4 h-4" /> },
-          { id: "family_batch", label: "Family Batch", icon: <Users className="w-4 h-4" /> },
-          { id: "new_patient", label: "New Patient", icon: <UserPlus className="w-4 h-4" /> }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setAuthMode(tab.id as any)}
-            className={`p-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-2 transition-all ${
-              authMode === tab.id
-                ? "bg-[#C2CD93]/20 border-[#C2CD93] text-[#C2CD93]"
-                : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
+          { id: "aadhaar_otp", label: "Aadhaar / ABHA Number" },
+          { id: "abha_qr", label: "Scan ABHA QR Code" },
+          { id: "family_batch", label: "Family Batch (Single OTP)" },
+          { id: "new_patient", label: "New Walk-in Patient" }
+        ].map((item) => (
+          <label key={item.id} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="authMode"
+              checked={authMode === item.id}
+              onChange={() => setAuthMode(item.id as any)}
+              className="accent-[#0f4c81] w-4 h-4 cursor-pointer"
+            />
+            <span className={authMode === item.id ? "text-[#0f4c81] font-bold" : "text-gray-600"}>
+              {item.label}
+            </span>
+          </label>
         ))}
       </div>
 
-      {/* Main Form Container */}
-      <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md mb-6 space-y-5">
-        {authMode === "abha_qr" && (
-          <div className="text-center py-4 space-y-4">
-            <div className="w-32 h-32 mx-auto border-2 border-dashed border-[#C2CD93]/50 rounded-xl flex items-center justify-center bg-black/40 relative overflow-hidden">
-              <QrCode className="w-16 h-16 text-[#C2CD93]" />
-              <motion.div
-                animate={{ y: [0, 100, 0] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="absolute top-0 left-0 w-full h-1 bg-[#C2CD93] shadow-[0_0_10px_#C2CD93]"
-              />
-            </div>
+      {/* Auth Input Container */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5 shadow-xs">
+        
+        {authMode === "aadhaar_otp" && (
+          <div className="space-y-4">
             <div>
-              <p className="text-sm text-gray-300 font-medium">Scan Ayushman Bharat Card QR</p>
-              <p className="text-xs text-gray-500">Hold QR code in front of the kiosk camera</p>
+              <label className="text-xs font-semibold text-[#0f2942] block mb-1">
+                Enter 14-digit ABHA Number or 12-digit Aadhaar Number *
+              </label>
+              <input
+                type="text"
+                value={abhaInput}
+                onChange={(e) => setAbhaInput(e.target.value)}
+                placeholder="e.g. 91-4820-1934-8291"
+                className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none"
+              />
+              <p className="text-[11px] text-emerald-700 mt-1.5 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Aadhaar OTP verification simulated sandbox active
+              </p>
             </div>
           </div>
         )}
 
-        {authMode === "aadhaar_otp" && (
-          <div className="space-y-3">
-            <label className="text-xs text-gray-400">12-Digit Aadhaar / 14-Digit ABHA Number</label>
-            <input
-              type="text"
-              value={abhaInput}
-              onChange={(e) => setAbhaInput(e.target.value)}
-              className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:border-[#C2CD93] outline-none"
-            />
-            <p className="text-[11px] text-[#C2CD93]/80">OTP sent to Aadhaar-linked mobile (Simulated Sandbox)</p>
+        {authMode === "abha_qr" && (
+          <div className="text-center py-6 space-y-3 bg-slate-50 rounded-xl border border-dashed border-gray-300">
+            <div className="w-20 h-20 mx-auto rounded-lg bg-white border border-gray-300 flex items-center justify-center shadow-xs">
+              <QrCode className="w-10 h-10 text-[#0f4c81]" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-[#0f2942]">Hold Ayushman Bharat Card QR Code in Front of Camera</p>
+              <p className="text-[11px] text-gray-500">Auto-detected in real-time with zero manual entry</p>
+            </div>
           </div>
         )}
 
         {authMode === "family_batch" && (
           <div className="space-y-3">
-            <label className="text-xs text-gray-400">Linked Family Members (Single-OTP Verified)</label>
+            <label className="text-xs font-semibold text-[#0f2942]">
+              Select Family Member to Register (Single-OTP Verified):
+            </label>
             <div className="space-y-2">
               {familyMembers.map((member) => (
                 <button
                   key={member}
+                  type="button"
                   onClick={() => setSelectedFamilyMember(member)}
-                  className={`w-full p-3 rounded-xl border text-left text-xs flex items-center justify-between transition-all ${
+                  className={`w-full p-3 rounded-lg border text-left text-xs font-semibold flex items-center justify-between transition-all ${
                     selectedFamilyMember === member
-                      ? "bg-[#C2CD93]/20 border-[#C2CD93] text-white"
-                      : "bg-white/5 border-white/10 text-gray-400"
+                      ? "bg-blue-50 border-[#0f4c81] text-[#0f4c81]"
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-slate-50"
                   }`}
                 >
                   <span>{member}</span>
-                  {selectedFamilyMember === member && <CheckCircle2 className="w-4 h-4 text-[#C2CD93]" />}
+                  {selectedFamilyMember === member && <CheckCircle2 className="w-4 h-4 text-[#0f4c81]" />}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
               <input 
                 type="checkbox" 
                 id="memberConsent" 
                 checked={memberConsentGiven} 
                 onChange={(e) => setMemberConsentGiven(e.target.checked)} 
-                className="accent-[#C2CD93]"
+                className="accent-[#0f4c81] w-4 h-4"
               />
-              <label htmlFor="memberConsent" className="text-xs text-gray-300">
-                Member is present and explicitly consents to record intake (DPDP Privacy Guard)
+              <label htmlFor="memberConsent" className="text-xs text-gray-700 font-medium">
+                Patient is physically present and explicitly consents to record case-taking (DPDP Act 2023 Guard)
               </label>
             </div>
           </div>
@@ -134,25 +137,25 @@ export default function Step2_Identify({ onIdentify, onNext }: Step2Props) {
         {authMode === "new_patient" && (
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-gray-400">Patient Full Name</label>
+              <label className="text-xs font-semibold text-[#0f2942] block mb-1">Patient Full Name *</label>
               <input
                 type="text"
                 defaultValue="Suresh Patil"
-                className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:border-[#C2CD93] outline-none"
+                className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400">Age</label>
+                <label className="text-xs font-semibold text-[#0f2942] block mb-1">Age</label>
                 <input
                   type="number"
                   defaultValue={48}
-                  className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:border-[#C2CD93] outline-none"
+                  className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-400">Gender</label>
-                <select className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:border-[#C2CD93] outline-none">
+                <label className="text-xs font-semibold text-[#0f2942] block mb-1">Gender</label>
+                <select className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none">
                   <option>Male</option>
                   <option>Female</option>
                   <option>Other</option>
@@ -162,68 +165,69 @@ export default function Step2_Identify({ onIdentify, onNext }: Step2Props) {
           </div>
         )}
 
-        {/* Caregiver / Proxy Mode Accordion */}
-        <div className="border-t border-white/10 pt-4">
-          <div className="flex items-center justify-between mb-3">
+        {/* Caregiver & Proxy Mode Accordion */}
+        <div className="border-t border-gray-200 pt-4 mt-2">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-[#C891AA]" />
-              <span className="text-xs font-medium text-gray-200">Is a family member / caregiver answering on patient's behalf?</span>
+              <UserCheck className="w-4 h-4 text-[#0f4c81]" />
+              <span className="text-xs font-semibold text-[#0f2942]">
+                Is a family escort / caregiver reporting on the patient's behalf?
+              </span>
             </div>
             <input
               type="checkbox"
               checked={isCaregiver}
               onChange={(e) => setIsCaregiver(e.target.checked)}
-              className="accent-[#C891AA] w-4 h-4 cursor-pointer"
+              className="accent-[#0f4c81] w-4 h-4 cursor-pointer"
             />
           </div>
 
           {isCaregiver && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="grid grid-cols-2 gap-3 pt-2"
-            >
+            <div className="grid grid-cols-2 gap-3 pt-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
               <input
                 type="text"
-                placeholder="Caregiver Name"
+                placeholder="Caregiver Name (e.g. Amit Patil)"
                 value={caregiverName}
                 onChange={(e) => setCaregiverName(e.target.value)}
-                className="bg-black/50 border border-[#C891AA]/40 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-[#0f2942] outline-none"
               />
               <select
                 value={caregiverRelation}
                 onChange={(e) => setCaregiverRelation(e.target.value)}
-                className="bg-black/50 border border-[#C891AA]/40 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-[#0f2942] outline-none"
               >
                 <option>Son / Daughter</option>
                 <option>Spouse</option>
                 <option>Parent</option>
                 <option>ASHA Worker / Volunteer</option>
               </select>
-            </motion.div>
+            </div>
           )}
 
-          {/* Multi-Generational Remote Assist Trigger */}
-          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-            <span className="text-gray-400">Family member at home / work?</span>
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span>Family member assisting from home?</span>
             <button
+              type="button"
               onClick={() => alert("📱 Remote Assist Link generated!\nSMS sent to relative: https://samanvaya.gov.in/assist/P123?token=abc123xyz\nThey can now fill details on their phone.")}
-              className="text-[#C2CD93] hover:underline font-medium"
+              className="text-[#0f4c81] font-semibold hover:underline"
             >
               Generate Remote Assist Link →
             </button>
           </div>
         </div>
+
       </div>
 
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={handleProceed}
-        className="w-full bg-[#C2CD93] hover:bg-[#b0bd82] text-black font-semibold py-4 rounded-xl flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(194,205,147,0.3)] transition-all"
-      >
-        Confirm & Continue to Consent <ArrowRight className="w-5 h-5" />
-      </motion.button>
-    </motion.div>
+      {/* Action Button */}
+      <div className="pt-2 flex justify-end">
+        <button
+          onClick={handleProceed}
+          className="bg-[#1d2d44] hover:bg-[#0f2942] text-white font-semibold py-3 px-8 rounded-lg flex items-center gap-2 text-sm shadow-sm transition-colors cursor-pointer"
+        >
+          Confirm & Continue to Consent <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+    </div>
   );
 }

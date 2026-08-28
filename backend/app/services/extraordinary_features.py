@@ -178,3 +178,33 @@ def calculate_generic_savings(branded_drug: str) -> dict:
         "savings_percentage": round((savings / item["brand_price"]) * 100, 1)
     }
 
+def translate_to_controlled_vocabulary(patient_idiom: str) -> dict:
+    """
+    (Feature 63: Controlled-Vocabulary Mapping)
+    Expands the Babel Fish layer to map local idioms to standard medical terms (SNOMED-CT / FHIR).
+    """
+    # Mocking SNOMED-CT mapping for demonstration
+    mapping = {
+        "chhati pe patthar": {
+            "english": "Chest heaviness / tightness",
+            "snomed_ct_code": "29847000",
+            "fhir_display": "Chest tightness (finding)"
+        },
+        "ang-ang toot raha hai": {
+            "english": "Severe body ache",
+            "snomed_ct_code": "28743005",
+            "fhir_display": "Generalized body ache"
+        },
+        "chakkar aa raha hai": {
+            "english": "Dizziness",
+            "snomed_ct_code": "404640003",
+            "fhir_display": "Dizziness (finding)"
+        }
+    }
+    
+    key = patient_idiom.strip().lower()
+    return mapping.get(key, {
+        "english": "Unmapped symptom",
+        "snomed_ct_code": "Unknown",
+        "fhir_display": "Unknown condition"
+    })

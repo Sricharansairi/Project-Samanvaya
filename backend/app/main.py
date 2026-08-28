@@ -371,6 +371,23 @@ async def create_remote_assist(request: RemoteAssistRequest):
     """
     return generate_remote_assist_link(request.patient_id, request.relative_phone)
 
+from app.services.stalled_case_monitor import flag_stalled_cases
+from datetime import datetime, timedelta
+
+@app.get("/api/admin/stalled-cases")
+async def get_stalled_cases():
+    """
+    (Phase 6 Integration: Self-Scoped Stalled Case Flag)
+    Retrieves cases that have been waiting beyond the threshold.
+    """
+    now = datetime.now()
+    # Mocking active cases database for the demo
+    mock_active_cases = [
+        {"id": "V-1234", "patient_name": "Ramesh Kumar", "status": "waiting", "submitted_at": (now - timedelta(hours=3)).isoformat()},
+        {"id": "V-5678", "patient_name": "Sita Devi", "status": "waiting", "submitted_at": (now - timedelta(minutes=45)).isoformat()}
+    ]
+    return flag_stalled_cases(mock_active_cases, threshold_hours=2)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

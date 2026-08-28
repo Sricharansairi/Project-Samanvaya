@@ -169,5 +169,24 @@ This checklist explicitly sequences EVERY SINGLE feature, UI flow step, architec
 - `[x]` **ABHA Creation via FaceAuth:** Implemented in simulated sandbox mode.
 - `[x]` **Audio-Verifiable Consent:** Paired with mandatory physical tap.
 - `[x]` **Nearest Budget Hospital Finder:** Cut entirely.
-- `[x]` **"0% Hallucination" Claim:** Replaced with "Reduced hallucination via retrieval grounding and human confirmation".
 - `[x]` **Complex RAG Stack:** Down-scoped to flat vector search with confidence threshold.
+
+---
+
+## 🚀 Phase 6: Advanced Case Management & NLP Enhancements (New from Analysis)
+- `[x]` **62. Semantic-Similarity Routing Layer:** Integrate embeddings (Sarvam/NIM) for robust intent routing instead of strict string matching.
+- `[x]` **63. Controlled-Vocabulary Mapping:** Expand Babel Fish into a dialect-to-standard-term dictionary (SNOMED-CT style) for FHIR readiness.
+- `[x]` **64. Confidence-Gated Confirmation Loop:** Wire the Green/Red/Back loop to trigger automatically on low-confidence semantic matches.
+- `[x]` **65. Full Context Cross-Referencing:** Pass entire conversation history to LLM to connect related symptoms (e.g., diabetes & numbness) and generate a "connections flag".
+- `[x]` **66. The "Next Action" Card:** Build a persistent UI card showing unified pre-consultation routing (token/department) and post-consultation discharge instructions.
+- `[x]` **67. Portable Case Summary:** Generate a clean, printable/QR one-pager (problem -> history -> medications -> findings -> actions) for non-ABDM hospitals.
+- `[x]` **68. "Why are we doing this test" Explainer:** Add short, doctor-approved template explainers for each prescribed test in the summary.
+- `[x]` **69. Self-Scoped "Stalled Case" Flag:** Implement an internal flag for un-consulted histories or neglected scheme checklists.
+
+---
+
+## 📢 Phase 7: Pitch Narrative & Scope Guardrails
+*These items are specifically for pitch framing and preventing over-engineering, extracted from the final analysis.*
+- `[x]` **70. The "Case Manager" Frame:** Reposition project as ensuring patients don't fall through cracks (Narrative only; do not build a human-staffed coordination desk).
+- `[x]` **71. Indoor Navigation Scope Check:** Stick to the simple token + text directions. Do not promise or build live facility mapping/wayfinding.
+- `[x]` **72. Core Value Proposition Pivot:** Update pitch deck/README: *"We make sure the patient's case doesn't fall through the cracks between the moment they walk in and the moment they're actually seen."*

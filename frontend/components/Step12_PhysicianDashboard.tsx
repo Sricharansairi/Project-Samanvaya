@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Stethoscope, Check, X, AlertTriangle, Mic, MicOff, Save, Clock, FileText, ArrowLeft, History } from "lucide-react";
+import { Stethoscope, Check, X, AlertTriangle, Mic, MicOff, Save, FileText, ArrowLeft, History, Pill, Building } from "lucide-react";
+import TestExplainer from "./TestExplainer";
+import NextActionCard from "./NextActionCard";
 
 interface Step12Props {
   onBackToKiosk: () => void;
@@ -20,7 +21,6 @@ export default function Step12_PhysicianDashboard({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
-  // Line-by-Line Accept / Reject state (Doctor-Edit Audit Trail)
   const [lines, setLines] = useState([
     { id: 1, text: "Presenting Complaint: High grade fever with nocturnal chills and productive cough.", status: "accepted" },
     { id: 2, text: "Onset & Duration: Acute onset, 3 days duration (Gradual worsening).", status: "accepted" },
@@ -38,7 +38,7 @@ export default function Step12_PhysicianDashboard({
       setTimeout(() => {
         setDictationText("Bilateral wheezing detected on auscultation. Prescribing Levosalbutamol + Budesonide nebulization.");
         setIsDictating(false);
-      }, 2500);
+      }, 2000);
     } else {
       setIsDictating(false);
     }
@@ -50,165 +50,173 @@ export default function Step12_PhysicianDashboard({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="w-full max-w-5xl bg-black/60 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-2xl text-white shadow-2xl space-y-6"
-    >
-      {/* Top Clinician Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-5 gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-[#C2CD93]/20 text-[#C2CD93] border border-[#C2CD93]/40">
-              <Stethoscope className="w-5 h-5" />
-            </span>
-            <div>
-              <h2 className="text-xl font-medium text-white">{patientName}</h2>
-              <p className="text-xs text-gray-400">Token: <span className="text-[#C2CD93] font-mono font-bold">A-142</span> | ABHA: <span className="font-mono">91-4820-1934-8291</span></p>
-            </div>
+    <div className="w-full space-y-6">
+      
+      {/* Top Clinician Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 pb-4 gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#0f4c81] flex items-center justify-center border border-blue-100">
+            <Stethoscope className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-[#0f2942] flex items-center gap-2">
+              {patientName}
+              <span className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-bold">
+                Token: A-142
+              </span>
+            </h3>
+            <p className="text-xs text-gray-500 font-mono">ABHA ID: 91-4820-1934-8291 • General Medicine OPD</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
+            type="button"
             onClick={() => setShowAnalytics(!showAnalytics)}
-            className="px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-medium hover:bg-amber-500/30 transition-colors"
+            className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
           >
-            📊 Festival/Season OPD Analytics
+            📊 Seasonal Surge Radar
           </button>
           <button
+            type="button"
             onClick={onBackToKiosk}
-            className="px-4 py-2 rounded-xl border border-white/20 text-gray-300 text-xs hover:bg-white/10 flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Kiosk Mode
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Kiosk
           </button>
           <button
+            type="button"
             onClick={handleFinalSave}
-            className="px-5 py-2 rounded-xl bg-[#C2CD93] hover:bg-[#b0bd82] text-black font-semibold text-xs flex items-center gap-1.5 shadow-[0_0_20px_rgba(194,205,147,0.3)] transition-all"
+            className="px-4 py-2 rounded-lg bg-[#0f4c81] hover:bg-blue-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
-            <Save className="w-4 h-4" /> {savedSuccess ? "Saved to ABDM ✓" : "Commit to ABDM (FHIR)"}
+            <Save className="w-4 h-4" /> {savedSuccess ? "Committed to ABDM ✓" : "Commit to ABDM (FHIR)"}
           </button>
         </div>
       </div>
 
-      {/* Expandable Festival / Season OPD Analytics Card */}
+      {/* Expandable Seasonal Analytics Card */}
       {showAnalytics && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 text-xs space-y-3">
-          <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-            <span className="font-bold text-amber-300">Hospital Administration: Regional Festival & Climate Surge Forecast</span>
-            <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded text-amber-200">District PIN: 110001 (Monsoon Season)</span>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs space-y-2">
+          <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+            <span className="font-bold text-amber-900">Hospital Administration: Regional Festival & Climate Surge Forecast</span>
+            <span className="text-[10px] bg-amber-200 px-2 py-0.5 rounded font-semibold text-amber-900">District PIN: 110001 (Monsoon Season)</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-gray-200">
-            <div className="p-3 bg-black/40 rounded-xl">
-              <p className="font-semibold text-white">Upcoming: Post-Diwali Smog Surge (+45%)</p>
-              <p className="text-gray-400 mt-1">High influx of acute asthma, COPD flare-ups, and pediatric wheezing expected.</p>
-              <p className="text-[#C2CD93] mt-2 font-medium">Recommended Stock: Inhalers & Nebulization kits (+50%).</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 bg-white rounded-lg border border-amber-200">
+              <p className="font-bold text-[#0f2942]">Upcoming: Post-Diwali Smog Surge (+45%)</p>
+              <p className="text-gray-500 mt-1">High influx of acute asthma and pediatric wheezing expected.</p>
+              <p className="text-emerald-800 mt-1 font-bold">Recommended Buffer: Inhalers & Nebulizers (+50%).</p>
             </div>
-            <div className="p-3 bg-black/40 rounded-xl">
-              <p className="font-semibold text-white">Current: Monsoon Waterlogging Gastro (+30%)</p>
-              <p className="text-gray-400 mt-1">Spike in acute gastroenteritis and waterborne diarrheal infections.</p>
-              <p className="text-[#C2CD93] mt-2 font-medium">Recommended Stock: ORS, IV Fluids & Ciprofloxacin.</p>
+            <div className="p-3 bg-white rounded-lg border border-amber-200">
+              <p className="font-bold text-[#0f2942]">Current: Monsoon Waterlogging Gastro (+30%)</p>
+              <p className="text-gray-500 mt-1">Spike in acute gastroenteritis and waterborne infections.</p>
+              <p className="text-emerald-800 mt-1 font-bold">Recommended Buffer: ORS & IV Fluids (+35%).</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Safety Alert Banners */}
+      {/* Safety Alert Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Herb-Drug Conflict Alert */}
-        <div className="bg-red-500/10 border border-red-500/40 rounded-2xl p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5" />
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
           <div className="text-xs">
-            <p className="font-bold text-red-300">Herb-Drug Contraindication Alert</p>
-            <p className="text-gray-300 mt-0.5 leading-relaxed">
-              Patient takes Metformin for T2DM and reports consuming Karela juice daily. Severe additive hypoglycemic risk detected.
+            <p className="font-bold text-red-900">Herb-Drug Contraindication Alert</p>
+            <p className="text-red-700 mt-0.5 leading-relaxed">
+              Patient takes Metformin for T2DM and reports consuming Karela juice daily. Additive hypoglycemic risk detected.
             </p>
           </div>
         </div>
 
         {/* Visit-to-Visit Memory */}
-        <div className="bg-[#C891AA]/10 border border-[#C891AA]/40 rounded-2xl p-4 flex items-start gap-3">
-          <History className="w-5 h-5 text-[#C891AA] mt-0.5" />
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-start gap-3">
+          <History className="w-5 h-5 text-purple-700 mt-0.5 shrink-0" />
           <div className="text-xs">
-            <p className="font-bold text-[#C891AA]">Returning Patient History (Visit Memory)</p>
-            <p className="text-gray-300 mt-0.5 leading-relaxed">
-              Last visit (14 days ago): Treated for Upper Respiratory Tract Infection. Persistent cough flagged for sputum cytology.
+            <p className="font-bold text-purple-900">Returning Patient History (Visit Memory)</p>
+            <p className="text-purple-800 mt-0.5 leading-relaxed">
+              Last visit (14 days ago): Treated for Upper Respiratory Tract Infection. Persistent cough flagged for sputum test.
             </p>
           </div>
         </div>
       </div>
 
-      {/* TB Red-Flag Linkage to National Nikshay Portal */}
-      <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 text-red-300">
-          <AlertTriangle className="w-4 h-4 text-red-400" />
-          <span><strong>National Health Program Alert:</strong> Symptom triad indicates potential Pulmonary TB (Cough &gt; 2 weeks + Fever).</span>
+      {/* TB Red-Flag Linkage to Nikshay Portal */}
+      <div className="bg-red-50/70 border border-red-200 rounded-xl p-3.5 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2 text-red-900 font-medium">
+          <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+          <span><strong>National Program Alert:</strong> Symptom triad indicates potential Pulmonary TB (Cough &gt; 2 weeks + Fever).</span>
         </div>
         <button
+          type="button"
           onClick={() => alert("📋 Nikshay Case Notification Pre-Filled:\nPatient: Ramesh Kumar\nRecommended Investigation: Sputum CBNAAT / GeneXpert\nNational TB Elimination Program (NTEP) ID: NIK-2026-8941")}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors"
+          className="bg-red-700 hover:bg-red-800 text-white font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
         >
           Pre-fill Nikshay TB Notification
         </button>
       </div>
 
       {/* Live Hospital Pharmacy Stock-Check */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs space-y-2">
-        <div className="flex items-center justify-between border-b border-white/10 pb-2">
-          <span className="font-semibold text-white">🏥 Live Hospital Pharmacy Inventory (Jan Aushadhi Counter)</span>
-          <span className="text-[#C2CD93] font-mono text-[11px]">Sync: 2 mins ago</span>
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2">
+        <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+          <span className="font-bold text-[#0f2942] flex items-center gap-1.5">
+            <Building className="w-4 h-4 text-[#0f4c81]" /> Live Hospital Pharmacy Inventory (Jan Aushadhi Counter)
+          </span>
+          <span className="text-emerald-700 font-mono font-bold text-[11px]">Sync: 2 mins ago</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div className="p-2.5 bg-black/40 rounded-xl flex justify-between items-center">
-            <span>Amoxicillin 500mg</span>
-            <span className="text-[#C2CD93] font-bold">In Stock (450 tabs)</span>
+          <div className="p-2.5 bg-white rounded-lg border border-gray-200 flex justify-between items-center">
+            <span className="font-semibold text-gray-700">Amoxicillin 500mg</span>
+            <span className="text-emerald-700 font-bold">In Stock (450 tabs)</span>
           </div>
-          <div className="p-2.5 bg-black/40 rounded-xl flex justify-between items-center">
-            <span>Pantoprazole 40mg</span>
-            <span className="text-[#C2CD93] font-bold">In Stock (210 tabs)</span>
+          <div className="p-2.5 bg-white rounded-lg border border-gray-200 flex justify-between items-center">
+            <span className="font-semibold text-gray-700">Pantoprazole 40mg</span>
+            <span className="text-emerald-700 font-bold">In Stock (210 tabs)</span>
           </div>
-          <div className="p-2.5 bg-black/40 rounded-xl flex justify-between items-center">
-            <span>Azithromycin 500mg</span>
-            <span className="text-red-400 font-bold">Out of Stock ⚠️</span>
+          <div className="p-2.5 bg-white rounded-lg border border-gray-200 flex justify-between items-center">
+            <span className="font-semibold text-gray-700">Azithromycin 500mg</span>
+            <span className="text-red-600 font-bold">Out of Stock ⚠️</span>
           </div>
         </div>
       </div>
 
       {/* Line-by-Line AI Draft Accept / Reject Audit Table */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <span className="text-xs font-semibold text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#C2CD93]" />
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs space-y-3">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+          <span className="text-xs font-bold text-[#0f2942] flex items-center gap-1.5">
+            <FileText className="w-4 h-4 text-[#0f4c81]" />
             AI-Drafted Clinical Summary (Line-by-Line Legal Demarcation)
           </span>
-          <span className="text-[11px] text-gray-400">Doctor edits logged for audit trail</span>
+          <span className="text-[11px] text-gray-500">Doctor edits logged for legal audit trail</span>
         </div>
 
         <div className="space-y-2">
           {lines.map((line) => (
             <div
               key={line.id}
-              className={`p-3 rounded-xl border flex items-center justify-between gap-4 transition-all text-xs ${
+              className={`p-3 rounded-lg border flex items-center justify-between gap-4 transition-all text-xs ${
                 line.status === "accepted"
-                  ? "bg-black/40 border-white/10 text-gray-200"
-                  : "bg-red-500/10 border-red-500/30 text-gray-400 line-through"
+                  ? "bg-slate-50 border-gray-200 text-[#0f2942] font-medium"
+                  : "bg-red-50 border-red-200 text-gray-400 line-through"
               }`}
             >
               <span className="flex-1">{line.text}</span>
               <div className="flex items-center gap-1.5">
                 <button
+                  type="button"
                   onClick={() => toggleLineStatus(line.id, "accepted")}
-                  className={`p-1.5 rounded-lg border transition-colors ${
-                    line.status === "accepted" ? "bg-[#C2CD93]/20 border-[#C2CD93] text-[#C2CD93]" : "border-white/10 text-gray-500"
+                  className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
+                    line.status === "accepted" ? "bg-emerald-700 text-white border-emerald-700" : "border-gray-300 text-gray-500"
                   }`}
                   title="Accept line"
                 >
                   <Check className="w-3.5 h-3.5" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => toggleLineStatus(line.id, "rejected")}
-                  className={`p-1.5 rounded-lg border transition-colors ${
-                    line.status === "rejected" ? "bg-red-500/20 border-red-500 text-red-400" : "border-white/10 text-gray-500"
+                  className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
+                    line.status === "rejected" ? "bg-red-600 text-white border-red-600" : "border-gray-300 text-gray-500"
                   }`}
                   title="Reject line"
                 >
@@ -221,30 +229,31 @@ export default function Step12_PhysicianDashboard({
       </div>
 
       {/* Reverse Doctor Voice Dictation */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-white flex items-center gap-2">
-            <Mic className="w-4 h-4 text-[#C891AA]" />
-            Reverse Doctor Dictation (Hands-Free Consultation Notes)
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-[#0f2942] flex items-center gap-1.5">
+            <Mic className="w-4 h-4 text-[#0f4c81]" />
+            Hands-Free Reverse Doctor Voice Dictation
           </span>
-          {isDictating && <span className="text-xs text-red-400 animate-pulse">Recording doctor's voice...</span>}
+          {isDictating && <span className="text-xs text-red-600 font-bold animate-pulse">Recording doctor's voice...</span>}
         </div>
 
         <textarea
           value={dictationText}
           onChange={(e) => setDictationText(e.target.value)}
-          placeholder="Dictate clinical observations, physical exam findings, or final prescription..."
-          className="w-full h-20 bg-black/50 border border-white/10 rounded-xl p-3 text-xs text-white focus:border-[#C891AA] outline-none resize-none mb-3"
+          placeholder="Dictate physical exam findings, differential diagnosis, or final prescription to append to FHIR Encounter..."
+          className="w-full h-20 bg-slate-50 border border-gray-300 rounded-lg p-3 text-xs text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none resize-none"
         />
 
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] text-gray-500">Auto-transcribes and appends to patient's FHIR Encounter bundle.</p>
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[11px] text-gray-500">Auto-appends to patient's ABDM FHIR encounter bundle.</p>
           <button
+            type="button"
             onClick={handleVoiceDictation}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               isDictating
-                ? "bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
-                : "bg-[#C891AA]/20 border-[#C891AA]/50 text-[#C891AA] hover:bg-[#C891AA]/30"
+                ? "bg-red-600 text-white animate-pulse"
+                : "bg-[#0f4c81] hover:bg-blue-900 text-white"
             }`}
           >
             {isDictating ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -252,6 +261,32 @@ export default function Step12_PhysicianDashboard({
           </button>
         </div>
       </div>
-    </motion.div>
+
+      {/* Post-Consultation Discharge UI */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs space-y-4">
+        <h4 className="text-sm font-bold text-[#0f2942] border-b border-gray-100 pb-2">Discharge & Investigations Summary</h4>
+        
+        {/* Mocked Tests for the demo */}
+        <TestExplainer 
+            testName="Sputum CBNAAT / GeneXpert" 
+            description="A highly sensitive test to detect Tuberculosis bacteria and check if it is resistant to Rifampicin."
+            whyNeeded="Because your persistent cough and fever flag a risk for TB. We need to rule this out safely."
+            preparation="Collect the sample early morning before eating or brushing."
+        />
+        <TestExplainer 
+            testName="Random Blood Sugar (RBS)" 
+            description="A quick blood test to check your current glucose levels."
+            whyNeeded="You are a known diabetic, and we need to see how well your Metformin is working today."
+        />
+
+        {/* Final Discharge Card */}
+        <NextActionCard 
+            type="post-consultation"
+            followUpTiming="7 days"
+            symptomWatch="Chest tightness worsens, or fever crosses 101°F."
+        />
+      </div>
+
+    </div>
   );
 }

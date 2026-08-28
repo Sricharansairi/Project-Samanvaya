@@ -77,3 +77,25 @@ Instead of an undifferentiated feature blob, Project Samanvaya cleanly separates
 - **Nearest Budget Hospital Finder:** Cut entirely.
 - **"0% Hallucination" Claim:** Replaced with "Reduced hallucination via retrieval grounding and human confirmation".
 - **Complex RAG Stack:** Down-scoped to flat vector search with confidence threshold.
+
+---
+
+## 🚀 6. Advanced Case Management & NLP Enhancements
+
+1. **Semantic-Similarity Routing Layer:** Uses embeddings (Sarvam or NIM) instead of strict keyword matching to map patient utterances to known intents, chips, or symptom categories reliably.
+2. **Controlled-Vocabulary Mapping:** Extends the Babel Fish idiom translation into a broader dialect-to-standard-term dictionary (SNOMED-CT style) required by FHIR/ABDM.
+3. **Confidence-Gated Confirmation Loop:** Re-uses the existing Green/Red/Back readback loop, triggering it automatically whenever semantic match confidence is low.
+4. **Full Context Cross-Referencing:** Passes entire conversation context to the LLM to connect earlier answers (e.g., diabetes history) with current complaints (e.g., numbness), generating a "connections for doctor's attention" flag.
+5. **The "Next Action" Card:** A persistent, unified UI card that surfaces pre-visit routing (Token, Department) and post-visit discharge instructions (Follow-up timing) without needing a heavy organizational case-manager system.
+6. **Portable Case Summary:** A clean, printable/QR one-pager (problem -> history -> medications -> findings -> actions) that the patient can carry to *any* hospital, bypassing immediate ABDM integration limits.
+7. **"Why are we doing this test" Explainer:** A short, doctor-approved template explaining the purpose of each prescribed test (CT scan, blood work).
+8. **Self-Scoped "Stalled Case" Flag:** An internal system flag that highlights submitted histories sitting un-consulted for hours, or scheme checklists never followed up on.
+
+---
+
+## 📢 7. Pitch Narrative & Value Proposition Strategy
+*These are critical narrative frames extracted for the pitch, explicitly scoped to avoid over-engineering.*
+
+1. **The "Case Manager" Frame:** Present the project as a system that ensures patients don't fall through the cracks, rather than promising to build a human-staffed coordination desk.
+2. **Indoor Navigation Scope:** Keep navigation simple (token + text directions) and avoid claiming live facility map/wayfinding without actual hospital data.
+3. **The Core Value Proposition Shift:** Pivot the pitch from "we digitize the intake form" to **"we make sure the patient's case doesn't fall through the cracks between the moment they walk in and the moment they're actually seen."**

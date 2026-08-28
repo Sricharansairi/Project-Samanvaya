@@ -93,8 +93,36 @@ def run_tests():
     assert len(schemes) > 0
     print(f"  ✓ Deterministic State Scheme Engine (Matched {len(schemes)} schemes): PASSED")
 
+    # 4. Test Phase 6 NLP & Case Management Features
+    print("\n[TEST GROUP 4] Phase 6 NLP & Case Management:")
+    from app.services.router import classify_query_semantic
+    semantic_result = classify_query_semantic("I have a fever and my body aches")
+    assert semantic_result["intent"] == "MEDICAL_RAG"
+    print("  ✓ Semantic-Similarity Routing Layer: PASSED")
+    
+    from app.services.extraordinary_features import translate_to_controlled_vocabulary
+    vocab = translate_to_controlled_vocabulary("chakkar aa raha hai")
+    assert vocab["snomed_ct_code"] == "404640003"
+    print("  ✓ Controlled-Vocabulary Mapping (Babel Fish -> SNOMED-CT): PASSED")
+    
+    from app.services.stalled_case_monitor import flag_stalled_cases
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    mock_cases = [
+        {"id": "1", "status": "waiting", "submitted_at": (now - timedelta(hours=3)).isoformat()},
+        {"id": "2", "status": "waiting", "submitted_at": (now - timedelta(minutes=30)).isoformat()}
+    ]
+    stalled = flag_stalled_cases(mock_cases, threshold_hours=2)
+    assert len(stalled) == 1 and stalled[0]["id"] == "1"
+    print("  ✓ Self-Scoped Stalled Case Flag: PASSED")
+    
+    from app.services.dialog_manager import TriageSession
+    session = TriageSession("test_client")
+    assert "connections_flag" in session.system_prompt
+    print("  ✓ Full Context Cross-Referencing (Prompt Injection): PASSED")
+
     print("\n==================================================")
-    print("  ALL 15 BACKEND CORE TEST SUITES PASSED (100%)    ")
+    print("  ALL 19 BACKEND CORE TEST SUITES PASSED (100%)    ")
     print("==================================================")
 
 if __name__ == "__main__":

@@ -1204,3 +1204,54 @@ This split is also a good pitch-deck slide on its own — it shows you've though
 5. **Portable identity for migrant workers.** A large population of Indian patients work in a state that isn't their home state and may not have a local address or ABHA linkage. A path that doesn't assume local residency (or a fixed home state for the scheme checker) closes a real gap your current state-based scheme logic doesn't yet account for.
 6. **Postnatal follow-up chain.** You already built SMS/IVR reminder infrastructure — point a dedicated sequence of it at postnatal follow-ups specifically, since missed postnatal checks are a significant, well-documented contributor to maternal complications in India. Reusing infrastructure you've already built for a targeted high-stakes use case is cheap to add and easy to defend in a pitch.
 7. **Point-and-photograph for visible symptoms — the safe version of what Darshana was reaching for.** Instead of guessing doshas or pallor from a face photo, let patients document an actual visible symptom (a wound, rash, swelling) as part of history-taking, tagged with date, purely as a **visual record for the doctor to look at themselves** — no AI interpretation layer making a clinical claim about it. Same camera capability you already built for documents, redirected toward something with a real, low-risk use case instead of an unvalidated diagnostic guess.
+
+## NLP / "Understand It Even When Phrased Differently" — How This Actually Gets Built
+
+Good news first: using an LLM (which you already are, for the dialogue manager) already gets you most of this for free — LLMs generalize over paraphrase and indirect phrasing by nature, because they're not doing keyword matching. The real engineering risk isn't "it can't understand similar phrasing" — it's the opposite: an LLM will confidently generalize even when it *shouldn't*, silently mapping something ambiguous to the wrong thing. So the actual work is calibrating confidence and verifying uncertain matches, not teaching it to understand paraphrase.
+
+Concretely, four pieces make this real rather than aspirational:
+
+1. **A semantic-similarity layer for routing, not string matching.** When a patient's utterance needs to map to a known intent/chip/symptom category, compare it via embeddings (Sarvam or NIM both expose embedding models) against your canonical set — this is what actually catches "similar but not identical" phrasing reliably, rather than hoping the LLM's raw output happens to line up.
+
+2. **Extend the Babel Fish layer into a real controlled-vocabulary mapping**, not just idiom translation. Right now it converts phrases like "chhati pe patthar" into medical English — extend that same mechanism into a broader dialect/synonym-to-standard-term dictionary. This isn't just UX polish: FHIR/ABDM ultimately wants coded terms (SNOMED-CT style), not free text, so this normalization step is functionally required regardless — you're not adding new scope, you're making an existing requirement actually work.
+
+3. **Confidence-gated confirmation, reusing what you already built.** When the semantic match confidence is low — genuinely ambiguous phrasing, a dialect the model handles poorly — trigger the same Green/Red/Back readback loop you already have, just on a new trigger condition (low confidence) instead of only "AI acted autonomously." No new UI component needed, just a second reason to fire the one you have.
+
+4. **Full conversation context, always, with an explicit cross-reference instruction.** The "human-like thinking" quality — connecting a diabetes mention in question 3 to a numbness complaint in question 9 — comes from passing the *entire* conversation to each interpretation step (not treating each answer in isolation) and explicitly prompting the model to check new answers against everything said earlier. Then your existing summary generator (Module C) gets one more instruction: surface a short "connections for the doctor's attention" section — e.g., "patient reports foot numbness; earlier reported diabetic history — consider peripheral neuropathy screening" — clearly separated from the raw transcript, framed as a flag, never a diagnosis. This is a prompting change to something you've already built, not a new subsystem.
+
+---
+
+## The Hospital-Issues Table — What's Covered, What's Genuinely New
+
+Most of this table maps directly onto features already in your 52-item list (queue prioritization → red-flag triage, department routing → auto-select mode, repeated history → visit memory, scattered reports → OCR digitization, language barriers → multi-language ASR/TTS, medicine confusion → discharge translator + audio playback, costs → cost estimator + scheme engine, follow-ups → SMS/IVR reminders, emergencies → red-flag interstitial). Two rows are genuinely **not** covered yet, and they're worth naming precisely:
+
+- **"Lack of coordination between departments"** and **"patients not knowing what to do next"** — these are new, and they're the strongest ideas in the case-manager document.
+
+## The "Next Action" Idea — Building Out What You Loved
+
+This is buildable cheaply because it's a *presentation* of data you already generate, not a new system:
+
+- **Pre-consultation:** your existing triage/routing logic already decides which department and doctor-type fits the symptoms and assigns a token. Surface that decision as a plain card instead of just a token number: *"Next: See Dr. [specialty], General OPD. Token A-142. Nothing else needed right now."*
+- **Post-consultation:** your discharge translator and reminder infrastructure already generate follow-up timing and symptom-watch instructions. Thread those into the same card format: *"Next: Return in 7 days, or sooner if fever crosses 101°F."*
+
+One persistent card, same visual language, fed by two pipelines you've already built — pre-visit routing and post-visit discharge — rather than a new "case timeline" system. This is the cheapest, highest-payoff piece of the whole case-manager document.
+
+**On "which doctor should we consider"** — that's literally your existing symptom-to-department triage logic, just resurfaced in friendlier language on this card instead of buried in a routing decision the patient never sees explained.
+
+---
+
+## An Honest Scope Check on the Case-Manager Document
+
+A few of these ideas are excellent *narrative* framing but a much bigger *engineering* ask than "patient case-taking software," and it's worth being clear about which is which before you commit build time:
+
+**Cheap, buildable now — do these:**
+- The Next Action card (above)
+- **Portable Case Summary as a standalone artifact** — a clean, printable/QR one-pager (problem → history → medications → findings → pending actions) the patient can physically carry to *any* hospital, including ones with no ABDM integration at all. This is more useful than pure ABHA linkage in the near term, since most facilities aren't ABDM-integrated yet, and it costs you nothing new — it's a formatted export of data you already collect.
+- **"Why are we doing this test" explainer** — a short, doctor-approved template per test type (CT scan, blood work, etc.), triggered whenever a test appears in the doctor's summary. Low effort, real comfort value, no new data source needed.
+- **A self-scoped "stalled case" flag** — within your own system's visibility only: a submitted history sitting un-consulted for X hours, or a generated scheme checklist never followed up on. Flag it internally. Don't promise cross-department detection ("referral generated, specialist not seen") unless you actually have live data from those other departments — that requires integration you won't have for a hackathon demo, and claiming it without the data behind it is the same overclaiming risk flagged earlier in this project.
+
+**Good pitch narrative, not a software build item:**
+- The "Case Manager" / Patient Advocate Desk concept is a genuinely compelling way to *frame* your whole project ("hospitals treat the patient, our system makes sure nothing falls through the cracks") — but a human-staffed coordination desk is an operations/staffing model, not a feature your code delivers. Use the line in your pitch; don't put "build case manager assignment system" on your task board.
+- Full hospital indoor navigation ("Counter 4 → 2nd floor → Room 215") needs a live facility map/wayfinding data source you don't have — keep this as the simple token+text-direction version you already scoped earlier, not a live indoor-routing system.
+
+**The single strongest line to take from this whole document into your pitch:** reposition your project's value proposition from "we digitize the intake form" to "we make sure the patient's case doesn't fall through the cracks between the moment they walk in and the moment they're actually seen" — that's a genuinely more compelling frame than a feature list, and everything you've already built (routing, reminders, summaries, tokens) already supports it without needing the heavier organizational pieces.

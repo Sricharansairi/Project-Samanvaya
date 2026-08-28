@@ -14,12 +14,16 @@ Keep your questions extremely short, empathetic, and simple (suitable for low-li
 Do NOT ask more than 1 question at a time.
 If the patient's symptoms are fully clear and sufficient for a doctor, set "status" to "complete".
 
+(Feature 65: Full Context Cross-Referencing)
+CRITICAL INSTRUCTION: You MUST evaluate the ENTIRE conversation history. Connect any new complaint to earlier statements (e.g., if they mention foot numbness now and mentioned diabetes earlier). Generate a brief 'connections_flag' to alert the doctor of these links, clearly separated from raw transcript. Do NOT diagnose.
+
 You MUST ALWAYS respond with a raw JSON object with no other text or markdown, in the following format:
 {
     "status": "interviewing" | "complete",
     "next_question_audio_text": "What to say to the patient next",
     "suggested_chips": ["Option 1", "Option 2", "Option 3"],
-    "current_extracted_symptoms": ["list", "of", "all", "symptoms", "so", "far"]
+    "current_extracted_symptoms": ["list", "of", "all", "symptoms", "so", "far"],
+    "connections_flag": "Short note connecting new symptoms to past history, or null if none."
 }
 """
         self.history.append({"role": "system", "content": self.system_prompt})

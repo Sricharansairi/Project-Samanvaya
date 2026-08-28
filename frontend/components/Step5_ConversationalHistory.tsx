@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Sparkles, Volume2, ArrowRight, HeartPulse, Clock, HelpCircle } from "lucide-react";
-import VoiceChip from "./VoiceChip";
+import { useState } from "react";
+import { Mic, MicOff, Sparkles, ArrowRight, Clock, User, Users, CheckCircle2 } from "lucide-react";
 
 interface Step5Props {
   onHistorySubmit: (historyData: {
@@ -30,19 +28,17 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
   const [isGeneratingChips, setIsGeneratingChips] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<"patient" | "caregiver">("patient");
 
-  // Timeline Scale Options
   const timelineOptions = ["Today", "Few Days", "Weeks", "Months"];
 
   const handleMicToggle = () => {
     if (!isRecording) {
       setIsRecording(true);
-      // Simulate real-time browser speech capture with noise suppression
       setTimeout(() => {
         const spoken = "Mujhe do din se bukhar aur tez khansi hai";
         setComplaintText(spoken);
         setIsRecording(false);
         generateFollowupChips(spoken);
-      }, 2500);
+      }, 2000);
     } else {
       setIsRecording(false);
     }
@@ -50,13 +46,11 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
 
   const generateFollowupChips = async (complaint: string) => {
     setIsGeneratingChips(true);
-    // Check for red flags
     if (complaint.toLowerCase().includes("chest pain") || complaint.toLowerCase().includes("chhati")) {
       onTriggerRedFlag();
       return;
     }
     
-    // Simulate dynamic follow-up generation (4-6 generated chips)
     setTimeout(() => {
       setDynamicChips([
         "Severe body ache & chills",
@@ -65,7 +59,7 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
         "No chest pain"
       ]);
       setIsGeneratingChips(false);
-    }, 1200);
+    }, 1000);
   };
 
   const toggleChip = (chip: string) => {
@@ -87,52 +81,47 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="flex flex-col items-center w-full max-w-3xl"
-    >
-      <div className="text-center mb-4">
-        <h2 className="text-3xl font-light mb-2">What brings you in today?</h2>
-        <p className="text-gray-400 text-xs sm:text-sm max-w-md">
-          Speak in your native dialect or tap the symptoms below. AI will structure your clinical history.
-        </p>
-      </div>
-
-      {/* Joint-Family Speaker Switch */}
-      <div className="w-full flex items-center justify-between bg-black/40 border border-white/10 rounded-xl px-4 py-2 mb-4 text-xs">
-        <span className="text-gray-400">Currently Answering This Section:</span>
-        <div className="flex gap-1.5">
+    <div className="w-full space-y-5">
+      
+      {/* Joint-Family Speaker Switch Bar */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between text-xs">
+        <span className="font-semibold text-[#0f2942]">Who is currently answering?</span>
+        <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => setCurrentSpeaker("patient")}
-            className={`px-3 py-1 rounded-lg transition-all font-medium ${
-              currentSpeaker === "patient" ? "bg-[#C2CD93] text-black" : "text-gray-400 hover:text-white"
+            className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              currentSpeaker === "patient" 
+                ? "bg-[#0f4c81] text-white shadow-xs" 
+                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
           >
-            Patient (Self)
+            <User className="w-3.5 h-3.5" /> Patient (Self)
           </button>
           <button
+            type="button"
             onClick={() => setCurrentSpeaker("caregiver")}
-            className={`px-3 py-1 rounded-lg transition-all font-medium ${
-              currentSpeaker === "caregiver" ? "bg-[#C891AA] text-black" : "text-gray-400 hover:text-white"
+            className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              currentSpeaker === "caregiver" 
+                ? "bg-[#0f4c81] text-white shadow-xs" 
+                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
           >
-            Accompanying Family Member / Escort
+            <Users className="w-3.5 h-3.5" /> Family Escort
           </button>
         </div>
       </div>
 
-      {/* Voice Input Card */}
-      <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md mb-6 relative">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-medium text-[#C2CD93] flex items-center gap-2">
-            <Sparkles className="w-4 h-4" />
-            Live Conversational Dictation (Noise-Suppressed Web Audio)
-          </span>
+      {/* Voice Input & Text Box */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-[#0f2942] flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#0f4c81]" />
+            Describe your main health issue / मुख्य लक्षण बताएं *
+          </label>
           {isRecording && (
-            <span className="text-xs text-red-400 animate-pulse flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-500" /> Recording...
+            <span className="text-xs text-red-600 font-bold animate-pulse flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-red-500" /> Listening to voice...
             </span>
           )}
         </div>
@@ -140,49 +129,51 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
         <textarea
           value={complaintText}
           onChange={(e) => setComplaintText(e.target.value)}
-          placeholder="Describe how you are feeling (e.g. 'Mera gale me dard hai aur bukhar hai')..."
-          className="w-full h-24 bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-[#C2CD93] outline-none resize-none mb-4"
+          placeholder="Speak or type how you are feeling (e.g. 'Mujhe do din se bukhar aur tez khansi hai')..."
+          className="w-full h-24 bg-slate-50 border border-gray-300 rounded-lg p-3.5 text-xs sm:text-sm text-[#0f2942] font-medium focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none resize-none"
         />
 
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">
-            Tap mic to speak in Hindi, Telugu, Tamil, or Bengali
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[11px] text-gray-500">
+            Voice noise suppression active • Speak in Hindi, Telugu, Tamil, etc.
           </p>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
+            type="button"
             onClick={handleMicToggle}
-            className={`px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 border transition-all ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               isRecording
-                ? "bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
-                : "bg-[#C2CD93] text-black border-[#C2CD93] hover:bg-[#b0bd82]"
+                ? "bg-red-600 text-white animate-pulse shadow-sm"
+                : "bg-[#0f4c81] hover:bg-blue-900 text-white shadow-sm"
             }`}
           >
             {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            {isRecording ? "Listening..." : "Tap to Speak"}
-          </motion.button>
+            {isRecording ? "Stop Listening" : "Tap Mic to Speak"}
+          </button>
         </div>
       </div>
 
-      {/* Visual Symptom-Timeline Builder */}
-      <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md mb-6">
-        <div className="flex items-center justify-between mb-3">
+      {/* Visual Timeline Scale */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#C891AA]" />
-            <span className="text-xs font-medium text-white">Since when have you had these symptoms? (Visual Scale)</span>
+            <Clock className="w-4 h-4 text-[#0f4c81]" />
+            <span className="text-xs font-bold text-[#0f2942]">Since when have you had these symptoms?</span>
           </div>
-          <span className="text-xs text-[#C891AA] font-bold">{timeline}</span>
+          <span className="text-xs font-bold text-[#0f4c81] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+            {timeline}
+          </span>
         </div>
 
         <div className="grid grid-cols-4 gap-2">
           {timelineOptions.map((opt) => (
             <button
               key={opt}
+              type="button"
               onClick={() => setTimeline(opt)}
-              className={`py-3 rounded-xl border text-xs font-medium transition-all ${
+              className={`py-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                 timeline === opt
-                  ? "bg-[#C891AA]/20 border-[#C891AA] text-white shadow-[0_0_15px_rgba(200,145,170,0.3)]"
-                  : "bg-black/30 border-white/10 text-gray-400 hover:bg-white/5"
+                  ? "bg-[#0f4c81] text-white border-[#0f4c81] shadow-xs"
+                  : "bg-slate-50 border-gray-200 text-gray-700 hover:bg-slate-100"
               }`}
             >
               {opt}
@@ -191,48 +182,51 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
         </div>
       </div>
 
-      {/* Dynamic Per-Complaint Follow-up Chips */}
-      <div className="w-full mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-medium text-gray-300">
-            Suggested Follow-up Parameters {isGeneratingChips && "(Generating...)"}
+      {/* Suggested Follow-up Parameter Chips */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold text-[#0f2942]">
+            Suggested Clinical Parameters {isGeneratingChips && "(Generating...)"}
           </span>
-          <span className="text-[11px] text-gray-500">Tap to select all that apply</span>
+          <span className="text-gray-500 text-[11px]">Select all that apply</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {dynamicChips.map((chip) => {
             const isSelected = selectedChips.includes(chip);
             return (
               <button
                 key={chip}
+                type="button"
                 onClick={() => toggleChip(chip)}
-                className={`p-3.5 rounded-xl border text-xs text-left flex items-center justify-between transition-all ${
+                className={`p-3 rounded-lg border text-xs font-semibold text-left flex items-center justify-between transition-all cursor-pointer ${
                   isSelected
-                    ? "bg-[#C2CD93]/20 border-[#C2CD93] text-white shadow-[0_0_15px_rgba(194,205,147,0.2)]"
-                    : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
+                    ? "bg-blue-50 border-[#0f4c81] text-[#0f4c81] ring-1 ring-[#0f4c81]"
+                    : "bg-white border-gray-200 text-gray-700 hover:bg-slate-50"
                 }`}
               >
                 <span>{chip}</span>
-                <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
-                  isSelected ? "bg-[#C2CD93] border-[#C2CD93] text-black font-bold" : "border-gray-600"
-                }`}>
-                  {isSelected ? "✓" : "+"}
-                </span>
+                {isSelected ? (
+                  <CheckCircle2 className="w-4 h-4 text-[#0f4c81]" />
+                ) : (
+                  <span className="w-4 h-4 rounded border border-gray-300 flex items-center justify-center text-gray-400 text-[10px]">+</span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={handleProceed}
-        className="w-full bg-[#C2CD93] hover:bg-[#b0bd82] text-black font-semibold py-4 rounded-xl flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(194,205,147,0.3)] transition-all"
-      >
-        Proceed to AYUSH Examination <ArrowRight className="w-5 h-5" />
-      </motion.button>
-    </motion.div>
+      {/* Action Button */}
+      <div className="pt-2 flex justify-end">
+        <button
+          onClick={handleProceed}
+          className="bg-[#1d2d44] hover:bg-[#0f2942] text-white font-semibold py-3 px-8 rounded-lg flex items-center gap-2 text-sm shadow-sm transition-colors cursor-pointer"
+        >
+          Proceed to AYUSH Pariksha <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+    </div>
   );
 }

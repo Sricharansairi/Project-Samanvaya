@@ -40,8 +40,13 @@
 
 ## 1. Executive Summary & Problem Statement
 
-### The Indian OPD Bottleneck
+### The Indian OPD Bottleneck & Our Core Value Proposition
 In major Indian government hospitals (AIIMS, PGI, District Headquarters Hospitals), daily outpatient footfall routinely exceeds **4,000 to 10,000 patients**. Outpatient doctors are forced to evaluate **80 to 120 patients in a single 4-hour morning shift**, allowing an average of **less than 2.5 minutes per patient**.
+
+**Our Core Value Proposition:** *"We act as the ultimate clinical case manager. We make sure the patient's case doesn't fall through the cracks between the moment they walk in and the moment they're actually seen."*
+
+> [!NOTE]
+> **Scope Boundaries:** Project Samanvaya strictly focuses on pre-consultation intelligence and post-consultation discharge routing. We **do not** promise or build live facility mapping, indoor navigation wayfinding, or human-staffed coordination desks.
 
 ```
 [ Traditional OPD Reality ]

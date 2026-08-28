@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Flame, Moon, Utensils, HelpCircle, Volume2, ArrowRight, Check } from "lucide-react";
+import { Flame, Moon, Utensils, HelpCircle, Volume2, ArrowRight, CheckCircle2 } from "lucide-react";
 
 interface Step6Props {
   onAyushSubmit: (ayushData: {
@@ -18,11 +17,10 @@ interface Step6Props {
 export default function Step6_AyushModule({ onAyushSubmit, onNext, selectedLanguage = "hi" }: Step6Props) {
   const [agni, setAgni] = useState("Sama (Normal & Balanced)");
   const [nidra, setNidra] = useState("Disturbed / Insomnia");
-  const [dietHabits, setDietHabits] = useState("Warm cooked grains (Roti/Rice)");
+  const [dietHabits, setDietHabits] = useState("Wheat Roti & Dal");
   const [fastingObserved, setFastingObserved] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
-  // Region-adapted diet options based on selected language (North vs South)
   const isSouthRegion = ["te", "ta", "kn"].includes(selectedLanguage);
   const dietOptions = isSouthRegion
     ? [
@@ -58,42 +56,30 @@ export default function Step6_AyushModule({ onAyushSubmit, onNext, selectedLangu
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="flex flex-col items-center w-full max-w-3xl"
-    >
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-light mb-2">AYUSH Dashavidha Pariksha</h2>
-        <p className="text-gray-400 text-xs sm:text-sm max-w-md">
-          Non-invasive visual assessment of your metabolic fire (Agni), sleep (Nidra), and lifestyle (Ahara-Vihara).
-        </p>
-      </div>
-
-      {/* "Why am I being asked this" Active Banner */}
+    <div className="w-full space-y-5">
+      
+      {/* Audio Explanation Tooltip */}
       {activeTooltip && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full bg-[#C891AA]/15 border border-[#C891AA]/40 rounded-xl p-3 mb-6 flex items-start gap-3 text-xs text-gray-200"
-        >
-          <Volume2 className="w-4 h-4 text-[#C891AA] mt-0.5 animate-pulse" />
-          <p className="flex-1">{activeTooltip}</p>
-          <button onClick={() => setActiveTooltip(null)} className="text-gray-400 hover:text-white">✕</button>
-        </motion.div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs text-[#0f4c81]">
+          <div className="flex items-start gap-2">
+            <Volume2 className="w-4 h-4 mt-0.5 text-[#0f4c81]" />
+            <p className="font-semibold">{activeTooltip}</p>
+          </div>
+          <button onClick={() => setActiveTooltip(null)} className="text-gray-400 hover:text-gray-700">✕</button>
+        </div>
       )}
 
-      {/* 1. Agni (Digestive Fire) */}
-      <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md mb-5">
+      {/* 1. Agni (Metabolic Fire) */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Flame className="w-4 h-4 text-[#C2CD93]" />
-            <span className="text-sm font-medium text-white">How is your digestion & appetite? (Agni)</span>
+            <Flame className="w-4 h-4 text-orange-600" />
+            <span className="text-xs font-bold text-[#0f2942]">How is your appetite and digestion? (Agni / अग्नि)</span>
           </div>
           <button
+            type="button"
             onClick={() => handleWhyTooltip("Agni", "Ayurveda evaluates digestive fire because improper digestion creates Ama (metabolic toxins), which triggers fever and inflammation.")}
-            className="text-[11px] text-[#C2CD93] flex items-center gap-1 hover:underline"
+            className="text-[11px] text-[#0f4c81] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
           >
             <HelpCircle className="w-3.5 h-3.5" /> Why ask this?
           </button>
@@ -101,36 +87,44 @@ export default function Step6_AyushModule({ onAyushSubmit, onNext, selectedLangu
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {[
-            { id: "Sama (Normal & Balanced)", label: "Balanced", desc: "Hungry at regular intervals" },
-            { id: "Tikshna (Hyperactive/Acidity)", label: "Sharp / Acidic", desc: "Burning sensation, frequent hunger" },
-            { id: "Manda (Sluggish/Bloated)", label: "Sluggish / Heavy", desc: "Bloating, lack of appetite" }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setAgni(item.id)}
-              className={`p-3.5 rounded-xl border text-left text-xs transition-all ${
-                agni === item.id
-                  ? "bg-[#C2CD93]/20 border-[#C2CD93] text-white shadow-[0_0_15px_rgba(194,205,147,0.2)]"
-                  : "bg-black/30 border-white/10 text-gray-400 hover:bg-white/5"
-              }`}
-            >
-              <p className="font-medium text-white mb-0.5">{item.label}</p>
-              <p className="text-[10px] text-gray-400">{item.desc}</p>
-            </button>
-          ))}
+            { id: "Sama (Normal & Balanced)", label: "Balanced / Normal", desc: "Hungry at regular intervals" },
+            { id: "Tikshna (Hyperactive/Acidity)", label: "Sharp / Acidic", desc: "Burning sensation, intense hunger" },
+            { id: "Manda (Sluggish/Bloated)", label: "Sluggish / Heavy", desc: "Bloating, poor digestion" }
+          ].map((item) => {
+            const isSelected = agni === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setAgni(item.id)}
+                className={`p-3 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-blue-50 border-[#0f4c81] ring-1 ring-[#0f4c81]"
+                    : "bg-slate-50 border-gray-200 hover:bg-slate-100 text-gray-700"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <p className="font-bold text-[#0f2942]">{item.label}</p>
+                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-[#0f4c81]" />}
+                </div>
+                <p className="text-[11px] text-gray-500">{item.desc}</p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* 2. Nidra (Sleep Pattern) */}
-      <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md mb-5">
+      {/* 2. Nidra (Sleep Quality) */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Moon className="w-4 h-4 text-[#C891AA]" />
-            <span className="text-sm font-medium text-white">How is your sleep quality? (Nidra)</span>
+            <Moon className="w-4 h-4 text-purple-700" />
+            <span className="text-xs font-bold text-[#0f2942]">How is your sleep quality? (Nidra / निद्रा)</span>
           </div>
           <button
-            onClick={() => handleWhyTooltip("Nidra", "Sleep disturbances point to Vata imbalances and neurological fatigue affecting immunity.")}
-            className="text-[11px] text-[#C891AA] flex items-center gap-1 hover:underline"
+            type="button"
+            onClick={() => handleWhyTooltip("Nidra", "Sleep disturbances indicate Vata imbalances and neurological fatigue affecting overall immunity.")}
+            className="text-[11px] text-[#0f4c81] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
           >
             <HelpCircle className="w-3.5 h-3.5" /> Why ask this?
           </button>
@@ -141,70 +135,77 @@ export default function Step6_AyushModule({ onAyushSubmit, onNext, selectedLangu
             { id: "Sound Sleep (6-8 hrs)", label: "Sound & Deep" },
             { id: "Disturbed / Insomnia", label: "Disturbed / Broken" },
             { id: "Excessive Sleepiness", label: "Excessive / Lethargic" }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setNidra(item.id)}
-              className={`py-3 px-2 rounded-xl border text-center text-xs transition-all ${
-                nidra === item.id
-                  ? "bg-[#C891AA]/20 border-[#C891AA] text-white shadow-[0_0_15px_rgba(200,145,170,0.2)]"
-                  : "bg-black/30 border-white/10 text-gray-400 hover:bg-white/5"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+          ].map((item) => {
+            const isSelected = nidra === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setNidra(item.id)}
+                className={`py-2.5 px-2 rounded-lg border text-center text-xs font-semibold transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-purple-50 border-purple-700 text-purple-900 ring-1 ring-purple-700"
+                    : "bg-slate-50 border-gray-200 hover:bg-slate-100 text-gray-700"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* 3. Ahara-Vihara (Region-Adapted Diet & Fasting) */}
-      <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Utensils className="w-4 h-4 text-[#C2CD93]" />
-            <span className="text-sm font-medium text-white">Primary Daily Diet Pattern (Region-Adapted)</span>
-          </div>
+      {/* 3. Diet & Fasting (Ahara-Vihara) */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+        <div className="flex items-center gap-2 mb-3">
+          <Utensils className="w-4 h-4 text-emerald-700" />
+          <span className="text-xs font-bold text-[#0f2942]">Daily Dietary Habit (Region-Adapted)</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-          {dietOptions.map((opt) => (
-            <button
-              key={opt.label}
-              onClick={() => setDietHabits(opt.label)}
-              className={`p-3 rounded-xl border text-center text-xs flex flex-col items-center gap-1.5 transition-all ${
-                dietHabits === opt.label
-                  ? "bg-[#C2CD93]/20 border-[#C2CD93] text-white"
-                  : "bg-black/30 border-white/10 text-gray-400 hover:bg-white/5"
-              }`}
-            >
-              <span className="text-xl">{opt.icon}</span>
-              <span className="text-[11px] leading-tight">{opt.label}</span>
-            </button>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          {dietOptions.map((opt) => {
+            const isSelected = dietHabits === opt.label;
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => setDietHabits(opt.label)}
+                className={`p-2.5 rounded-lg border text-center text-xs flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-emerald-50 border-emerald-700 text-emerald-900 ring-1 ring-emerald-700"
+                    : "bg-slate-50 border-gray-200 hover:bg-slate-100 text-gray-700"
+                }`}
+              >
+                <span className="text-lg">{opt.icon}</span>
+                <span className="text-[11px] font-semibold">{opt.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Fasting & Religious Practice Toggle */}
-        <div className="border-t border-white/10 pt-3 flex items-center justify-between">
-          <span className="text-xs text-gray-300">
+        <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
+          <span className="text-xs text-gray-700 font-medium">
             Do you observe regular religious fasting? (Ramzan / Navratri / Ekadashi)
           </span>
           <input
             type="checkbox"
             checked={fastingObserved}
             onChange={(e) => setFastingObserved(e.target.checked)}
-            className="accent-[#C2CD93] w-4 h-4 cursor-pointer"
+            className="accent-[#0f4c81] w-4 h-4 cursor-pointer"
           />
         </div>
       </div>
 
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={handleProceed}
-        className="w-full bg-[#C2CD93] hover:bg-[#b0bd82] text-black font-semibold py-4 rounded-xl flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(194,205,147,0.3)] transition-all"
-      >
-        Proceed to Prescription Scan <ArrowRight className="w-5 h-5" />
-      </motion.button>
-    </motion.div>
+      {/* Action Button */}
+      <div className="pt-2 flex justify-end">
+        <button
+          onClick={handleProceed}
+          className="bg-[#1d2d44] hover:bg-[#0f2942] text-white font-semibold py-3 px-8 rounded-lg flex items-center gap-2 text-sm shadow-sm transition-colors cursor-pointer"
+        >
+          Proceed to Prescription Scan <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+    </div>
   );
 }

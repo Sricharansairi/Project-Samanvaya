@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { ShieldCheck, Volume2, Lock, FileText, CheckCircle2, ArrowRight } from "lucide-react";
 
 interface Step3Props {
@@ -34,113 +33,114 @@ export default function Step3_Consent({ onConsentGiven, onNext }: Step3Props) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="flex flex-col items-center w-full max-w-2xl"
-    >
-      <div className="w-16 h-16 rounded-full bg-[#C2CD93]/20 border border-[#C2CD93]/40 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(194,205,147,0.3)]">
-        <ShieldCheck className="w-8 h-8 text-[#C2CD93]" />
-      </div>
-
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-light mb-2">Digital Consent & DPDP Privacy</h2>
-        <p className="text-gray-400 text-xs sm:text-sm max-w-md">
-          Compliant with India's Digital Personal Data Protection (DPDP) Act 2023. You have full control over your health information.
-        </p>
-      </div>
-
+    <div className="w-full space-y-6">
+      
       {/* Audio Narrator Bar */}
       <button
+        type="button"
         onClick={narrateConsent}
-        className="w-full bg-[#C2CD93]/10 border border-[#C2CD93]/30 rounded-xl p-3 mb-6 flex items-center justify-center gap-3 text-xs text-[#C2CD93] hover:bg-[#C2CD93]/20 transition-colors"
+        className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-[#0f4c81] font-semibold transition-colors cursor-pointer"
       >
-        <Volume2 className="w-4 h-4 animate-bounce" />
-        <span>{isPlayingAudio ? "Speaking consent in your language..." : "Tap to listen to consent in your language (Audio Narration)"}</span>
+        <div className="flex items-center gap-2">
+          <Volume2 className="w-4 h-4 text-[#0f4c81]" />
+          <span>{isPlayingAudio ? "Speaking consent terms aloud..." : "Tap to listen to consent terms in your language (Audio Narration)"}</span>
+        </div>
+        <span className="text-[11px] bg-white px-2 py-0.5 rounded border border-blue-200">
+          Audio Support
+        </span>
       </button>
 
-      {/* Granular Toggles */}
-      <div className="w-full space-y-3 mb-6">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+      {/* Granular Toggles in Clean White Cards */}
+      <div className="space-y-3">
+        
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-xs">
           <div className="flex items-start gap-3">
-            <Lock className="w-5 h-5 text-[#C2CD93] mt-0.5" />
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0f4c81] flex items-center justify-center mt-0.5">
+              <Lock className="w-4 h-4" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-white">Voice & Audio Recording Consent</p>
-              <p className="text-xs text-gray-400">Used strictly to transcribe symptoms; raw audio is immediately deleted.</p>
+              <p className="text-xs font-bold text-[#0f2942]">Voice & Audio Recording Consent</p>
+              <p className="text-[11px] text-gray-500">Used strictly to transcribe symptoms; raw audio waveforms are immediately purged.</p>
             </div>
           </div>
           <input
             type="checkbox"
             checked={audioConsent}
             onChange={(e) => setAudioConsent(e.target.checked)}
-            className="accent-[#C2CD93] w-5 h-5 cursor-pointer"
+            className="accent-[#0f4c81] w-4 h-4 cursor-pointer"
           />
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-xs">
           <div className="flex items-start gap-3">
-            <FileText className="w-5 h-5 text-[#C891AA] mt-0.5" />
+            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center mt-0.5">
+              <FileText className="w-4 h-4" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-white">Document & Prescription OCR Scan</p>
-              <p className="text-xs text-gray-400">Allow AI to extract previous medications to check for drug allergies & interactions.</p>
+              <p className="text-xs font-bold text-[#0f2942]">Prescription & Document Scan</p>
+              <p className="text-[11px] text-gray-500">Allow OCR to extract past medications for drug allergy & Jan Aushadhi generic savings.</p>
             </div>
           </div>
           <input
             type="checkbox"
             checked={docScanConsent}
             onChange={(e) => setDocScanConsent(e.target.checked)}
-            className="accent-[#C891AA] w-5 h-5 cursor-pointer"
+            className="accent-[#0f4c81] w-4 h-4 cursor-pointer"
           />
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-xs">
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-[#C2CD93] mt-0.5" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center mt-0.5">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-white">Govt Scheme Eligibility Screening</p>
-              <p className="text-xs text-gray-400">Pre-screen for Ayushman Bharat PM-JAY and state welfare subsidies.</p>
+              <p className="text-xs font-bold text-[#0f2942]">Govt Welfare Scheme Screening</p>
+              <p className="text-[11px] text-gray-500">Pre-screen for Ayushman Bharat PM-JAY (₹5L) and state government subsidies.</p>
             </div>
           </div>
           <input
             type="checkbox"
             checked={schemeConsent}
             onChange={(e) => setSchemeConsent(e.target.checked)}
-            className="accent-[#C2CD93] w-5 h-5 cursor-pointer"
+            className="accent-[#0f4c81] w-4 h-4 cursor-pointer"
           />
         </div>
+
       </div>
 
-      {/* Explicit Tap Requirement (Legally Defensible) */}
+      {/* Mandatory Physical Tap (DPDP Act 2023 Compliance) */}
       <div 
         onClick={() => setExplicitTapGiven(!explicitTapGiven)}
-        className={`w-full p-4 rounded-2xl border cursor-pointer flex items-center gap-3 transition-all mb-6 ${
+        className={`p-4 rounded-xl border cursor-pointer flex items-center gap-3 transition-all ${
           explicitTapGiven 
-            ? "bg-[#C2CD93]/20 border-[#C2CD93] shadow-[0_0_20px_rgba(194,205,147,0.25)]" 
-            : "bg-white/5 border-red-500/40 hover:bg-white/10"
+            ? "bg-emerald-50 border-emerald-400 text-emerald-900" 
+            : "bg-slate-50 border-gray-300 hover:bg-slate-100 text-gray-700"
         }`}
       >
-        <div className={`w-6 h-6 rounded-full border flex items-center justify-center ${explicitTapGiven ? "bg-[#C2CD93] border-[#C2CD93]" : "border-gray-500"}`}>
-          {explicitTapGiven && <CheckCircle2 className="w-4 h-4 text-black" />}
+        <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${explicitTapGiven ? "bg-emerald-700 border-emerald-700 text-white" : "border-gray-400 bg-white"}`}>
+          {explicitTapGiven && <CheckCircle2 className="w-3.5 h-3.5" />}
         </div>
-        <p className="text-xs text-gray-200">
-          <span className="font-semibold text-white">MANDATORY PHYSICAL TAP:</span> I hereby give informed consent for AI-assisted anamnesis and clinical data processing.
+        <p className="text-xs font-semibold">
+          <span>MANDATORY PHYSICAL TAP:</span> I hereby give informed consent for AI-assisted anamnesis and clinical case-taking.
         </p>
       </div>
 
-      <motion.button
-        whileHover={{ scale: explicitTapGiven ? 1.03 : 1 }}
-        whileTap={{ scale: explicitTapGiven ? 0.97 : 1 }}
-        disabled={!explicitTapGiven}
-        onClick={handleProceed}
-        className={`w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
-          explicitTapGiven
-            ? "bg-[#C2CD93] text-black shadow-[0_0_25px_rgba(194,205,147,0.4)] cursor-pointer"
-            : "bg-white/10 text-gray-500 cursor-not-allowed border border-white/10"
-        }`}
-      >
-        Confirm Consent & Enter Triage <ArrowRight className="w-5 h-5" />
-      </motion.button>
-    </motion.div>
+      {/* Action Button */}
+      <div className="pt-2 flex justify-end">
+        <button
+          disabled={!explicitTapGiven}
+          onClick={handleProceed}
+          className={`py-3 px-8 rounded-lg font-semibold flex items-center gap-2 text-sm shadow-sm transition-all ${
+            explicitTapGiven
+              ? "bg-[#1d2d44] hover:bg-[#0f2942] text-white cursor-pointer"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+          }`}
+        >
+          Confirm Consent & Proceed <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+    </div>
   );
 }
