@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { FaPrint, FaQrcode, FaFileMedical, FaUser, FaNotesMedical, FaStethoscope, FaPills } from 'react-icons/fa';
+import { Printer, QrCode, FileText, User, ClipboardList, Stethoscope, Pill } from 'lucide-react';
 
 export default function PortableCaseSummary() {
     return (
@@ -13,10 +13,10 @@ export default function PortableCaseSummary() {
                 </div>
                 <div className="flex space-x-3 text-gray-400">
                     <button className="hover:text-blue-600 transition" title="Print Summary" onClick={() => window.print()}>
-                        <FaPrint size={24} />
+                        <Printer size={24} />
                     </button>
                     <button className="hover:text-blue-600 transition" title="Scan QR">
-                        <FaQrcode size={24} />
+                        <QrCode size={24} />
                     </button>
                 </div>
             </div>
@@ -24,14 +24,14 @@ export default function PortableCaseSummary() {
             {/* Patient Info */}
             <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded mb-6 border border-gray-100">
                 <div className="flex items-center space-x-3">
-                    <FaUser className="text-gray-400" />
+                    <User className="text-gray-400" />
                     <div>
                         <p className="text-xs text-gray-500 uppercase">Patient Name</p>
                         <p className="font-semibold text-gray-900">Ramesh Kumar (42/M)</p>
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                    <FaFileMedical className="text-gray-400" />
+                    <FileText className="text-gray-400" />
                     <div>
                         <p className="text-xs text-gray-500 uppercase">ABHA ID (Linked)</p>
                         <p className="font-semibold text-gray-900">14-2234-9981-0021</p>
@@ -45,7 +45,7 @@ export default function PortableCaseSummary() {
                 {/* Problem */}
                 <section>
                     <div className="flex items-center space-x-2 text-blue-800 mb-2 border-b border-gray-200 pb-1">
-                        <FaNotesMedical />
+                        <ClipboardList />
                         <h2 className="text-lg font-bold uppercase tracking-wide">Chief Complaint</h2>
                     </div>
                     <p className="text-gray-700 pl-6 border-l-2 border-gray-200 ml-2">
@@ -56,7 +56,7 @@ export default function PortableCaseSummary() {
                 {/* History & Vitals */}
                 <section>
                     <div className="flex items-center space-x-2 text-blue-800 mb-2 border-b border-gray-200 pb-1">
-                        <FaStethoscope />
+                        <Stethoscope />
                         <h2 className="text-lg font-bold uppercase tracking-wide">Reported History & Vitals</h2>
                     </div>
                     <ul className="list-disc pl-10 space-y-1 text-gray-700">
@@ -70,7 +70,7 @@ export default function PortableCaseSummary() {
                 {/* Medications */}
                 <section>
                     <div className="flex items-center space-x-2 text-blue-800 mb-2 border-b border-gray-200 pb-1">
-                        <FaPills />
+                        <Pill />
                         <h2 className="text-lg font-bold uppercase tracking-wide">Current Medications</h2>
                     </div>
                     <p className="text-gray-700 pl-6 border-l-2 border-gray-200 ml-2">

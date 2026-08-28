@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { FaRegClock, FaUserMd, FaArrowRight, FaMapMarkerAlt } from 'react-icons/fa';
+import { Clock, ArrowRight, MapPin } from 'lucide-react';
 
 interface NextActionCardProps {
     type: 'pre-consultation' | 'post-consultation';
@@ -28,7 +28,7 @@ export default function NextActionCard({
             
             <div className="flex items-start space-x-4">
                 <div className="bg-blue-100 p-3 rounded-full text-blue-700 shrink-0">
-                    {type === 'pre-consultation' ? <FaMapMarkerAlt size={24} /> : <FaRegClock size={24} />}
+                    {type === 'pre-consultation' ? <MapPin size={24} /> : <Clock size={24} />}
                 </div>
                 
                 <div className="flex-1">
@@ -46,7 +46,7 @@ export default function NextActionCard({
                                     <p className="text-sm text-gray-500 uppercase tracking-wide">Your Token Number</p>
                                     <p className="text-3xl font-black text-blue-900">{token || 'A-142'}</p>
                                 </div>
-                                <FaArrowRight className="text-gray-400" size={24} />
+                                <ArrowRight className="text-gray-400" size={24} />
                             </div>
                             <p className="text-sm text-gray-500 mt-2 italic">Nothing else needed right now.</p>
                         </div>

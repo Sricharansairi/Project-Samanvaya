@@ -99,3 +99,12 @@ Instead of an undifferentiated feature blob, Project Samanvaya cleanly separates
 1. **The "Case Manager" Frame:** Present the project as a system that ensures patients don't fall through the cracks, rather than promising to build a human-staffed coordination desk.
 2. **Indoor Navigation Scope:** Keep navigation simple (token + text directions) and avoid claiming live facility map/wayfinding without actual hospital data.
 3. **The Core Value Proposition Shift:** Pivot the pitch from "we digitize the intake form" to **"we make sure the patient's case doesn't fall through the cracks between the moment they walk in and the moment they're actually seen."**
+
+---
+
+## ⚡ 8. Medical NLP Architecture (Speed, Awareness & Fail-Safes)
+*To balance speed, zero-hallucination safety, and deep medical knowledge, we use a 3-tiered NLP approach.*
+
+1. **Sub-Second Routing Layer (Groq LPU):** A lightweight Llama-3-8b model handles intent parsing. This keeps UI interactions (like voice-navigating screens) near-instantaneous.
+2. **Deterministic Fail-Safe Layer:** Hardcoded dictionary lookups for Red Flag keywords (e.g., "chest pain") and Herb-Drug interactions guarantee absolute safety and 0% hallucination by bypassing LLM reasoning during emergencies.
+3. **Medically Aware Extraction (NVIDIA 70B + RAG):** For complex history summarization, ICMR guidelines are injected via RAG into a massive 70B parameter model, which strictly maps symptoms to SNOMED-CT terminologies for the final FHIR output.

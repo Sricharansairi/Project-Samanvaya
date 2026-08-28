@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { FaVial, FaInfoCircle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { TestTube, Info, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface TestExplainerProps {
     testName: string;
@@ -20,7 +20,7 @@ export default function TestExplainer({ testName, description, whyNeeded, prepar
             >
                 <div className="flex items-center space-x-3">
                     <div className="bg-blue-100 text-blue-700 p-2 rounded-full">
-                        <FaVial size={16} />
+                        <TestTube size={16} />
                     </div>
                     <div>
                         <h4 className="font-semibold text-gray-900">{testName}</h4>
@@ -28,7 +28,7 @@ export default function TestExplainer({ testName, description, whyNeeded, prepar
                     </div>
                 </div>
                 <div className="text-gray-400">
-                    {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                    {isExpanded ? <ChevronUp /> : <ChevronDown />}
                 </div>
             </button>
 
@@ -41,7 +41,7 @@ export default function TestExplainer({ testName, description, whyNeeded, prepar
                     
                     <div className="bg-blue-50 border-l-2 border-blue-500 p-3 rounded-r">
                         <div className="flex items-center space-x-2 mb-1">
-                            <FaInfoCircle className="text-blue-600" size={14} />
+                            <Info className="text-blue-600" size={14} />
                             <p className="text-xs uppercase font-bold text-blue-800 tracking-wider">Why we are doing this</p>
                         </div>
                         <p className="text-sm text-blue-900 leading-relaxed">{whyNeeded}</p>

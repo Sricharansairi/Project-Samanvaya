@@ -57,6 +57,21 @@ def triage_symptoms(symptom_text: str) -> dict:
     intent_data = classify_query_semantic(symptom_text)
     print(f"[Phase 6 Router] Intent detected: {intent_data['intent']} with confidence {intent_data['confidence']}")
     
+    # Phase 8: Deterministic Fail-Safe Layer (Zero-Hallucination)
+    red_flag_keywords = ["chest pain", "heart attack", "stroke", "bleeding heavily", "shortness of breath", "choking", "unconscious", "coughing blood"]
+    lower_symptoms = symptom_text.lower()
+    
+    for keyword in red_flag_keywords:
+        if keyword in lower_symptoms:
+            print(f"[Phase 8 Fail-Safe] Triggered by keyword: {keyword}")
+            return {
+                "urgency": "Critical",
+                "department": "Emergency",
+                "advice": f"EMERGENCY: Proceed to the ER immediately. Red flag symptom '{keyword}' detected.",
+                "snomed_mapping": {"concept": "Emergency condition", "code": "1391004"},
+                "confidence": 1.0
+            }
+    
     # Get a fresh key from the rotator
     api_key = key_rotator.get_llama_3_3_70b_key()
     

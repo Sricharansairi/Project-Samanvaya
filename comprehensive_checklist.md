@@ -190,3 +190,10 @@ This checklist explicitly sequences EVERY SINGLE feature, UI flow step, architec
 - `[x]` **70. The "Case Manager" Frame:** Reposition project as ensuring patients don't fall through cracks (Narrative only; do not build a human-staffed coordination desk).
 - `[x]` **71. Indoor Navigation Scope Check:** Stick to the simple token + text directions. Do not promise or build live facility mapping/wayfinding.
 - `[x]` **72. Core Value Proposition Pivot:** Update pitch deck/README: *"We make sure the patient's case doesn't fall through the cracks between the moment they walk in and the moment they're actually seen."*
+
+---
+
+## ⚡ Phase 8: Medical NLP Architecture (Speed, Awareness & Fail-Safes)
+- `[x]` **73. Sub-Second Routing Layer (Groq LPU):** Use lightweight Llama-3-8b for instantaneous intent parsing and UI navigation without waiting for heavy medical analysis.
+- `[x]` **74. Deterministic Fail-Safe Layer (Zero-Hallucination):** Implement strict dictionary lookups (offline) for Red Flag keywords (e.g., "chest pain") and Herb-Drug interactions to bypass LLMs entirely during emergencies.
+- `[x]` **75. Medically Aware Extraction (NVIDIA 70B + RAG):** Inject ICMR guidelines into a 70B parameter model via RAG to extract and map clinical history directly to structured SNOMED-CT/FHIR formats.

@@ -27,15 +27,31 @@ export default function FloatingAssistant({ currentStep, onNavigate, onAction, o
     if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.lang = "en-IN";
 
+      let debounceTimer: any;
+
       recognition.onresult = (event: any) => {
-        const spokenText = event.results[0][0].transcript;
-        setTranscript(`"${spokenText}"`);
-        setIsListening(false);
-        processCommand(spokenText);
+        let finalTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        
+        if (finalTranscript) {
+          setTranscript(`"${finalTranscript}"`);
+          setUserInput(finalTranscript);
+          
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            setIsListening(false);
+            recognition.stop();
+            processCommand(finalTranscript);
+          }, 2000); // Wait 2 seconds for silence before auto-processing
+        }
       };
 
       recognition.onerror = () => {
