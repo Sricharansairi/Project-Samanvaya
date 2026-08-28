@@ -954,3 +954,253 @@ Short answer: **yes, but not uniformly** — and the honest breakdown matters mo
 **On implementation** — you've actually already solved this exact problem once. Sahakar's `model_router.rs` / `brain_switcher.rs` is precisely a "route between local and larger models based on availability/constraints" pattern. That's directly reusable thinking here: MediKiosk's offline/online switch is the same architectural shape — router checks connectivity, picks the local quantized model or the cloud one, everything downstream (dialogue manager, extraction, summarizer) doesn't need to know which one answered.
 
 **Practical scope for a 36-hour build:** don't try to make everything work offline. Pick the "store-and-forward" pattern as your baseline (capture audio/images/answers locally via IndexedDB, sync when signal returns) and layer the local-model fallback on top only for the adaptive-questioning piece as your stretch/demo-differentiator — that's a strong, honest "we thought about rural connectivity" story without overclaiming full offline parity.
+
+I read through the whole document. Before the extra features — a direct, no-flattery pass on what's actually in this spec, because a few things here need correcting before you build on top of them.
+
+## Changes Needed in the Document (Say This Before Anything Else)
+
+**1. "Bhashini is mandatory" — soften this claim.** The problem statement says "Bhashini / AI4Bharat models" — that's an *example*, not a requirement. Locking your architecture to a single government API as "mandatory" is a single point of failure risk you don't need to take on yourself. Frame it as "primary choice, with a self-hosted IndicWhisper fallback" — which the doc actually does elsewhere (contradicts itself: section 1B says "mandatory," section on LLM matrix and section 6 both quietly assume Bhashini uptime for TTS too).
+
+**2. The RAG/Self-RAG/GraphRAG/hybrid-search stack is over-engineered for a 36-hour build.** "Adaptive Self-Corrective Agentic RAG with 0% hallucination," BM25 + semantic hybrid search, self-correction validation loops, query-injection routing — this is a research paper's worth of infrastructure. For a hackathon, this is the single biggest risk in the whole document: you will spend two of your five build days on RAG plumbing that judges will see for 90 seconds. Cut this to a flat vector search with a confidence threshold, and cite Self-RAG as "future work" in the pitch instead.
+
+**3. The "0% hallucination" claim needs to be deleted, not softened.** No LLM pipeline gets you to 0%. Stating it in a healthcare pitch to judges is a credibility risk — one competent judge asking "how did you measure that" ends the conversation badly. Say "reduced hallucination risk via retrieval grounding and human-in-the-loop confirmation" instead.
+
+**4. Committing actual API keys in a plaintext `.env` example, including a live-looking Supabase URL, is a real security habit to break now** — not a hackathon-only issue. Rotate that Supabase project's keys before this doc (or its repo) goes anywhere near a public GitHub push, which SIH submissions often require.
+
+**5. The Smart Key Rotator solves the wrong problem.** `random.choice()` across multiple personal API keys to dodge rate limits is a demo hack, not architecture worth a "Day 1, Step 3" priority slot. It's fine as an internal note; don't present it to judges as a designed system — it reads as "we're circumventing quotas," not "we built resilience."
+
+**6. The vision-LLM-for-OCR claims (Llama 3.2 90B Vision reading lab reports, Phi-4 for OCR) need the same caveat as before: genuinely useful for printed/typed reports, still unreliable for handwritten scrawl.** Nothing in this doc changes that reality — a bigger vision model helps at the margins, it doesn't solve doctor handwriting.
+
+**7. Drop the "Nearest Budget-Friendly Hospital Finder."** You already correctly talked yourself out of this once. It's back in this doc, now with GPS + SerpAPI/OpenStreetMap. The reasoning against it hasn't changed: a patient inside the hospital using your kiosk doesn't need you to recommend a different hospital, and it dilutes your pitch's focus. Keep it out, or cut it to a single line ("future scope: referral-network integration") rather than a build item.
+
+## What Genuinely Changes the Game Here (New, Real Value)
+
+**8. Voice-driven chip parameters (from Sambhav) is the single best UI idea in this whole document.** Combining tap-chips with a mic that auto-selects the matching chip solves the exact "elderly + low-literacy + noisy room" triad better than either input mode alone — say "headache," and the AI pre-selects "sudden onset" instead of making them tap through five screens. Genuinely worth building first, not last.
+
+**9. Dynamic per-complaint questioning (`discover-params`) is real value, correctly scoped.** Generating 4-6 relevant follow-ups from one free-text complaint instead of a static 40-question form is exactly the "collapse the interview" story your pitch needs — and it's realistic to build in a hackathon window, unlike the full RAG stack.
+
+## More Real Features, Grounded in Indian Cultural and Social Reality
+
+**10. Gender and modesty-aware intake routing.** In many Indian settings — rural and urban alike — women, especially older or first-generation-literate women, are far less likely to disclose symptoms (menstrual, reproductive, sexual health) to a male attendant, a male family member standing next to them, or even out loud in a shared kiosk area. Give a "private mode" toggle: headphones-only audio, text-only input for sensitive sections, and an option to flag "I'd prefer a female staff member" that routes discreetly to triage — without making the patient say why out loud.
+
+**11. Joint-family decision dynamics.** A large share of Indian patients, especially elderly ones, don't make health decisions alone — a son, daughter-in-law, or spouse is often the actual decision-maker present. Design the "who is answering" tag (patient vs. caregiver) you already have to also support **two people answering different sections** — e.g., the patient describes symptoms, the accompanying family member fills history/medication details they know better — without restarting the whole flow.
+
+**12. Fasting and religious-practice-aware history taking.** Ayurvedic Ahara-Vihara assessment and drug-timing instructions ("take before food") collide directly with religious fasting practices — Ramzan, Navratri, Ekadashi, Karva Chauth, and regional fasting customs are extremely common and affect medication adherence in ways doctors often don't ask about. A simple "do you observe any regular fasting?" prompt feeding into the diet/medication-timing advisory is a real, underserved gap — not decorative.
+
+**13. Trust-building through a human face, not just AI.** Indian patients, particularly older and rural ones, are more likely to trust a system that visibly involves a person somewhere — purely autonomous "AI decided this" framing can trigger suspicion or refusal to engage. Keep a visible "a nurse reviews everything you tell this screen" message on-screen throughout, even if the review is just a spot-check — it's not a technical feature, but it materially affects whether people actually use the thing.
+
+**14. Multi-generational literacy bridge at the point of scanning documents.** Old prescriptions and reports in Indian households are frequently kept and explained by one literate family member (often a grandchild) for an illiterate elder. Let the "assisted mode" explicitly support a **remote assist** option too — a family member elsewhere gets a link/OTP to help fill in details for a relative physically at the hospital, since escorts aren't always available in person on hospital day.
+
+**15. Caste and community sensitivity in the consent/demographic flow.** If any part of your system asks about caste category for the PM-JAY/scheme-eligibility logic (many schemes are means-tested via caste-linked certificates like SC/ST/OBC), this is a section that needs to be handled with real care — private, optional-until-needed, never displayed on a shared screen, and clearly explained as being used only for scheme matching, not stored or shown elsewhere. Get this wrong and it becomes a dignity issue, not a UX issue.
+
+**16. Festival- and season-aware OPD load prediction.** India's OPD surges spike predictably around festivals (heat-related illness in summer, respiratory illness post-Diwali/Deepavali smog, gastro spikes during monsoon and major festival gatherings). If you build the anonymized analytics dashboard idea from before, tie it to the Indian festival/season calendar specifically — it's a much more locally grounded predictive signal than generic "seasonal trends."
+
+**17. A print option for every single output, always.** Not everyone trusts or wants a digital record, and hospital staff downstream (pharmacy counters, lab desks) frequently still run on paper. Every AI-generated summary, scheme checklist, and token should have a "print this" option as a first-class action, not an afterthought — digital-first doesn't mean paper-never in this environment.
+
+## First: The "Coding Agent" Update List Needs a Hard Look
+
+A few of these need fixing before they go anywhere near `comprehensive_checklist.md` or a judge's screen — not because they're bad ideas in spirit, but because a couple are unsafe or effectively fictional as described.
+
+**🚩 Acoustic biomarkers (dyspnea/wet cough from waveform matching) — this is the biggest problem in the list.** Detecting respiratory disease from raw audio is real research (it exists), but it requires a properly trained classifier on curated, labeled cough/breath-sound datasets — not a "simulated ML interceptor scanning for waveforms matching X." As described, this sounds like either a hardcoded/mocked response or a naive signal-matching heuristic with no validated accuracy behind it. Presenting this to a hospital pipeline, or to SIH judges, as if it's a working diagnostic signal is a real integrity risk — if a judge asks "what's your model's sensitivity/specificity on this," there's no honest answer to give. **Fix:** either drop it, or explicitly label it in your docs as a mocked placeholder for a future real classifier, never as a delivered detection capability.
+
+**🚩 Vision-AI "Darshana" (Doshas/pallor from a face or nail photo) — cut this one, or box it very tightly.** Having an LLM look at a photo and render an opinion on someone's Ayurvedic constitution or a clinical sign like pallor (an anemia indicator) is unvalidated pseudo-diagnosis. Vision-language models are not clinically validated for this, and a wrong guess here can genuinely mislead a patient about their health — false reassurance or false alarm, either way. If you keep any version of it, it must never render a determination to the patient; at most, it's an unlabeled visual note a doctor may glance at and is free to ignore, with a visible disclaimer, not a feature you demo as "AI reads your Prakriti."
+
+**⚠️ "Zero-friction" ABHA creation via Aadhaar Face Authentication — this can't actually work as built, and it's worth knowing why.** I checked: real Aadhaar authentication (including face auth) requires the calling entity to be a UIDAI-licensed AUA or KUA (or a sub-AUA under one), with a formal onboarding and audit process — it's not an open API a hackathon team can call directly. What you've built is fine as a **sandbox simulation of the flow**, but your docs and pitch need to say "simulated pending UIDAI AUA/KUA certification," not "instantly generates an ABHA ID" — otherwise you're claiming regulatory access you don't have.
+
+**⚠️ Audio-verifiable consent (matching "yes"/"haan" in the ASR transcript) — too fragile for something with legal weight.** People say yes a dozen ways ("haanji," "theek hai," "sahi hai," a nod that never gets transcribed at all), and an ASR mishearing "nahi" (no) as something consent-shaped is a real failure mode with real consequences under DPDP. Keep the audio explanation, but pair it with an explicit tap-to-confirm — audio alone shouldn't be your only proof of consent.
+
+**⚠️ Single-OTP family auth — flag the privacy gap.** One OTP unlocking every linked family member's full medical record means person A can see person B's health data without B ever individually consenting. Keep the one-OTP convenience for login, but require a per-member consent tap before their specific record becomes visible/editable in that session.
+
+**On "all 12 tests passed":** passing unit tests confirms your code does what you told it to do — it says nothing about whether what you told it to do (e.g., "this waveform pattern means dyspnea") is actually true. Keep those as separate claims in your documentation; conflating them is exactly what invites the tough question above.
+
+**Genuinely fine as-is:** the polypharmacy/herb-drug clash checker and the epidemic radar (just make the radar trigger a *notification for human review*, not an automatic broadcast, and keep it aggregated by threshold count, not raw per-patient data).
+
+---
+
+## Government Scheme Feature — How to Actually Build It
+
+Skip the RAG/vector-store approach from the doc for this specific feature — eligibility is a binary/rules question, not a "retrieve similar text" question, and an LLM inferring eligibility from embedded PDF chunks can hallucinate a wrong yes/no on something with real financial consequences for the patient.
+
+1. **Get the actual published criteria, not memory or an API.** There's no live eligibility API for PM-JAY, Aarogyasri, CGHS, or RAN — pull the official guideline PDFs from the National Health Authority (PM-JAY) and each relevant state/central health department, and hand-encode the real criteria as a small config file per scheme (JSON/YAML: which fields matter, what values qualify).
+   - One correction worth knowing before you encode this: PM-JAY eligibility isn't primarily income-based — it's driven by **SECC 2011 deprivation/occupational categories** (i.e., whether the household is listed in that census by specific deprivation criteria), not a self-declared income threshold. A rule like "income < ₹X" would be factually wrong. The safer question to ask the patient is "do you have a ration card of type X" or "are you already listed/enrolled," and point them to the official portal for the real check rather than computing it yourself.
+2. **A plain deterministic function evaluates the rules.** No LLM involved in the yes/no decision — just conditionals against the fields you collected.
+3. **The LLM's only job here is translation/phrasing** — turning "matched: PM-JAY, ration-card-based" into a friendly sentence in the patient's language, and formatting the document checklist. It never decides eligibility.
+4. **Every output ends with "confirm at the official portal / hospital welfare desk."** You're a pre-screener that removes "I didn't know I might qualify," not a legal determination.
+
+---
+
+## Noise Handling — The Actual Priority Order
+
+You don't need custom neural denoising as your first move — most of this problem is solved by settings you already have access to.
+
+1. **Start here, costs nothing:** when you call `getUserMedia()` in the browser, just set `echoCancellation: true, noiseSuppression: true, autoGainControl: true`. This is a one-line config, not custom DSP — modern browsers already run decent adaptive noise suppression under the hood. Do this before building anything else.
+2. **If that's not enough, add a light server-side pass**, not a heavy one: Python's `noisereduce` library (spectral gating) is a few lines to wire in after upload, before ASR. Far simpler to integrate under time pressure than compiling RNNoise/DeepFilterNet to WebAssembly.
+3. **Full neural denoising (RNNoise/DeepFilterNet WASM) is a stretch goal**, not a baseline — put it on day 4-5 if time allows, and don't let it block your core pipeline.
+4. **Don't ignore the physical layer.** A short on-screen prompt ("please hold the mic side close to your mouth") does real work for free. If budget allows even slightly, a ₹200-500 clip-on lapel mic for the hospital tablets is a peripheral accessory, not custom hardware — still fits the software track, and meaningfully improves capture quality in a loud OPD.
+5. **Always show the live transcript** so the patient/volunteer can catch an obvious mishearing immediately and retype — a fast human-correction loop beats chasing perfect audio.
+
+---
+
+## UI Structure — One Clean Flow, Everything Else Tucked Away
+
+For a first-time, non-tech-savvy user, the rule is: **one primary action per screen, nothing else competing for attention.** Persistent elements only:
+- Language selector (small, top corner, always visible)
+- The floating voice-assistant orb (bottom corner — see below)
+- A subtle progress indicator across the main flow
+
+**Primary linear flow** (this is the whole app for a first-time patient — no menu-hunting):
+Welcome/Language → Identify & Consent → Mode auto-select (Allopathic/Ayurvedic) → Conversational History → AYUSH module (if applicable) → Document Scan → Scheme checklist → Confirm Summary → Token/Queue.
+
+**Secondary things** (past-visit history, download/print checklist, help/FAQ) live behind either a single simple menu icon or — more naturally — behind the voice assistant, so they don't clutter the main screen for someone who'll never need them on a given visit.
+
+**Doctor-facing view is a completely separate interface** (different device/login): structured editable summary, document timeline, safety flags, and any admin-only views like the epidemic radar — never shown on the patient kiosk.
+
+---
+
+## The Floating Autonomous Assistant — Yes, Genuinely Buildable, With One Honest Caveat
+
+What you're describing is a **function-calling agent**, and it's very achievable with what you're already building — it's not a separate "computer use" system, it's the same LLM you use for dialogue, given a different job.
+
+**How it actually works:**
+1. Define a fixed, whitelisted set of app-level actions as a tool schema: `navigate_to(screen)`, `fill_field(field_id, value)`, `start_document_scan()`, `open_scheme_checker()`, `read_summary_aloud()`, `submit_history()`, etc.
+2. The floating mic (small, corner, always present) listens on tap or a wake phrase.
+3. Speech → ASR → transcript. That transcript, plus the current screen state and the list of available actions, goes to the LLM.
+4. The LLM returns **one structured action call** — not free-form text, not arbitrary DOM manipulation — and the frontend executes it directly (router navigation, form fill, whatever the action is).
+5. A brief spoken/visual confirmation follows ("Opening document scan now").
+
+**Where "fully autonomous" should mean exactly that, and where it shouldn't:**
+- Navigation, reading things aloud, opening a screen, showing the checklist — execute immediately, zero friction, genuinely seamless. No reason to slow this down.
+- Anything that **writes clinical data or submits to HIS/ABDM** — insert one lightweight confirm step ("You said chest pain since this morning — is that right?") before it commits. This isn't a technical limitation; it's a deliberate boundary given that ASR can mishear a symptom, and a misfired autonomous write into a medical record is a real failure mode, not a hypothetical one. When a judge asks "what happens if it mishears you," you want an answer better than "it just writes it in."
+
+That split — instant for navigation, one-tap-confirm for anything that changes the medical record — is what makes this "fully intelligent and seamless" *and* defensible in a healthcare context, rather than a flashy demo with an obvious hole in it. Practically: this reuses your existing dialogue-management LLM call with a different system prompt and a small function-calling schema, so it's not a new subsystem — it's the same brain doing a second job.
+
+---
+
+## A Few More Genuinely Practical Additions
+
+- **Audio playback of old prescriptions** — once OCR digitizes a past prescription, read it back in plain language ("This is Metformin, for sugar control, twice daily") — most patients don't actually know what their own medications are for.
+- **Visible "not sure" flags instead of silent guesses** — when OCR is uncertain about a smudged number, show the raw image crop next to a flagged value for a human to confirm rather than silently picking a guess.
+- **Region-adapted food/lifestyle chips** — the Ahara-Vihara food-plate idea should show regionally relevant food icons (rice/sambar in a Telugu OPD, roti/dal in a Punjab OPD) rather than one generic set.
+- **Actual rupee savings on the generic-drug suggestion** — showing "₹340 vs ₹40 at the government pharmacy" moves behavior far more than just "generic available."
+- **One optional attendant phone number captured at intake** — for elderly patients without their own phone, this becomes the number SMS reminders go to.
+
+## "Every Scheme Based on City" — One Correction First
+
+Health schemes in India are granted at the **state** level, not city level — a scheme like Aarogyasri doesn't change whether the patient is in Hyderabad or a small Telangana town; it's the state that administers it, not the municipality. So "city" isn't quite the right filter — you want **state**, and city is really just a way of inferring the state (or you skip the inference and just ask state directly, which is more reliable than reverse-geocoding a city name).
+
+And it's genuinely more varied than "one scheme per state" — I checked current examples, and the eligibility logic differs meaningfully:
+
+| State | Scheme | How eligibility works |
+|---|---|---|
+| Rajasthan | Chiranjeevi (₹25L) | Universal — covers **all** families, small annual registration fee |
+| West Bengal | Swasthya Sathi (₹5L) | Universal — all state residents |
+| Andhra Pradesh | YSR Aarogyasri (₹25L) | Income/BPL-based |
+| Maharashtra | MJPJAY | Ration-card category based, **now integrated with PM-JAY** — one claim can satisfy both |
+| Tamil Nadu | CMCHIS / Kalaignar | Income-threshold based, separate empanelment from PM-JAY |
+| Karnataka | Arogya Bhagya | State top-up alongside PM-JAY |
+
+This matters practically: a rules engine that assumes "check income against a threshold" for every state will be wrong for Rajasthan and West Bengal (universal, no income test) and wrong in a different way for Maharashtra (ration-card category, not income). **Your rule schema needs a `type` field per scheme** — `universal`, `income_threshold`, `ration_card_category`, `secc_deprivation` — not one shared logic path.
+
+## How to Actually Scale This to "Every Scheme"
+
+Realistically build it as **data, not code**, so "every state" is a data-entry problem you can grow after the hackathon, not a rewrite:
+
+1. One record per scheme: `{state, scheme_name, type, criteria: {...}, coverage_amount, integrates_with_pmjay: bool}` — a flat table/JSON, not per-scheme hardcoded functions.
+2. One evaluator function that reads `type` and applies the right check — universal → auto-match on state alone; income-based → compare declared bracket; ration-card-based → compare card category; SECC-based → "are you already listed" question, don't compute it yourself (mentioned last time — still true for PM-JAY itself).
+3. For the hackathon, seed maybe 6-8 real schemes covering a spread of types (PM-JAY + CGHS/RAN nationally, plus 3-4 states like the ones above, chosen so your demo shows at least one universal, one income-based, and one PM-JAY-integrated scheme — that variety is what proves the engine actually generalizes, not just hardcoded for one case).
+4. Pitch line that's both honest and strong: *"the schema supports all 28 states/UTs — we've seeded N as working proof; scaling to the rest is data entry, not new engineering."* Judges respond well to "architecturally complete, data-incomplete by design" — it's a true and confident claim, unlike promising full national coverage you haven't built.
+
+## Assistant From Setup — Yes, and It Doesn't Need New Architecture
+
+This is a real strength of the function-calling design from before: since the assistant works off a schema of "screens + fields," extending that schema to include the very first screens (language, state/city select, identify) isn't a special case — it's just adding a few more entries to the same list. There's no separate "setup mode" to build; the assistant is just as capable on screen 1 as screen 10, by construction.
+
+## Groq + NVIDIA NIM Together — Good Instinct, Here's the Actual Split
+
+Don't pick one provider for everything — use them for what they're each good at:
+
+- **Groq for the assistant's real-time layer** (intent parsing → picking which action to call, e.g. "open the scheme checker" → `open_scheme_checker()`). This step needs to feel instant or the assistant feels laggy and broken; Groq's whole value proposition is very low-latency inference on open models, which is exactly what a snappy voice-driven UI needs.
+- **A stronger model via NVIDIA NIM (or whichever large model you're already using) for the content-heavy steps** — medical history structuring, document extraction, scheme-checklist phrasing — where getting the *content* right matters more than shaving off 200ms.
+
+This is the same tiered-router pattern you already used in Sahakar (`model_router.rs`/`brain_switcher.rs`) — fast/cheap model for routing decisions, stronger model for the actual work. Same idea, just now split across two hosted providers instead of local vs. cloud.
+
+## The Green/Red/Back Pattern — This Is a Good Design, Here's How to Make It Work Well
+
+You've actually landed on a clean solution to the exact "what if the AI mishears" problem from before. A few refinements to make it functional rather than just three colored buttons:
+
+- **Always pair the buttons with a readback**, spoken and shown as text — "You said: Hyderabad" — *then* green/red/back. Buttons alone, with nothing displayed to confirm, don't catch anything; the readback is what actually lets the patient catch a mishearing.
+- **Icon + color together, not color alone** — a checkmark and an X, not just green and red — for the same low-literacy, possibly colorblind-inclusive reasons as everywhere else in this app.
+- **Scope it to assistant-driven writes, not everything.** Reserve this 3-button confirm loop for moments where the assistant filled something on the patient's behalf (a symptom, a state selection, a scheme detail) — not for pure navigation ("opening document scan"), which can stay instant with just a brief toast/audio cue. If every single autonomous action needs a button press, "extraordinarily autonomous" turns into "extraordinarily many taps," which undercuts the exact seamlessness you're going for. Manual chip-taps also skip this loop — the confirm step exists specifically because the *AI* interpreted something, not because a human tapped an option themselves.
+- **Retry vs. Back, defined precisely:** Red/Retry re-listens for the *same* question and re-attempts the fill — it doesn't move the flow anywhere. Back steps to the *previous* screen/question and should leave that earlier answer editable rather than wiped — discarding an answer someone already gave reintroduces the "repeat yourself" problem you're trying to eliminate everywhere else in this project.
+
+This pattern, applied consistently, is what actually earns you the "universal" claim — one interaction rule (assistant acts → readback → confirm/retry/back) that works identically whether it's filling "which state are you in" on screen one or "what's your chief complaint" on screen five. That consistency is more convincing to judges than raw autonomy would be on its own.
+
+
+
+
+
+
+
+## Gap Analysis — Checklist vs. What's Actually Needed
+
+A few real gaps, and a few things that need explicit confirmation before you call them "verified":
+
+**Real gaps to close:**
+
+1. **Module D (FHIR/ABDM push to HIS) isn't a listed item.** This is one of the four core modules in the *original problem statement itself* — not an add-on feature, the literal expected deliverable. Scanning all 52 items, I don't see "format structured history into FHIR R4 and push to HIS/EMR" checked off anywhere. Everything else here is enhancement; this one is the brief. It needs its own explicit, verified line item.
+
+2. **Single-OTP family consent (item 8) still has the privacy gap I flagged earlier**, and Phase 5's safety-boundary review doesn't seem to have caught it — it fixed the audio-consent, FaceAuth, and RAG issues, but this one looks untouched. One OTP unlocking every family member's individual medical record without each member's own consent is still the same gap. Worth a dedicated fix and its own checklist line.
+
+3. **Prakriti assessment isn't explicitly named.** Item 12 lists Agni and Nidra, but not Prakriti — the single most-emphasized Ayurvedic concept in the entire problem statement (it's the *first* term listed in the Dashavidha Pariksha framework, and it's what "Gamified Visual Prakriti Assessment" was built around earlier in this conversation). If it's actually built and just not named in the checklist, fine — but confirm it explicitly, because this is the one AYUSH-specific feature judges are most likely to probe directly.
+
+**Things to verify, not assume:**
+
+4. **Does the scheme engine (item 19) actually branch by eligibility *type*, or does it apply one formula to all 8 schemes?** This matters concretely: Rajasthan's Chiranjeevi and West Bengal's Swasthya Sathi are **universal** (no income/ration-card test at all), while AP's Aarogyasri and TN's CMCHIS are income-based, and Maharashtra's MJPJAY is ration-card-category based (and now integrated with PM-JAY claims). If the JSON rules assume one shared eligibility logic, the universal-scheme states will incorrectly gate people behind a check that shouldn't exist for them. Worth a specific look at the rule schema, not just "8 schemes evaluated."
+
+5. **What does "deterministic offline rules active" (item 3) actually cover?** If it's the scheme checker and red-flag rules, good — those should be deterministic regardless of connectivity. But does the *adaptive conversational history-taking* (the LLM-driven follow-up questions) work at all when offline, or does voice/adaptive intake simply stop and only touch-based static forms survive? Given how much weight "offline-first" carries in your pitch, be precise about which parts degrade to what, rather than one umbrella "offline: handled" line.
+
+6. **One general caution, stated once and not repeated per item:** "implemented and verified via automated test suites" proves your code runs as written — it doesn't independently confirm that the herb-drug interaction data, scheme eligibility criteria, or idiom translations are *medically/factually accurate*. Those need a separate accuracy pass (checking against real guideline documents, a pharmacist's sanity check on the interaction list) distinct from unit tests passing.
+
+---
+
+## The "Vaasani" API — I Think You Mean One of Two Real Things
+
+I couldn't find a product called "Vaasani" — closest real matches are **Vaani** (an Indic voice-AI company with an explicit healthcare vertical — "diagnostics report follow-ups and patient outreach") and **Sarvam AI**, which is the stronger fit for your actual pipeline. Assuming this is what you meant:
+
+**Sarvam is genuinely worth centralizing around** — it bundles almost everything you're currently sourcing from separate providers, under one API key:
+- **Saaras v3** — speech-to-text, 22 Indian languages + English, code-mixed/Hinglish support, **and a real-time WebSocket streaming mode released this month** (`saaras:v3-realtime`) with partial transcripts and live mid-stream reconfiguration — this is the actual answer to your earlier "Gemini Live" ask, purpose-built for Indic speech.
+- **Bulbul v3** — TTS, natural voices across 11 languages, sub-250ms streaming — for your audio-readback and closed-loop discharge features.
+- **Mayura** — translation across 11 languages — this is your "Babel Fish" idiom-to-medical-English layer, off the shelf.
+- **Sarvam Vision** — document AI, OCR for scans/handwritten forms into structured JSON — directly replaces your Tesseract/PaddleOCR step with something purpose-trained for messy Indian documents.
+- **Sarvam-105B** — a 128K-context Indic-tuned chat model, usable for your structuring/summarization step.
+
+**How to actually wire it in:** sign up at `dashboard.sarvam.ai`, generate an API key, then either hit the REST endpoints directly or `pip install sarvamai` for the Python SDK — it's a single POST per call (audio in → transcript out, text in → speech out, image in → structured fields out). For the live conversational loop specifically, they have ready-made integration guides for **LiveKit** and **Pipecat** that scaffold a full real-time voice agent around Saaras + Bulbul, rather than you wiring WebSocket streaming from scratch.
+
+**Practical framing for your pitch:** keep **Bhashini** named in your architecture slide since it's explicitly cited in the problem statement — it signals Digital India alignment — but note your actual voice/OCR backend is **provider-agnostic** (the same model-router pattern you're already using for Groq/NIM), with Sarvam as your working implementation and Bhashini as a swappable government-aligned option. That's a stronger, more honest story than picking one and hard-coding it.
+
+---
+
+## Hybrid Mode — Clear Feature Split
+
+Here's the breakdown you asked for, since right now everything reads as one undifferentiated feature list:
+
+| Mode | Who uses it | What's in it |
+|---|---|---|
+| **Kiosk (hospital tablet/PC)** | Walk-in patients, no smartphone | The full core flow end to end — welcome, identify/consent, conversational history, AYUSH module, document scan, scheme card, red-flag interstitial, confirm/submit, token/print. This mode must be complete on its own; it's the baseline. |
+| **Personal Device / Home PWA** | Smartphone owners | Everything Kiosk has, **plus** the features that only make sense off-site: pre-visit history capture from home, WhatsApp delivery of the summary/checklist, live queue SMS ("leave the waiting hall, we'll text you"), and multi-generational remote assist (a family member elsewhere helps via their own phone). |
+| **Assisted Mode** | Volunteer/ASHA/family member operating the device | Same core flow, but this is where caregiver/proxy tagging, joint-family two-person answering, gender/modesty routing, and confidence-based ASHA escalation actually earn their keep — they exist specifically because a third party is present or literacy is zero. |
+| **Physician-side (separate device/login)** | Doctor only | Structured summary with accept/reject diffs, herb-drug alerts, visit memory, reverse voice dictation. Never patient-facing. |
+| **Admin-side (separate device/login)** | Hospital management | Festival-aware analytics, any outbreak/aggregate dashboards. Never patient- or doctor-facing. |
+
+This split is also a good pitch-deck slide on its own — it shows you've thought about *where* each feature actually lives, not just that it exists.
+
+---
+
+## More Game-Changers — Genuinely New Ground, Not Repeats
+
+1. **A discreet "something else is wrong" channel.** A patient accompanied by the person harming them (a real and common situation, not hypothetical) has no way to signal distress on a screen someone else is watching. A quiet option — buried in a menu, phrased innocuously ("I'd like to speak to a nurse privately") — that routes to a staff member without announcing itself on-screen is a genuinely underserved, high-value feature in Indian hospital settings. This needs real hospital protocol behind it, not just a button, but it's worth raising with your team as a serious addition, not a gimmick.
+2. **TB red-flag linkage to Nikshay.** India mandates TB case notification via the Nikshay portal. If your symptom intake flags a classic TB pattern (cough >2 weeks, weight loss, night sweats), surface a sputum-test suggestion and a Nikshay-notification prompt for the doctor — ties a symptom you're already capturing to a real national health system, not a hypothetical one.
+3. **A silent, text-only "Quiet Mode."** Your whole design leans voice-first — which quietly excludes deaf and hard-of-hearing patients, and anyone who can't speak freely in a shared space. A mode that's 100% touch/text with no audio dependency in either direction isn't just an accessibility checkbox, it's a real population your current design doesn't serve yet.
+4. **Live pharmacy stock-check at prescription time.** Government hospital pharmacies frequently run out of specific drugs. If the doctor's screen can check current stock (even just a hospital-maintained spreadsheet/simple inventory table) and flag "not in stock, here's the available alternative" before the prescription is finalized, you save patients a wasted trip to a private pharmacy — a genuinely operational, unglamorous, high-impact win.
+5. **Portable identity for migrant workers.** A large population of Indian patients work in a state that isn't their home state and may not have a local address or ABHA linkage. A path that doesn't assume local residency (or a fixed home state for the scheme checker) closes a real gap your current state-based scheme logic doesn't yet account for.
+6. **Postnatal follow-up chain.** You already built SMS/IVR reminder infrastructure — point a dedicated sequence of it at postnatal follow-ups specifically, since missed postnatal checks are a significant, well-documented contributor to maternal complications in India. Reusing infrastructure you've already built for a targeted high-stakes use case is cheap to add and easy to defend in a pitch.
+7. **Point-and-photograph for visible symptoms — the safe version of what Darshana was reaching for.** Instead of guessing doshas or pallor from a face photo, let patients document an actual visible symptom (a wound, rash, swelling) as part of history-taking, tagged with date, purely as a **visual record for the doctor to look at themselves** — no AI interpretation layer making a clinical claim about it. Same camera capability you already built for documents, redirected toward something with a real, low-risk use case instead of an unvalidated diagnostic guess.

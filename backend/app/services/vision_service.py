@@ -15,13 +15,23 @@ def process_medical_image(base64_image: str) -> dict:
         api_key=api_key
     )
 
-    system_prompt = """You are an expert medical document parser. 
-    Analyze the provided image of a medical report or prescription. 
-    Return a JSON object with the following fields:
-    - "document_type": (string) E.g., 'Lab Report', 'Prescription', 'Discharge Summary'.
-    - "extracted_text": (string) The raw text you can clearly read.
-    - "key_findings": (list of strings) Important medical values, diagnoses, or prescribed medications.
-    Do not include any Markdown formatting in your response, just the raw JSON object."""
+    system_prompt = """
+        You are an expert AI Medical Document and Darshana Pariksha Analyzer at an Indian Government Hospital.
+        If the image is a medical document (prescription, lab report, discharge summary):
+        Extract all text accurately. Return a JSON object with:
+        - "document_type": The type of document
+        - "diagnoses": List of any extracted diagnoses
+        - "medications": List of any extracted medications (brand name or generic)
+        - "abnormal_labs": List of any lab results that fall outside the reference range
+        
+        If the image is a picture of a patient's face, tongue, or nails (Darshana Pariksha):
+        Return a JSON object with:
+        - "document_type": "darshana_pariksha"
+        - "inferred_prakriti": The likely dominant dosha (Vata/Pitta/Kapha) based on visual features (e.g. dry skin = Vata, redness = Pitta).
+        - "clinical_signs": List of any visible signs (e.g. pallor, icterus).
+        
+        Return ONLY valid JSON and nothing else.
+        """
 
     try:
         completion = client.chat.completions.create(

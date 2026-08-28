@@ -16,9 +16,10 @@ def test_triage():
     response = client.post("/api/triage", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert "urgency" in data
-    assert "department" in data
-    print(f"Success: {data}\n")
+    assert "resourceType" in data
+    assert data["resourceType"] == "Bundle"
+    assert "entry" in data
+    print(f"Success (FHIR Bundle): {str(data)[:100]}...\n")
 
 def test_vision_ocr():
     print("Testing POST /api/vision/ocr...")

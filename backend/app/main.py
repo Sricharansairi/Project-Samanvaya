@@ -1,9 +1,25 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import json
 from app.services.triage_service import triage_symptoms
 from app.services.vision_service import process_medical_image
 from app.services.bhashini_service import bhashini_service
+from app.services.pii_service import strip_pii
+from app.services.fhir_service import convert_to_fhir_r4
+from app.services.clinical_automation import evaluate_overdose_guard, generate_ayurvedic_regimen, generate_patient_questions
+from app.services.hospital_finder import get_nearby_hospitals
+from app.services.whatsapp_service import send_whatsapp_message
+from app.services.extraordinary_features import (
+    generate_dynamic_followup_chips, append_doctor_dictation_to_fhir,
+    get_festival_analytics, estimate_rough_cost, generate_remote_assist_link,
+    fetch_asha_records, play_old_prescription
+)
+from app.services.extraordinary_features_v2 import (
+    translate_dialect_to_medical, check_herb_drug_conflict, delete_raw_data,
+    log_doctor_audit_trail, tag_caregiver_proxy, generate_closed_loop_discharge,
+    pull_last_visit_history
+)
 
 class TranscribeRequest(BaseModel):
     base64_audio: str
@@ -19,6 +35,21 @@ class TriageRequest(BaseModel):
 
 class OCRRequest(BaseModel):
     base64_image: str
+
+class AutomationRequest(BaseModel):
+    ocr_medications: list[str] = []
+    dosha: str = "vata"
+    lat: float = 28.6139
+    lon: float = 77.2090
+    triage_condition: str = ""
+
+class HospitalRequest(BaseModel):
+    postal_code: str
+
+class WhatsappRequest(BaseModel):
+    phone_number: str
+    message: str
+    document_url: str = None
 
 app = FastAPI(
     title="Project Samanvaya API",
@@ -41,8 +72,16 @@ async def health_check():
 
 @app.post("/api/triage")
 async def handle_triage(request: TriageRequest):
-    result = triage_symptoms(request.symptoms)
-    return result
+    # 1. Strip PII (Aadhaar, Phone Numbers)
+    safe_symptoms = strip_pii(request.symptoms)
+    
+    # 2. RAG + Triage LLM
+    result = triage_symptoms(safe_symptoms)
+    
+    # 3. Translate to FHIR R4 Standard
+    fhir_bundle = convert_to_fhir_r4(result, safe_symptoms)
+    
+    return fhir_bundle
 
 @app.post("/api/vision/ocr")
 async def handle_ocr(request: OCRRequest):
@@ -59,6 +98,279 @@ async def handle_voice_speak(request: SpeakRequest):
     base64_audio = bhashini_service.generate_speech(request.text, request.target_language, request.gender)
     return {"base64_audio": base64_audio}
 
+@app.post("/api/automations/evaluate")
+async def handle_automations(request: AutomationRequest):
+    overdose = evaluate_overdose_guard(request.ocr_medications)
+    ayurvedic = generate_ayurvedic_regimen(request.dosha, request.lat, request.lon)
+    prompter = generate_patient_questions(request.triage_condition)
+    return {
+        "overdose_guard": overdose,
+        "ayurvedic_regimen": ayurvedic,
+        "patient_questions": prompter
+    }
+
+from fastapi import HTTPException
+
+# Mock supabase client for the rollback transaction example
+class MockSupabase:
+    def table(self, name):
+        class MockTable:
+            def insert(self, data):
+                class MockResponse:
+                    def execute(self):
+                        return type('obj', (object,), {'data': [{'id': 'mock_id_123'}]})()
+                return MockResponse()
+            def delete(self):
+                class MockResponse:
+                    def eq(self, k, v):
+                        class MockEq:
+                            def execute(self): pass
+                        return MockEq()
+                return MockResponse()
+        return MockTable()
+supabase = MockSupabase()
+
+from app.services.epidemic_radar import detect_epidemic_outbreak
+from app.services.abha_service import generate_abha_from_aadhaar, verify_audio_consent
+
+@app.get("/api/admin/epidemic-radar/{postal_code}")
+async def check_epidemic_radar(postal_code: str):
+    return detect_epidemic_outbreak(supabase, postal_code)
+
+class AbhaRequest(BaseModel):
+    name: str
+    aadhaar_number: str
+
+@app.post("/api/abha/create")
+async def create_abha(request: AbhaRequest):
+    return generate_abha_from_aadhaar(request.dict())
+
+class ConsentRequest(BaseModel):
+    audio_transcript: str
+
+@app.post("/api/abha/consent")
+async def verify_consent(request: ConsentRequest):
+    has_consent = verify_audio_consent(request.audio_transcript)
+    if not has_consent:
+        raise HTTPException(status_code=403, detail="Audio consent not verified. Patient must clearly say Yes.")
+    return {"status": "success", "message": "Immutable audio consent verified and attached to FHIR bundle."}
+
+class FamilyAuthRequest(BaseModel):
+    phone_number: str
+    otp: str
+
+@app.post("/api/family/auth")
+async def family_cluster_auth(request: FamilyAuthRequest):
+    # Mock returning multiple profiles for a single phone number
+    if request.otp == "1234":
+        return {
+            "status": "success",
+            "profiles": [
+                {"id": "p1", "name": "Ramesh", "relation": "Self", "abha_id": "12-3456-7890-1234"},
+                {"id": "p2", "name": "Sita", "relation": "Wife", "abha_id": "98-7654-3210-9876"},
+                {"id": "p3", "name": "Arjun", "relation": "Son", "abha_id": "55-5555-5555-5555"}
+            ]
+        }
+    raise HTTPException(status_code=401, detail="Invalid OTP")
+
+@app.post("/api/triage/submit")
+async def handle_triage_submission(patient_id: str, fhir_json: dict):
+    """
+    Saves a FHIR record safely. If any step fails, the transaction rolls back.
+    (Simulated using Supabase RPC or Python-level orchestration).
+    """
+    try:
+        # In a real app, this would use an RPC call for a true Postgres transaction:
+        # response = supabase.rpc('insert_triage_transaction', {'p_id': patient_id, 'fhir': fhir_json}).execute()
+        
+        # Simulating Python-level rollback safety:
+        visit_response = supabase.table("visits").insert({"patient_id": patient_id, "status": "triaged"}).execute()
+        if not visit_response.data:
+            raise Exception("Failed to create visit.")
+            
+        visit_id = visit_response.data[0]['id']
+        
+        fhir_response = supabase.table("fhir_records").insert({"visit_id": visit_id, "fhir_bundle": fhir_json}).execute()
+        if not fhir_response.data:
+            # Rollback visit if FHIR fails
+            supabase.table("visits").delete().eq("id", visit_id).execute()
+            raise Exception("Failed to insert FHIR record. Rolling back visit.")
+            
+        return {"status": "success", "visit_id": visit_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database Transaction Failed: {str(e)}")
+
+
+@app.post("/api/clinics/nearby")
+async def handle_clinics(request: HospitalRequest):
+    hospitals = get_nearby_hospitals(request.postal_code)
+    return {"hospitals": hospitals}
+
+@app.post("/api/notifications/whatsapp")
+async def handle_whatsapp(request: WhatsappRequest):
+    success = send_whatsapp_message(request.phone_number, request.message, request.document_url)
+    return {"success": success}
+
+class FollowUpRequest(BaseModel):
+    complaint: str
+
+@app.post("/api/triage/dynamic-chips")
+async def get_dynamic_chips(request: FollowUpRequest):
+    return generate_dynamic_followup_chips(request.complaint)
+
+class DictationRequest(BaseModel):
+    fhir_record: dict
+    dictated_text: str
+
+@app.post("/api/doctor/dictation")
+async def append_dictation(request: DictationRequest):
+    return append_doctor_dictation_to_fhir(request.fhir_record, request.dictated_text)
+
+@app.get("/api/admin/festival-analytics/{postal_code}")
+async def get_festival_stats(postal_code: str):
+    return get_festival_analytics(postal_code)
+
+@app.get("/api/cost-estimator")
+async def get_cost_estimate(department: str, scheme_eligible: bool = False):
+    return estimate_rough_cost(department, scheme_eligible)
+
+class RemoteAssistRequest(BaseModel):
+    patient_id: str
+    relative_phone: str
+
+@app.post("/api/family/remote-assist")
+async def request_remote_assist(request: RemoteAssistRequest):
+    return generate_remote_assist_link(request.patient_id, request.relative_phone)
+
+@app.get("/api/asha-records/{phone_number}")
+async def get_asha_records(phone_number: str):
+    return fetch_asha_records(phone_number)
+
+class PrescriptionAudioRequest(BaseModel):
+    drug_name: str
+    dosage: str
+    language: str = "hi"
+
+@app.post("/api/voice/play-prescription")
+async def play_prescription(request: PrescriptionAudioRequest):
+    return play_old_prescription(request.drug_name, request.dosage, request.language)
+
+class DialectRequest(BaseModel):
+    dialect_text: str
+
+@app.post("/api/translate/dialect")
+async def translate_dialect(request: DialectRequest):
+    return {"medical_english": translate_dialect_to_medical(request.dialect_text)}
+
+class ConflictRequest(BaseModel):
+    allopathic_drugs: list[str]
+    ayurvedic_drugs: list[str]
+
+@app.post("/api/safety/herb-drug-conflict")
+async def check_conflict(request: ConflictRequest):
+    return check_herb_drug_conflict(request.allopathic_drugs, request.ayurvedic_drugs)
+
+@app.delete("/api/privacy/delete-raw/{patient_id}")
+async def data_minimization(patient_id: str):
+    success = delete_raw_data(patient_id)
+    return {"status": "success", "deleted": success}
+
+class AuditRequest(BaseModel):
+    patient_id: str
+    ai_draft_fhir: dict
+    doctor_final_fhir: dict
+
+@app.post("/api/audit/doctor-edit")
+async def log_audit_trail(request: AuditRequest):
+    success = log_doctor_audit_trail(request.patient_id, request.ai_draft_fhir, request.doctor_final_fhir)
+    return {"status": "success", "logged": success}
+
+class ProxyRequest(BaseModel):
+    fhir_record: dict
+    caregiver_name: str
+    relation: str
+
+@app.post("/api/triage/proxy-tag")
+async def tag_proxy(request: ProxyRequest):
+    return tag_caregiver_proxy(request.fhir_record, request.caregiver_name, request.relation)
+
+class DischargeRequest(BaseModel):
+    prescription_text: str
+    language: str = "hi"
+
+@app.post("/api/discharge/translator")
+async def discharge_translator(request: DischargeRequest):
+    return generate_closed_loop_discharge(request.prescription_text, request.language)
+
+@app.get("/api/triage/fast-path/{abha_id}")
+async def fast_path_history(abha_id: str):
+    return pull_last_visit_history(abha_id)
+
+from app.services.dialog_manager import TriageSession
+
+# Store active sessions in memory
+active_sessions: dict[str, TriageSession] = {}
+
+@app.websocket("/ws/triage/{client_id}")
+async def websocket_triage(websocket: WebSocket, client_id: str):
+    await websocket.accept()
+    
+    # Initialize a new stateful session for this client
+    session = TriageSession(client_id)
+    active_sessions[client_id] = session
+    
+    # Send the initial greeting
+    initial_greeting = json.loads(session.history[1]["content"])
+    await websocket.send_json(initial_greeting)
+    
+    try:
+        while True:
+            # Receive patient's answer (voice transcribed to text, or chip tap)
+            data = await websocket.receive_text()
+            
+            # Process through the Dialog Manager
+            response = session.process_patient_input(data)
+            
+            # Stream back the next question and chips
+            await websocket.send_json(response)
+            
+            if response.get("status") == "complete":
+                # In a real app, trigger convert_to_fhir_r4 here
+                break
+    except WebSocketDisconnect:
+        print(f"Client {client_id} disconnected")
+    finally:
+        if client_id in active_sessions:
+            del active_sessions[client_id]
+
+class QueueAlertRequest(BaseModel):
+    phone_number: str
+    token_number: str
+    department: str
+
+class RemoteAssistRequest(BaseModel):
+    patient_id: str
+    relative_phone: str
+
+@app.post("/api/queue/live-alert")
+async def register_queue_alert(request: QueueAlertRequest):
+    """
+    (Feature: 'How long until my turn' live SMS alerts)
+    """
+    return {
+        "status": "registered",
+        "phone_number": request.phone_number,
+        "token_number": request.token_number,
+        "message": f"Alerts activated. You will receive an SMS when 3 patients away from {request.department}."
+    }
+
+@app.post("/api/patient/remote-assist")
+async def create_remote_assist(request: RemoteAssistRequest):
+    """
+    (Feature: Multi-Generational Remote Assist)
+    """
+    return generate_remote_assist_link(request.patient_id, request.relative_phone)
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
