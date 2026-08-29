@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, User, FileText, HeartPulse, Stethoscope, ShieldCheck, QrCode, FileCheck, UploadCloud, Loader2 } from "lucide-react";
+import { ArrowLeft, User, FileText, HeartPulse, Stethoscope, ShieldCheck, QrCode, FileCheck, UploadCloud, Loader2, Check } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import FloatingAssistant from "@/components/FloatingAssistant";

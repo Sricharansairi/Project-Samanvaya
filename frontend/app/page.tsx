@@ -16,7 +16,7 @@ export default function Home() {
       <TrustBanner 
         currentTab="home"
         onTabChange={() => {}}
-        onLanguageChange={setLanguage}
+        onLanguageChange={(lang: string) => setLanguage(lang as Language)}
       />
 
       {/* Main Body */}
@@ -96,6 +96,31 @@ export default function Home() {
             </p>
           </motion.a>
 
+        </div>
+        
+        {/* Restored Missing Features Grid */}
+        <div className="mt-16 w-full max-w-6xl mx-auto">
+          <div className="flex items-center gap-4 mb-6">
+            <h3 className="text-xl font-bold text-[#0f2942]">Explore Other Modules</h3>
+            <div className="h-[1px] flex-1 bg-gray-200"></div>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: "🏛️", title: "Scheme Eligibility", desc: "Check PMJAY/State Schemes" },
+              { icon: "📄", title: "OCR Scanner", desc: "Digitize Old Prescriptions" },
+              { icon: "🌿", title: "AYUSH Pariksha", desc: "Dashavidha Assessment" },
+              { icon: "🎙️", title: "Voice Intake", desc: "Conversational History" },
+              { icon: "🛡️", title: "DPDP Consent", desc: "Privacy Management" },
+              { icon: "📱", title: "Queue & SMS", desc: "Live Token Tracking" },
+            ].map((feature, idx) => (
+              <div key={idx} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-[#0f4c81] transition-all cursor-pointer group">
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{feature.icon}</div>
+                <h4 className="font-bold text-[#0f2942] text-sm mb-1">{feature.title}</h4>
+                <p className="text-xs text-gray-500 font-medium">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
