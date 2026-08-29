@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import json
 from app.services.triage_service import triage_symptoms
 from app.services.vision_service import process_medical_image
-from app.services.bhashini_service import bhashini_service
+from app.services.sarvam_service import sarvam_service
 from app.services.pii_service import strip_pii
 from app.services.fhir_service import convert_to_fhir_r4
 from app.services.clinical_automation import evaluate_overdose_guard, generate_ayurvedic_regimen, generate_patient_questions
@@ -90,13 +90,23 @@ async def handle_ocr(request: OCRRequest):
 
 @app.post("/api/voice/transcribe")
 async def handle_voice_transcribe(request: TranscribeRequest):
-    text = bhashini_service.transcribe_audio(request.base64_audio, request.source_language)
+    text = sarvam_service.transcribe_audio(request.base64_audio, request.source_language)
     return {"text": text}
 
 @app.post("/api/voice/speak")
 async def handle_voice_speak(request: SpeakRequest):
-    base64_audio = bhashini_service.generate_speech(request.text, request.target_language, request.gender)
+    base64_audio = sarvam_service.generate_speech(request.text, request.target_language, request.gender)
     return {"base64_audio": base64_audio}
+
+class VoiceTranscriptRequest(BaseModel):
+    transcript: str
+
+from app.services.triage_service import extract_patient_entities
+
+@app.post("/api/voice/extract-entities")
+async def handle_entity_extraction(request: VoiceTranscriptRequest):
+    entities = extract_patient_entities(request.transcript)
+    return entities
 
 @app.post("/api/automations/evaluate")
 async def handle_automations(request: AutomationRequest):
@@ -387,6 +397,116 @@ async def get_stalled_cases():
         {"id": "V-5678", "patient_name": "Sita Devi", "status": "waiting", "submitted_at": (now - timedelta(minutes=45)).isoformat()}
     ]
     return flag_stalled_cases(mock_active_cases, threshold_hours=2)
+
+# ==========================================
+# PHASE 5: SUPABASE DATABASE INTEGRATION
+# ==========================================
+
+class PatientRequest(BaseModel):
+    abha_id: str
+    name: str
+    phone: str
+
+@app.post("/api/db/patients")
+async def upsert_patient(request: PatientRequest):
+    if not supabase: return {"status": "error", "message": "Supabase not configured"}
+    
+    # Try to find existing
+    res = supabase.table("patients").select("*").eq("abha_id", request.abha_id).execute()
+    if res.data and len(res.data) > 0:
+        return {"status": "success", "patient": res.data[0]}
+    
+    # Insert new
+    insert_res = supabase.table("patients").insert({
+        "abha_id": request.abha_id,
+        "name": request.name,
+        "phone": request.phone
+    }).execute()
+    return {"status": "success", "patient": insert_res.data[0]}
+
+
+class VisitRequest(BaseModel):
+    abha_id: str
+    vitals: dict
+    chief_concern: str
+    urgency: str
+    department: str
+
+@app.post("/api/db/visits")
+async def create_visit(request: VisitRequest):
+    if not supabase: return {"status": "error", "message": "Supabase not configured"}
+    
+    # Get patient ID
+    patient_res = supabase.table("patients").select("id").eq("abha_id", request.abha_id).execute()
+    if not patient_res.data:
+        raise HTTPException(status_code=404, detail="Patient not found. Register patient first.")
+    patient_id = patient_res.data[0]["id"]
+    
+    # Generate Token Number safely
+    import random
+    token = f"A-{random.randint(100, 999)}"
+    
+    # Check for collision (naive)
+    collision_res = supabase.table("visits").select("id").eq("token_number", token).execute()
+    if collision_res.data:
+        token = f"A-{random.randint(1000, 9999)}"
+        
+    res = supabase.table("visits").insert({
+        "patient_id": patient_id,
+        "token_number": token,
+        "vitals": request.vitals,
+        "chief_concern": request.chief_concern,
+        "urgency": request.urgency,
+        "department": request.department,
+        "status": "waiting"
+    }).execute()
+    
+    return {"status": "success", "visit": res.data[0]}
+
+@app.get("/api/db/queue")
+async def get_clinic_queue():
+    if not supabase: return {"status": "error", "message": "Supabase not configured"}
+    
+    res = supabase.table("visits").select("*, patients(name, abha_id, phone)").eq("status", "waiting").order("created_at").execute()
+    return {"queue": res.data}
+
+class PrescriptionDataRequest(BaseModel):
+    visit_id: str
+    doctor_name: str
+    medications: list
+    clinical_summary: str
+
+@app.post("/api/db/prescriptions")
+async def save_prescription(request: PrescriptionDataRequest):
+    if not supabase: return {"status": "error", "message": "Supabase not configured"}
+    
+    # 1. Save prescription
+    presc_res = supabase.table("prescriptions").insert({
+        "visit_id": request.visit_id,
+        "doctor_name": request.doctor_name,
+        "medications": request.medications,
+        "clinical_summary": request.clinical_summary
+    }).execute()
+    
+    # 2. Update visit status to completed
+    supabase.table("visits").update({"status": "completed"}).eq("id", request.visit_id).execute()
+    
+    return {"status": "success", "prescription": presc_res.data[0]}
+
+@app.get("/api/db/history/{abha_id}")
+async def get_patient_history(abha_id: str):
+    if not supabase: return {"status": "error", "message": "Supabase not configured"}
+    
+    patient_res = supabase.table("patients").select("id").eq("abha_id", abha_id).execute()
+    if not patient_res.data:
+        return {"history": []}
+    
+    patient_id = patient_res.data[0]["id"]
+    
+    # Get completed visits with prescriptions
+    res = supabase.table("visits").select("*, prescriptions(*)").eq("patient_id", patient_id).eq("status", "completed").order("created_at", desc=True).execute()
+    
+    return {"history": res.data}
 
 if __name__ == "__main__":
     import uvicorn

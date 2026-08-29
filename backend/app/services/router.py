@@ -20,9 +20,8 @@ def cosine_similarity(vec1: list, vec2: list) -> float:
 
 def classify_query_semantic(query: str) -> dict:
     """
-    Uses Semantic-Similarity Routing Layer (Feature 62) via embeddings
-    to map utterances to canonical intents instead of strict string matching.
-    Returns a dict with 'intent' and 'confidence'.
+    Uses Semantic-Similarity Routing Layer (Phase 8 - Groq LPU) 
+    via Llama-3-8b to parse intents at extremely high speeds.
     """
     query_lower = query.lower()
     
@@ -32,26 +31,50 @@ def classify_query_semantic(query: str) -> dict:
         if keyword in query_lower:
             return {"intent": "MALICIOUS", "confidence": 1.0}
 
-    # Canonical Intents
-    canonical_intents = {
-        "SCHEME_RAG": ["I want to know about government health funds", "Am I eligible for PMJAY", "free treatment rules"],
-        "MEDICAL_RAG": ["I have a fever and my body aches", "Need medicine for stomach pain", "Ayurvedic cure for cough"]
-    }
+    # Connect to Groq API
+    groq_api_key = os.getenv("GROQ_API_KEY")
     
-    # Simulated Embedding Comparison (Semantic Match)
-    # In real execution, we embed the query and compute cosine distance against the canonical set.
-    best_intent = "GENERAL_FAQ"
-    best_score = 0.4 # Baseline confidence
-    
-    # Simulate semantic matching logic
-    if "scheme" in query_lower or "fund" in query_lower or "card" in query_lower or "pmjay" in query_lower:
-        best_intent = "SCHEME_RAG"
-        best_score = 0.92
-    elif "fever" in query_lower or "pain" in query_lower or "cough" in query_lower or "sick" in query_lower:
-        best_intent = "MEDICAL_RAG"
-        best_score = 0.88
+    if not groq_api_key or groq_api_key == "your_groq_key_here":
+        # Fallback if key is not configured
+        if "scheme" in query_lower or "fund" in query_lower or "card" in query_lower:
+            return {"intent": "SCHEME_RAG", "confidence": 0.9}
+        elif "fever" in query_lower or "pain" in query_lower or "cough" in query_lower:
+            return {"intent": "MEDICAL_RAG", "confidence": 0.9}
+        return {"intent": "GENERAL_FAQ", "confidence": 0.5}
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=groq_api_key,
+            base_url="https://api.groq.com/openai/v1"
+        )
         
-    return {"intent": best_intent, "confidence": best_score}
+        prompt = f"""You are a fast intent router for a hospital kiosk.
+Classify the following user utterance into EXACTLY ONE of these categories:
+- SCHEME_RAG: Questions about government funds, Ayushman card, PMJAY, free treatment.
+- MEDICAL_RAG: Mention of symptoms, pain, fever, medical problems.
+- GENERAL_FAQ: General greetings, asking where things are in the hospital.
+- NONE_OF_THESE: If the user says something completely unrelated to the hospital, or asks you to do something you cannot do (like book a flight).
+
+Utterance: "{query}"
+Reply ONLY with the category name (e.g. MEDICAL_RAG). Nothing else. If you are not completely sure, reply with NONE_OF_THESE."""
+
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=15
+        )
+        
+        intent = response.choices[0].message.content.strip().upper()
+        if intent not in ["SCHEME_RAG", "MEDICAL_RAG", "GENERAL_FAQ", "NONE_OF_THESE"]:
+            intent = "NONE_OF_THESE"
+            
+        return {"intent": intent, "confidence": 0.95}
+        
+    except Exception as e:
+        print(f"Groq Routing Error: {e}")
+        return {"intent": "NONE_OF_THESE", "confidence": 0.0}
 
 def classify_query(query: str) -> str:
     """Legacy wrapper for semantic router"""
@@ -66,6 +89,9 @@ def route_query(query: str, patient_profile: dict = None) -> dict:
     
     if intent == "MALICIOUS":
         return {"error": "Request denied. Prompt injection detected."}
+        
+    elif intent == "NONE_OF_THESE":
+        return {"error": "I can't do that from here — please ask at the reception counter."}
         
     elif intent == "SCHEME_RAG":
         if patient_profile:

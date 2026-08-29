@@ -93,7 +93,7 @@ def generate_closed_loop_discharge(prescription_text: str, language: str) -> dic
         icons = ["☀️", "🌙"]
         
     return {
-        "audio_guidance_url": f"https://mock-bhashini.api/audio/{language}/discharge_instructions.mp3",
+        "audio_guidance_url": f"https://mock-sarvam.api/audio/{language}/discharge_instructions.mp3",
         "icons": icons,
         "translated_text": f"Translated to {language}: {prescription_text}"
     }

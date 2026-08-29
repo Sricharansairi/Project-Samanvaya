@@ -1,8 +1,12 @@
 from app.services.db import supabase
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
+from app.core.key_rotator import key_rotator
 
-# Initialize embedding model for queries
-embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# Initialize embedding model for queries using NVIDIA's fast cloud endpoint
+embeddings_model = NVIDIAEmbeddings(
+    model="nvidia/nv-embedqa-e5-v5", 
+    api_key=key_rotator.get_llama_3_3_70b_key()
+)
 
 def query_medical_guidelines(query_text: str, match_count: int = 5):
     """

@@ -123,3 +123,50 @@ def triage_symptoms(symptom_text: str) -> dict:
             "department": "General",
             "advice": "Unable to process symptoms at this time. Please consult a doctor."
         }
+
+def extract_patient_entities(voice_transcript: str) -> dict:
+    """
+    Uses NVIDIA LLaMA to extract structured patient details from an unstructured voice transcript.
+    """
+    api_key = key_rotator.get_llama_3_3_70b_key()
+    
+    client = OpenAI(
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=api_key
+    )
+
+    system_prompt = """You are an advanced medical extraction AI. 
+    Analyze the provided voice transcript and extract the patient's information into a strict JSON object.
+    Fields to extract (leave as empty string "" if not found):
+    - "name": (string) The patient's full name.
+    - "phone": (string) 10-digit phone number.
+    - "weight": (string) Weight in kg. Return just the number.
+    - "bp": (string) Blood pressure (e.g., "120/80").
+    - "temp": (string) Temperature. Return just the number.
+    - "concern": (string) The chief medical complaint.
+    Do not include any Markdown formatting or code blocks in your response, just the raw JSON object."""
+
+    try:
+        completion = client.chat.completions.create(
+            model="nvidia/llama-3.1-nemotron-70b-instruct",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Voice Transcript: {voice_transcript}"}
+            ],
+            temperature=0.1,
+            max_tokens=256
+        )
+        
+        response_text = completion.choices[0].message.content.strip()
+        
+        # Clean up possible markdown code blocks from LLaMA response
+        if response_text.startswith("```json"):
+            response_text = response_text.replace("```json", "").replace("```", "").strip()
+            
+        result = json.loads(response_text)
+        return result
+    except Exception as e:
+        print(f"Error extracting entities: {e}")
+        return {
+            "name": "", "phone": "", "weight": "", "bp": "", "temp": "", "concern": ""
+        }

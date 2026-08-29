@@ -1,7 +1,7 @@
 from openai import OpenAI
 import json
 from app.core.key_rotator import key_rotator
-from app.services.bhashini_service import bhashini_service
+from app.services.sarvam_service import sarvam_service
 
 def generate_dynamic_followup_chips(complaint: str) -> dict:
     """
@@ -133,7 +133,7 @@ def play_old_prescription(drug_name: str, dosage: str, language: str = "hi") -> 
     (Feature: Audio Playback of Old Prescriptions)
     """
     text = f"This is {drug_name}. You need to take it {dosage}."
-    base64_audio = bhashini_service.generate_speech(text, language, gender="female")
+    base64_audio = sarvam_service.generate_speech(text, language, gender="female")
     return {
         "text": text,
         "audio_b64": base64_audio

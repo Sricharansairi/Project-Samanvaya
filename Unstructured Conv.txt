@@ -1255,3 +1255,62 @@ A few of these ideas are excellent *narrative* framing but a much bigger *engine
 - Full hospital indoor navigation ("Counter 4 → 2nd floor → Room 215") needs a live facility map/wayfinding data source you don't have — keep this as the simple token+text-direction version you already scoped earlier, not a live indoor-routing system.
 
 **The single strongest line to take from this whole document into your pitch:** reposition your project's value proposition from "we digitize the intake form" to "we make sure the patient's case doesn't fall through the cracks between the moment they walk in and the moment they're actually seen" — that's a genuinely more compelling frame than a feature list, and everything you've already built (routing, reminders, summaries, tokens) already supports it without needing the heavier organizational pieces.
+
+
+======================================================================================================================================================================================================================================================================================================================================================================================================================================================
+
+## Is AI4Bharat "Better"? Not Quite — Here's the Actual Trade-off
+
+Yes, AI4Bharat has both: **STT** (IndicWav2Vec, IndicWhisper, IndicConformer — covering all 22 scheduled languages) and **TTS** (IndicTTS/AI4BTTS across 13 languages, plus a newer Indic Parler-TTS release). Voice quality is genuinely decent — independent benchmarks put it around MOS 3.6–3.9, roughly mid-tier commercial quality, not toy-grade.
+
+But "better" isn't the right frame — it's a different trade: Sarvan is much better for hosted, low ops-overhead usage; AI4Bharat is a good choice for a self-hosted, no-per-request-cost usage, but comes with real operational costs of its own (you now own GPU provisioning, scaling, and uptime instead of paying per request). Interestingly, this is exactly how real production Indian voice-AI deployments are built in 2026 — most run **both together, routed by workflow**: AI4Bharat for cost-sensitive bulk/background tasks, commercial models like Sarvam for high-touch, quality-critical conversations. That's independent confirmation of the exact "Sarvam for the live patient conversation, AI4Bharat as a secondary path" split I suggested earlier — not just my own preference.
+
+## The Render Deployment Plan Needs a Correction
+
+Here's the important catch: **hosting AI4Bharat on a separate Render instance does not give you offline capability.** It's still a network call — just to your own server instead of Sarvam's. If the kiosk has no internet, it can't reach *either* server. The entire value of AI4Bharat for the offline story was "runs with zero network dependency" — that only holds if the model runs **on the kiosk device itself**, not on a second cloud instance.
+
+And separately, the free tier itself is a real problem for this specific job. I checked current numbers: Render's free web services get **512MB RAM and 0.1 CPU**, and — this is the disqualifying part — **spin down after 15 minutes of inactivity, taking 30-60 seconds to wake up on the next request.** For a voice assistant that's supposed to feel instantly responsive, a patient tapping the mic and staring at a spinner for a minute is a worse experience than not having the feature at all. 512MB also isn't enough headroom to comfortably load a speech model alongside your app process — you'd be fighting the platform, not building on it.
+
+**What I'd actually do instead:**
+- For the **online path**, just use Sarvam directly — don't self-host anything, it adds cost and fragility with no upside here.
+- For genuine **offline capability**, the honest scope for a hackathon is the store-and-forward pattern from earlier (capture locally, defer processing until connectivity returns) — not real-time on-device ML inference, which is a serious engineering lift (getting a speech model running inside a browser/PWA via WASM/WebGPU is close to a research project on its own, not a 36-hour add-on).
+- If you want to demonstrate "we thought about true offline inference" as a differentiator without betting the build on it, package a small AI4Bharat checkpoint to run locally on the kiosk's own OS (not a cloud tier at all) as a clearly-labeled stretch demo — separate from your main flow, so it doesn't put your core submission at risk if it's flaky.
+
+## The Autonomy Problem — Two Different Issues, Two Different Fixes
+
+**"Open that," "I want this" (vague pointing language) — this isn't an LLM intelligence problem, it's a missing-context problem.** No model, however good, can resolve "that" with zero information about what "that" refers to. The fix isn't a smarter model — it's smarter fallback design, and you already have the exact right tool for it:
+- When voice input is genuinely ambiguous, don't force a guess. Have the assistant respond with 2-3 large tappable options ("Did you mean this, or this?") — reusing your existing touch-mode UI, not building anything new.
+- If the screen has an obviously focused/highlighted element when they speak, bias toward that as the likely referent — but still confirm rather than commit silently, same Green/Red/Back pattern you already have, just triggered by low-confidence reference resolution instead of only "AI acted autonomously."
+
+**Code-mixing ("mujhe government schemes ke baare mein bolo") — better news here: this is largely already solved by the model choice, not something you need to build.** Sarvam's Saaras STT explicitly advertises native code-mixing support, and their TTS handles sentences like "Hello, kaise ho?" without special handling — these Indic-specific models are trained on exactly this kind of mixed speech because it's the *normal* way people talk, not an edge case. Large LLMs (whatever you use for the reasoning/action-selection layer) also handle code-mixed text reasonably well already, since they're trained on huge amounts of real Hinglish/mixed-language web text.
+
+**Should you fine-tune the LLM? No — not for this, and not for a hackathon timeline.** Fine-tuning needs a labeled dataset of real code-mixed medical-intent examples you don't have, and would need to collect and label — expensive and slow. The much cheaper, much faster lever that gets you most of the benefit:
+- **Few-shot examples in your system prompt.** Show the model 10-15 real example utterances (including code-mixed ones) mapped to the correct action, directly in the prompt. This is in-context learning, not weight updates — zero training infra, immediate effect, and you can add examples as you discover failure cases during testing.
+- **Treat it as an iterative loop, not a one-time fix.** Keep a running (anonymized) log of utterances the assistant got wrong, and feed the corrected ones back into your few-shot examples. This is a legitimate "phase 2" fine-tuning candidate *after* the hackathon, once you actually have real usage data worth training on — training on synthetic guesses now isn't worth the effort.
+
+**Your instinct about describing every feature in one place so the LLM validates correctly, and saying what to do when it can't — this is exactly the right design, and it's a well-established agent pattern, not a novel idea you need to invent from scratch.** Concretely:
+- Build one central manifest: every available action, with a rich natural-language description that includes multiple phrasings and aliases — for the scheme checker, the description should include "government schemes," "sarkari yojana," "govt yojana," "Ayushman card," "health insurance scheme," etc. — so both direct LLM reasoning and embedding-based matching (mentioned a few turns back) can catch varied phrasing, including mixed-language versions.
+- **Always include an explicit "none of these match" option in the action list itself**, not just as an afterthought. Instruct the model directly: if nothing in the list confidently matches, choose this option rather than force-picking the closest wrong action. This is the single most important fix for "hallucinated" autonomous actions — an agent without an explicit escape hatch will always pick *something*, even when it shouldn't.
+- When that fallback fires, the response should be concrete, not a generic apology: "I can't do that from here — please ask at the reception counter" or "that's not something I can help with, but a nurse at Counter 3 can." That's the "state what they should do and whom to approach" piece you asked for — it's a scripted response tied to the fallback action, not something the LLM needs to reason out fresh each time.
+
+## First — The Credits Question, Concretely
+
+₹100 is genuinely tight, and you're right to worry about it. Rough math against Sarvam's published rates:
+- **STT** (₹30/hour): ~3 hours of transcription total — eaten fast if 4-5 teammates are each testing repeatedly
+- **TTS** (₹30/10K characters): ~33,000 characters, maybe 300-400 short spoken prompts
+- **Translation** (₹20/10K characters): ~50,000 characters — the most headroom of the three
+
+That's workable for careful early testing, not for a full team iterating for days plus a live demo. Three things that actually help:
+
+1. **Cache your TTS output.** Most of your spoken prompts (welcome message, standard questions, consent script) are static text repeated every session — generate the audio file once, store it, reuse it. Only genuinely dynamic content (reading back a patient's own words) needs a fresh call each time. This alone probably cuts your TTS spend by most of its volume.
+2. **Mock the API during pure UI work.** When you're just testing button flow, layout, or navigation logic, don't hit the real STT/TTS endpoints — stub the response. Save real API calls for when you're actually testing the voice pipeline itself.
+3. **Check your actual dashboard balance rather than trusting either published number** — Sarvam's own pricing page and rate-limit docs disagreed on ₹100 vs ₹1,000 last I checked, so what you actually got on signup may be better than the worst case. For demo day specifically, a real top-up of a few hundred rupees is cheap insurance against running out mid-demo — worth doing rather than risking it.
+
+## Two Fixes Still Visible in This Version
+
+- **Step 8 (Scheme Check) always asks for Ration Card Color + Income Bracket** — but universal schemes (Rajasthan's Chiranjeevi, West Bengal's Swasthya Sathi) don't need either. The step should branch: ask state first, then only show the fields that scheme's `type` actually requires.
+- **Ration card colors aren't universal across states** — Yellow/Pink/White maps to different categories in different states' PDS systems. That mapping needs to live in your per-state scheme data, not be treated as one fixed nationwide legend.
+
+## The Structured Master Document
+
+Here's everything consolidated into one clean reference — deduplicated, organized by what it's actually for, with the two fixes above folded in and a short "verify before demo" list at the end so nothing gets presented as done when it still needs a check.This should be your one reference doc for pulling slides together — everything's grouped by what it's actually for rather than when it was thought of, and the last section is deliberately a checklist, not a claim, so you don't present something as verified that still needs a look.

@@ -6,12 +6,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
+from app.core.key_rotator import key_rotator
 from app.services.db import supabase
 
-# Initialize the embedding model (runs locally)
-print("Initializing embedding model (this may take a moment to download weights)...")
-embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# Initialize the embedding model
+print("Initializing NVIDIA cloud embedding model...")
+embeddings_model = NVIDIAEmbeddings(
+    model="nvidia/nv-embedqa-e5-v5", 
+    api_key=key_rotator.get_llama_3_3_70b_key()
+)
 
 def ingest_pdf(pdf_path: str):
     print(f"\n--- Ingesting {pdf_path} ---")
