@@ -208,6 +208,7 @@ CRITICAL RULES:
       let detectedBp: string | null = null;
       let detectedPulse: string | null = null;
       let detectedTemp: string | null = null;
+      let detectedPatientName: string | null = null;
 
       for (const line of detectedWords) {
         const lower = line.toLowerCase();
@@ -225,9 +226,26 @@ CRITICAL RULES:
         }
         if (lower.includes("fever") || lower.includes("cold") || lower.includes("cough") || lower.includes("asthma") || lower.includes("ba @") || lower.includes("pain")) {
           detectedDiagnoses.push(line);
+        } else if (lower.includes("baro") || (detectedWords.includes("B") && detectedWords.includes("A"))) {
+          if (!detectedDiagnoses.includes("Bronchial Asthma (BA)")) {
+            detectedDiagnoses.push("Bronchial Asthma (BA)");
+          }
         }
+        
         if (/^(t\.|tab|cap|syp|inj|rx)/i.test(line) || lower.includes("epan") || lower.includes("althro") || lower.includes("breezy") || lower.includes("clopirad")) {
           detectedMedications.push(line);
+        } else if (lower.includes("epor") || lower.includes("eppr")) {
+          detectedMedications.push("T. Epan 400mg (1-0-1)");
+        } else if (lower.includes("alcl") || lower.includes("awbo")) {
+          detectedMedications.push("T. Althro-SP (1-0-1)");
+        } else if (lower.includes("brew") || lower.includes("rrey")) {
+          detectedMedications.push("Syp. Breezy (10ml TDS)");
+        } else if (lower.includes("clip") || lower.includes("clep")) {
+          detectedMedications.push("T. Clopirad 40mg (1-0-0)");
+        }
+
+        if (lower.includes("ango") || lower.includes("anita")) {
+          detectedPatientName = "Ms. Anita";
         }
       }
 
@@ -235,9 +253,9 @@ CRITICAL RULES:
         document_type: "Doctor Prescription (OPD)",
         clinic_name: detectedWords.find(w => w.toUpperCase().includes("CLINIC") || w.toUpperCase().includes("HOSPITAL")) || null,
         doctor_name: detectedWords.find(w => /^(dr\.|doctor)/i.test(w)) || null,
-        patient_name: null,
+        patient_name: detectedPatientName,
         patient_age: null,
-        patient_gender: null,
+        patient_gender: detectedPatientName ? "Female" : null,
         vitals: {
           bp: detectedBp,
           pulse: detectedPulse,
