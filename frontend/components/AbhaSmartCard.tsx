@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   RotateCw, Download, Printer, ShieldCheck, QrCode, Heart, AlertCircle, 
@@ -14,8 +14,8 @@ export interface AbhaPatientProfile {
   gender: string;
   dob: string;
   yearOfBirth?: string;
-  bloodGroup: string;
-  phone: string;
+  bloodGroup?: string;
+  phone?: string;
   photoUrl?: string;
   address?: string;
   district?: string;
@@ -32,11 +32,27 @@ interface AbhaSmartCardProps {
   patient: AbhaPatientProfile;
   showActions?: boolean;
   compact?: boolean;
+  onFlip?: (isFlipped: boolean) => void;
 }
 
-export function AbhaSmartCard({ patient, showActions = true, compact = false }: AbhaSmartCardProps) {
+export function AbhaSmartCard({ patient, showActions = true, compact = false, onFlip }: AbhaSmartCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [copiedNotification, setCopiedNotification] = useState(false);
+
+  // Omnipresent Assistant Flip Listener
+  useEffect(() => {
+    const handleAssistantAction = (e: any) => {
+      if (e.detail?.action === "flip_card") {
+        setIsFlipped(prev => {
+          const next = !prev;
+          if (onFlip) onFlip(next);
+          return next;
+        });
+      }
+    };
+    window.addEventListener("samanvaya:assistant-action", handleAssistantAction);
+    return () => window.removeEventListener("samanvaya:assistant-action", handleAssistantAction);
+  }, [onFlip]);
 
   const formattedAbha = patient.abhaId.includes("-") 
     ? patient.abhaId 

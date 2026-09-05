@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, UserPlus, FileHeart, QrCode, ClipboardCheck, Sparkles, Loader2, KeyRound, Smartphone, ShieldCheck, RefreshCw } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -35,11 +35,30 @@ export default function RegistrationDashboard() {
   const [chipAnswers, setChipAnswers] = useState<Record<string, any>>({});
   const [isLoadingChips, setIsLoadingChips] = useState(false);
 
+  // Omnipresent Assistant Action Listener
+  useEffect(() => {
+    const handleAssistantAction = (e: any) => {
+      const { action, payload } = e.detail || {};
+      if (action === "open_abha_modal") {
+        setIsAbhaModalOpen(true);
+      } else if (action === "fill_form") {
+        if (payload?.name) setPatientData(p => ({ ...p, name: payload.name }));
+        if (payload?.phone) setPatientData(p => ({ ...p, phone: payload.phone }));
+        if (payload?.abhaId) setPatientData(p => ({ ...p, abhaId: payload.abhaId }));
+        if (payload?.concern) setChiefConcern(payload.concern);
+      } else if (action === "generate_abha") {
+        generateMockAbha();
+      }
+    };
+    window.addEventListener("samanvaya:assistant-action", handleAssistantAction);
+    return () => window.removeEventListener("samanvaya:assistant-action", handleAssistantAction);
+  }, []);
+
   const handleAbhaVerified = (profile: AbhaPatientProfile) => {
     setFullPatientProfile(profile);
     setPatientData({
       name: profile.name,
-      phone: profile.phone,
+      phone: profile.phone || "",
       abhaId: profile.abhaId
     });
     localStorage.setItem("mockAbhaId", profile.abhaId);
@@ -70,7 +89,7 @@ export default function RegistrationDashboard() {
     setFullPatientProfile(mockProfile);
     setPatientData({
       name: mockProfile.name,
-      phone: mockProfile.phone,
+      phone: mockProfile.phone || "",
       abhaId: newAbha
     });
     localStorage.setItem("mockAbhaId", newAbha);

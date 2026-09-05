@@ -148,6 +148,20 @@ export default function QueueTrackerPage() {
     setTimeout(() => setSmsNotificationStatus(null), 5000);
   };
 
+  // Omnipresent Assistant Action Listener
+  useEffect(() => {
+    const handleAssistantAction = (e: any) => {
+      if (e.detail?.action === "call_next_token") {
+        const nextWaiting = tokens.find(t => t.status === "WAITING");
+        if (nextWaiting) {
+          handleCallNext(nextWaiting);
+        }
+      }
+    };
+    window.addEventListener("samanvaya:assistant-action", handleAssistantAction);
+    return () => window.removeEventListener("samanvaya:assistant-action", handleAssistantAction);
+  }, [tokens]);
+
   const handleMarkComplete = (tokenNumber: number) => {
     setTokens(tokens.map(t => t.tokenNumber === tokenNumber ? { ...t, status: "COMPLETED" } : t));
   };

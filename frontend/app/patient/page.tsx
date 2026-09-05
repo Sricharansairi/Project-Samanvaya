@@ -48,6 +48,14 @@ export default function PatientPortal() {
       setAbhaIdInput(saved);
       setPatientProfile(prev => ({ ...prev, abhaId: saved }));
     }
+
+    const handleAssistantAction = (e: any) => {
+      if (e.detail?.action === "open_abha_modal") {
+        setIsAbhaModalOpen(true);
+      }
+    };
+    window.addEventListener("samanvaya:assistant-action", handleAssistantAction);
+    return () => window.removeEventListener("samanvaya:assistant-action", handleAssistantAction);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
