@@ -18,7 +18,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true);
     const savedLang = localStorage.getItem('samanvaya_language') as Language;
-    if (savedLang && (savedLang === 'en' || savedLang === 'hi' || savedLang === 'te')) {
+    if (savedLang && translations[savedLang]) {
       setLanguageState(savedLang);
     }
   }, []);

@@ -118,9 +118,30 @@ export default function QueueTrackerPage() {
   const callingToken = tokens.find(t => t.status === "CALLED") || tokens.find(t => t.status === "IN_CONSULT");
   const waitingTokens = filteredTokens.filter(t => t.status === "WAITING");
 
-  const triggerChime = (token: QueueToken) => {
+  const triggerChime = async (token: QueueToken) => {
     if (!announcementAudio) return;
-    if ("speechSynthesis" in window) {
+    try {
+      const text = `टोकन नंबर ${token.tokenNumber}। ${token.patientName}, कृपया ${token.roomNumber}, ${token.doctorName} के पास जाएँ। Token number ${token.tokenNumber}, please proceed to ${token.roomNumber}.`;
+      const res = await fetch("/api/voice/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          language_code: "hi-IN",
+          speaker: "pooja"
+        })
+      });
+      const data = await res.json();
+      if (data.base64_audio) {
+        const audio = new Audio(`data:audio/wav;base64,${data.base64_audio}`);
+        audio.play();
+        return;
+      }
+    } catch (e) {
+      console.warn("Sarvam audio callout fallback:", e);
+    }
+
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
       const speech = new SpeechSynthesisUtterance(`Token number ${token.tokenNumber}. Please proceed to ${token.roomNumber}, ${token.doctorName}.`);
       speech.rate = 0.9;
       speech.pitch = 1.05;

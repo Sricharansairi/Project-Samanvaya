@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Mic, MicOff, Sparkles, X, Send, Bot, Loader2, Volume2, VolumeX, 
   Settings2, Stethoscope, ChevronRight, AlertTriangle, 
-  CheckCircle2, ArrowUpRight, Play, HeartPulse, ShieldAlert
+  CheckCircle2, ArrowUpRight, Play, HeartPulse, ShieldAlert, Radio
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
-import { queryMedicalRAG } from "@/services/medical_rag";
-import { ALL_INDIA_SCHEMES } from "@/services/schemes_repository";
 import { translatePatientToClinical, ClinicalTranslationResult } from "@/services/clinical_nlp";
 
 interface FloatingAssistantProps {
@@ -19,24 +17,23 @@ interface FloatingAssistantProps {
   onLanguageChange?: (lang: string) => void;
 }
 
-export type VoicePersona = "neerja" | "aarav" | "pooja" | "kavya" | "alex";
+export type VoicePersona = "priya" | "aditya" | "pooja" | "kavitha" | "ritu";
 
 interface VoiceConfig {
   id: VoicePersona;
   name: string;
   role: string;
   lang: string;
+  sarvamSpeaker: string;
   gender: "female" | "male";
-  pitch: number;
-  rate: number;
 }
 
 const VOICE_PERSONAS: VoiceConfig[] = [
-  { id: "neerja", name: "Dr. Neerja", role: "Indian English Female Doctor", lang: "en-IN", gender: "female", pitch: 1.05, rate: 0.95 },
-  { id: "aarav", name: "Dr. Aarav", role: "Indian English Male Physician", lang: "en-IN", gender: "male", pitch: 0.88, rate: 0.95 },
-  { id: "pooja", name: "Pooja", role: "Hindi Natural Female Voice", lang: "hi-IN", gender: "female", pitch: 1.0, rate: 0.9 },
-  { id: "kavya", name: "Kavya", role: "Telugu Natural Female Voice", lang: "te-IN", gender: "female", pitch: 1.0, rate: 0.9 },
-  { id: "alex", name: "Dr. Alex", role: "Global Neutral Clear Voice", lang: "en-US", gender: "female", pitch: 1.0, rate: 1.0 }
+  { id: "priya", name: "Dr. Priya", role: "Indian English Female Doctor", lang: "en-IN", sarvamSpeaker: "priya", gender: "female" },
+  { id: "aditya", name: "Dr. Aditya", role: "Indian English Male Physician", lang: "en-IN", sarvamSpeaker: "aditya", gender: "male" },
+  { id: "pooja", name: "Pooja", role: "Hindi Natural Voice", lang: "hi-IN", sarvamSpeaker: "pooja", gender: "female" },
+  { id: "kavitha", name: "Kavitha", role: "Telugu Natural Voice", lang: "te-IN", sarvamSpeaker: "kavitha", gender: "female" },
+  { id: "ritu", name: "Dr. Ritu", role: "Hindi Clinical Specialist", lang: "hi-IN", sarvamSpeaker: "ritu", gender: "female" }
 ];
 
 export default function FloatingAssistant({ onNavigate, onAction, onLanguageChange }: FloatingAssistantProps) {
@@ -47,11 +44,11 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [speechRate, setSpeechRate] = useState<number>(1.0);
-  const [selectedPersona, setSelectedPersona] = useState<VoicePersona>("neerja");
+  const [selectedPersona, setSelectedPersona] = useState<VoicePersona>("priya");
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [lastActionExecuted, setLastActionExecuted] = useState<string | null>(null);
+  const [silenceSecondsLeft, setSilenceSecondsLeft] = useState<number>(8);
 
   // Available system voices
   const [systemVoices, setSystemVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -59,28 +56,31 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   // Disambiguation / Quick Action suggestions
   const [quickActions, setQuickActions] = useState<{ label: string; action: () => void; isPrimary?: boolean }[]>([]);
 
-  // Clinical NLP Standardized Result State (Powered by Kimi-K3 + Samanvaya Ontology)
+  // Clinical NLP Standardized Result State
   const [clinicalNlpResult, setClinicalNlpResult] = useState<ClinicalTranslationResult | null>(null);
 
   const [assistantResponse, setAssistantResponse] = useState<string>(
-    "Namaste! I am Samanvaya Autonomous Clinical AI. Speak or type in any language—even colloquial terms like 'seene me dabav', 'pet me jalan', or 'bukhar'—and I will translate it into formal medical terms, ICD-10, and clinical workflows."
+    "Namaste! I am Samanvaya Autonomous Clinical AI with Gemini Live intelligence and Sarvam AI natural Indian voice. I can auto-fill web forms, translate colloquial symptoms, and navigate the hospital system autonomously."
   );
 
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const silenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const speechDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTranscriptRef = useRef<string>("");
 
-  // Load voices from browser
+  // Load voices from browser for fallback
   useEffect(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       const updateVoices = () => {
-        const voices = window.speechSynthesis.getVoices();
-        setSystemVoices(voices);
+        setSystemVoices(window.speechSynthesis.getVoices());
       };
       updateVoices();
       window.speechSynthesis.onvoiceschanged = updateVoices;
 
-      // Restore user settings
       const savedPersona = localStorage.getItem("samanvaya_voice_persona") as VoicePersona;
       if (savedPersona && VOICE_PERSONAS.some(p => p.id === savedPersona)) {
         setSelectedPersona(savedPersona);
@@ -94,71 +94,103 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     setSelectedPersona(personaId);
     localStorage.setItem("samanvaya_voice_persona", personaId);
     const persona = VOICE_PERSONAS.find(p => p.id === personaId);
-    const msg = `Voice changed to ${persona?.name} (${persona?.role}).`;
+    const msg = `Voice changed to ${persona?.name} (${persona?.role}). Powered by Sarvam AI.`;
     setAssistantResponse(msg);
     speakResponse(msg, personaId);
   };
 
-  // Select exact browser voice matching persona
-  const getMatchingVoice = (personaId: VoicePersona): SpeechSynthesisVoice | null => {
-    if (!systemVoices.length) return null;
-    const persona = VOICE_PERSONAS.find(p => p.id === personaId) || VOICE_PERSONAS[0];
+  // -------------------------------------------------------------
+  // SARVAM AI VOICE SYNTHESIS + HTML5 AUDIO PLAYBACK
+  // -------------------------------------------------------------
+  const speakResponse = async (text: string, overridePersona?: VoicePersona) => {
+    if (isMuted || !text) return;
 
-    // Language match + name match
-    if (persona.lang === "hi-IN") {
-      const hiVoice = systemVoices.find(v => v.lang.startsWith("hi") || v.name.toLowerCase().includes("hindi") || v.name.includes("हिन्दी"));
-      if (hiVoice) return hiVoice;
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
     }
-    if (persona.lang === "te-IN") {
-      const teVoice = systemVoices.find(v => v.lang.startsWith("te") || v.name.toLowerCase().includes("telugu") || v.name.includes("తెలుగు"));
-      if (teVoice) return teVoice;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
     }
 
-    // Gender + Regional Indian English
-    if (persona.lang === "en-IN") {
-      const inVoices = systemVoices.filter(v => v.lang === "en-IN" || v.name.toLowerCase().includes("india"));
-      if (persona.gender === "female") {
-        const femaleIn = inVoices.find(v => v.name.toLowerCase().includes("heera") || v.name.toLowerCase().includes("neerja") || v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira"));
-        if (femaleIn) return femaleIn;
-        if (inVoices.length > 0) return inVoices[0];
-      } else {
-        const maleIn = inVoices.find(v => v.name.toLowerCase().includes("ravi") || v.name.toLowerCase().includes("prabhat") || v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("david"));
-        if (maleIn) return maleIn;
-        if (inVoices.length > 0) return inVoices[0];
+    const persona = VOICE_PERSONAS.find(p => p.id === (overridePersona || selectedPersona)) || VOICE_PERSONAS[0];
+
+    try {
+      setIsSpeaking(true);
+      const res = await fetch("/api/voice/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          language_code: persona.lang,
+          speaker: persona.sarvamSpeaker
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.base64_audio) {
+          const audio = new Audio(`data:audio/wav;base64,${data.base64_audio}`);
+          currentAudioRef.current = audio;
+          audio.onended = () => {
+            setIsSpeaking(false);
+            currentAudioRef.current = null;
+          };
+          audio.onerror = () => {
+            setIsSpeaking(false);
+            fallbackBrowserSpeech(text, persona);
+          };
+          await audio.play();
+          return;
+        }
       }
+    } catch (err) {
+      console.warn("Sarvam AI speak error, falling back to browser speech:", err);
     }
 
-    // Fallback: First voice matching language prefix
-    const langMatch = systemVoices.find(v => v.lang.startsWith(persona.lang.slice(0, 2)));
-    return langMatch || systemVoices[0] || null;
+    fallbackBrowserSpeech(text, persona);
   };
 
-  // Autonomous Speech Synthesis with dynamic persona
-  const speakResponse = (text: string, overridePersona?: VoicePersona) => {
-    if (isMuted) return;
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
-    window.speechSynthesis.cancel();
-    const persona = VOICE_PERSONAS.find(p => p.id === (overridePersona || selectedPersona)) || VOICE_PERSONAS[0];
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    utterance.lang = persona.lang;
-    utterance.pitch = persona.pitch;
-    utterance.rate = persona.rate * speechRate;
-
-    const matchedVoice = getMatchingVoice(overridePersona || selectedPersona);
-    if (matchedVoice) {
-      utterance.voice = matchedVoice;
+  const fallbackBrowserSpeech = (text: string, persona: VoiceConfig) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setIsSpeaking(false);
+      return;
     }
-
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = persona.lang;
+    utterance.rate = 1.0;
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-
     window.speechSynthesis.speak(utterance);
   };
 
-  // Dispatch omnipresent in-app actions to active pages
+  // -------------------------------------------------------------
+  // AUTONOMOUS WEB FORM AUTO-FILLER
+  // Capable of filling any field in the web app directly
+  // -------------------------------------------------------------
+  const autoFillDOMInput = (selector: string, value: string): boolean => {
+    if (typeof document === "undefined") return false;
+    const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+    if (el) {
+      const proto = el instanceof HTMLSelectElement ? window.HTMLSelectElement.prototype
+        : el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+      if (setter) {
+        setter.call(el, value);
+      } else {
+        el.value = value;
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.classList.add("ring-2", "ring-emerald-500", "bg-emerald-50/30");
+      setTimeout(() => el.classList.remove("ring-2", "ring-emerald-500", "bg-emerald-50/30"), 3000);
+      return true;
+    }
+    return false;
+  };
+
   const dispatchInAppAction = (action: string, payload?: any) => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("samanvaya:assistant-action", {
@@ -167,7 +199,40 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     }
   };
 
-  // Omnipresent Autonomous Intent Analyzer & Clinical NLP Pipeline
+  // -------------------------------------------------------------
+  // GEMINI LIVE 8-SECOND SILENCE INACTIVITY TIMER
+  // -------------------------------------------------------------
+  const reset8sSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current);
+
+    setSilenceSecondsLeft(8);
+
+    const startTime = Date.now();
+    silenceIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(0, 8 - elapsed);
+      setSilenceSecondsLeft(remaining);
+      if (remaining <= 0 && silenceIntervalRef.current) {
+        clearInterval(silenceIntervalRef.current);
+      }
+    }, 1000);
+
+    silenceTimerRef.current = setTimeout(() => {
+      stopListening();
+      setAssistantResponse("No voice detected for 8 seconds. Listening paused. Tap the microphone to speak again.");
+    }, 8000);
+  }, []);
+
+  const clearSilenceTimers = () => {
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current);
+    if (speechDebounceRef.current) clearTimeout(speechDebounceRef.current);
+  };
+
+  // -------------------------------------------------------------
+  // OMNIPRESENT INTENT REASONING & AUTONOMOUS ACTION DISPATCHER
+  // -------------------------------------------------------------
   const processAutonomousCommand = async (rawCmd: string) => {
     const text = rawCmd.toLowerCase().trim();
     if (!text) return;
@@ -179,133 +244,137 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
     let reply = "";
 
-    // -------------------------------------------------------------
-    // INTENT 0: VOICE PERSONA CHANGER
-    // -------------------------------------------------------------
+    // A. VOICE PERSONA SWITCHER
     if (text.includes("change voice") || text.includes("switch voice") || text.includes("different voice")) {
       const nextIdx = (VOICE_PERSONAS.findIndex(p => p.id === selectedPersona) + 1) % VOICE_PERSONAS.length;
-      const nextPersona = VOICE_PERSONAS[nextIdx];
-      changePersona(nextPersona.id);
+      changePersona(VOICE_PERSONAS[nextIdx].id);
       setIsProcessing(false);
       return;
     }
 
-    if (text.includes("voice to neerja") || text.includes("female doctor voice") || text.includes("doctor neerja")) {
-      changePersona("neerja");
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("voice to aarav") || text.includes("male voice") || text.includes("doctor aarav")) {
-      changePersona("aarav");
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("voice to pooja") || text.includes("hindi voice")) {
-      changePersona("pooja");
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("voice to kavya") || text.includes("telugu voice")) {
-      changePersona("kavya");
-      setIsProcessing(false);
-      return;
-    }
+    // B. DIRECT WEB FORM AUTO-FILLER (NAME, AGE, PHONE, VITALS, COMPLAINT)
+    const hasFillIntent = text.includes("register") || text.includes("patient") || text.includes("fill") || 
+                          text.includes("name is") || text.includes("named") || text.includes("bp") || 
+                          text.includes("fever") || text.includes("symptom");
 
-    // -------------------------------------------------------------
-    // INTENT 1: IN-PAGE DOM COMPONENT AUTOMATION (ABHA, FLIP, TOKENS)
-    // -------------------------------------------------------------
-    if (text.includes("open abha") || text.includes("create abha") || text.includes("aadhaar e-kyc") || text.includes("ekyc") || text.includes("scan and share")) {
-      dispatchInAppAction("open_abha_modal");
-      setLastActionExecuted("Opened ABHA e-KYC Modal");
-      reply = "Opening the interactive ABDM Ayushman Bharat Creation & Verification Modal.";
-      if (pathname !== "/his/registration" && pathname !== "/patient") {
+    if (hasFillIntent) {
+      // Extract patient demographic info with regex
+      const nameMatch = rawCmd.match(/(?:named|name is|patient)\s+([A-Za-z\s]+?)(?:\s+(?:age|aged|phone|mobile|having|with|and|\d)|$)/i);
+      const ageMatch = rawCmd.match(/(?:age|aged|years old|yr)\s*[:=]?\s*(\d{1,3})/i);
+      const phoneMatch = rawCmd.match(/(?:phone|mobile|contact|call)\s*[:=]?\s*(\d{10})/i);
+      const bpMatch = rawCmd.match(/(?:bp|blood pressure)\s*[:=]?\s*(\d{2,3}[/\s]\d{2,3})/i);
+      const tempMatch = rawCmd.match(/(?:temp|temperature|fever)\s*[:=]?\s*(\d{2,3}(?:\.\d)?)/i);
+
+      const extractedName = nameMatch ? nameMatch[1].trim() : "";
+      const extractedAge = ageMatch ? ageMatch[1] : "";
+      const extractedPhone = phoneMatch ? phoneMatch[1] : "";
+      const extractedBp = bpMatch ? bpMatch[1].replace(/\s+/, "/") : "";
+      const extractedTemp = tempMatch ? tempMatch[1] : "";
+
+      // Check if user is on registration or if we should navigate
+      const isRegistrationPage = pathname === "/his/registration";
+
+      if (!isRegistrationPage && (extractedName || text.includes("register"))) {
+        // Save pending autofill to sessionStorage
+        sessionStorage.setItem("samanvaya_pending_fill", JSON.stringify({
+          name: extractedName,
+          age: extractedAge,
+          phone: extractedPhone,
+          bp: extractedBp,
+          temp: extractedTemp,
+          concern: rawCmd
+        }));
         router.push("/his/registration");
       }
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    else if (text.includes("flip card") || text.includes("show emergency card") || text.includes("show blood group") || text.includes("organ donor")) {
-      dispatchInAppAction("flip_card");
-      setLastActionExecuted("Flipped Ayushman Card");
-      reply = "Flipping Ayushman Smart Card to display the Emergency Health Record and organ donor pledge.";
-      if (pathname !== "/patient") {
-        router.push("/patient");
+
+      // Populate DOM elements directly
+      let filledFields: string[] = [];
+      if (extractedName) {
+        autoFillDOMInput('input[placeholder*="Suresh" i], input[placeholder*="Name" i], input[name="name"]', extractedName);
+        filledFields.push(`Name: ${extractedName}`);
       }
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    else if (text.includes("next patient") || text.includes("call next") || text.includes("next token") || text.includes("chime")) {
-      dispatchInAppAction("call_next_token");
-      setLastActionExecuted("Called Next OPD Token");
-      reply = "Dispatched calling chime and SMS notification for the next patient in queue.";
-      if (pathname !== "/his/queue") {
-        router.push("/his/queue");
+      if (extractedPhone) {
+        autoFillDOMInput('input[placeholder*="9876" i], input[placeholder*="Phone" i], input[name="phone"]', extractedPhone);
+        filledFields.push(`Phone: ${extractedPhone}`);
       }
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
+      if (extractedBp) {
+        autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i]', extractedBp);
+        filledFields.push(`BP: ${extractedBp}`);
+      }
+      if (extractedTemp) {
+        autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i]', extractedTemp);
+        filledFields.push(`Temp: ${extractedTemp}°F`);
+      }
+      
+      // Auto-fill chief complaint
+      autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i]', rawCmd);
+
+      // Dispatch state sync
+      dispatchInAppAction("fill_form", {
+        name: extractedName,
+        phone: extractedPhone,
+        bp: extractedBp,
+        temp: extractedTemp,
+        concern: rawCmd
+      });
+
+      if (filledFields.length > 0) {
+        reply = `Autonomously filled form with: ${filledFields.join(", ")}.`;
+        setLastActionExecuted(`Auto-filled: ${filledFields.join(", ")}`);
+        setAssistantResponse(reply);
+        speakResponse(reply);
+        setIsProcessing(false);
+        return;
+      }
     }
 
-    // -------------------------------------------------------------
-    // INTENT 2: DIRECT SYSTEM NAVIGATION
-    // -------------------------------------------------------------
-    if (text.includes("open scheme") || text.includes("check scheme") || text.includes("pmjay") || text.includes("aarogyasri") || text.includes("insurance") || text.includes("claim")) {
+    // C. NAVIGATION COMMANDS
+    if (text.includes("open scheme") || text.includes("check scheme") || text.includes("pmjay") || text.includes("insurance")) {
       router.push("/his/schemes");
       setLastActionExecuted("Navigated to Schemes");
-      reply = "Opening Government Health Scheme & Claim Navigator across 36 States.";
-      setQuickActions([
-        { label: "Check All Schemes", action: () => router.push("/his/schemes"), isPrimary: true }
-      ]);
+      reply = "Opening Government Health Scheme & Claim Navigator.";
       setAssistantResponse(reply);
       speakResponse(reply);
       setIsProcessing(false);
       return;
     }
-    else if (text === "open rag" || text === "clinical rag" || text === "decision support" || text === "medical rag") {
-      router.push("/his/rag");
-      setLastActionExecuted("Navigated to Clinical RAG");
-      reply = "Opening Clinical RAG Co-Pilot & Decision Support Console.";
-      setQuickActions([
-        { label: "Open RAG Console", action: () => router.push("/his/rag"), isPrimary: true }
-      ]);
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    else if (text === "open doctor" || text === "doctor view" || text === "physician desk") {
+    if (text.includes("open doctor") || text.includes("physician desk") || text.includes("doctor view")) {
       router.push("/his/doctor");
       setLastActionExecuted("Navigated to Doctor Desk");
-      reply = "Opening Physician OPD Consultation Desk.";
+      reply = "Opening Physician Consultation & Clinical Decision Support Desk.";
       setAssistantResponse(reply);
       speakResponse(reply);
       setIsProcessing(false);
       return;
     }
-    else if (text === "patient portal" || text === "my card" || text === "abha card") {
-      router.push("/patient");
-      setLastActionExecuted("Navigated to Patient Portal");
-      reply = "Opening Patient Self-Service Portal with 3D Ayushman Smart Card.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    else if (text === "ocr scanner" || text === "scan prescription" || text === "camera") {
+    if (text.includes("open ocr") || text.includes("scan prescription") || text.includes("camera")) {
       router.push("/his/ocr");
       setLastActionExecuted("Navigated to OCR Scanner");
-      reply = "Opening Prescription & Document OCR Scanner.";
+      reply = "Opening AI Prescription & Document OCR Scanner.";
       setAssistantResponse(reply);
       speakResponse(reply);
       setIsProcessing(false);
       return;
     }
-    else if (text === "ayush" || text === "prakriti test") {
+    if (text.includes("open queue") || text.includes("token queue") || text.includes("opd queue")) {
+      router.push("/his/queue");
+      setLastActionExecuted("Navigated to Queue");
+      reply = "Opening Live OPD Queue & SMS Token Board.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    if (text.includes("patient portal") || text.includes("my card") || text.includes("abha card")) {
+      router.push("/patient");
+      setLastActionExecuted("Navigated to Patient Portal");
+      reply = "Opening Patient Self-Service Portal with 3D Ayushman Card.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    if (text.includes("ayush") || text.includes("prakriti")) {
       router.push("/his/ayush");
       setLastActionExecuted("Navigated to AYUSH");
       reply = "Opening AYUSH Prakriti Pariksha.";
@@ -314,42 +383,21 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       setIsProcessing(false);
       return;
     }
-    else if (text === "dpdp" || text === "consent manager") {
-      router.push("/his/dpdp");
-      setLastActionExecuted("Navigated to DPDP");
-      reply = "Opening DPDP 2023 Patient Consent Manager.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
 
-    // -------------------------------------------------------------
-    // INTENT 3: CLINICAL NLP ENGINE (KIMI-K3 MEDICAL STANDARDIZATION)
-    // Patient expresses symptoms in layperson / vernacular terms
-    // -------------------------------------------------------------
-    const isClinicalPrompt = 
+    // D. CLINICAL NLP TRANSLATION & STANDARDIZATION
+    const isClinical = 
       text.includes("dard") || text.includes("pain") || text.includes("jalan") || 
-      text.includes("bukhar") || text.includes("fever") || text.includes("jwaram") || 
-      text.includes("noppi") || text.includes("cough") || text.includes("khansi") || 
-      text.includes("sar") || text.includes("head") || text.includes("pet") || 
-      text.includes("stomach") || text.includes("seene") || text.includes("chest") || 
-      text.includes("vomit") || text.includes("ulti") || text.includes("chakkar") || 
-      text.includes("dizzy") || text.includes("balgam") || text.includes("blood") || 
-      text.includes("peshab") || text.includes("urine") || text.includes("ghutna") || 
-      text.includes("knee") || text.includes("dengue") || text.includes("asthma") || 
-      text.includes("stroke") || text.includes("attack") || text.includes("chhati") ||
-      text.includes("kadupu") || text.includes("tala") || text.includes("daggu") ||
-      text.includes("weak") || text.includes("kamzori") || text.includes("breath");
+      text.includes("bukhar") || text.includes("fever") || text.includes("cough") || 
+      text.includes("khansi") || text.includes("head") || text.includes("chest") || 
+      text.includes("vomit") || text.includes("ulti") || text.includes("seene") ||
+      text.includes("pet") || text.includes("chakkar") || text.includes("dizzy") ||
+      text.includes("jwaram") || text.includes("noppi") || text.includes("asthma");
 
-    if (isClinicalPrompt) {
-      // 1. Instant local ontology translation for 0 ms responsiveness
+    if (isClinical) {
       const baselineResult = translatePatientToClinical(rawCmd);
       setClinicalNlpResult(baselineResult);
 
       let finalResult = baselineResult;
-
-      // 2. Asynchronous call to Moonshot Kimi-K3 via NVIDIA NIM for deep medical reasoning
       try {
         const nlpRes = await fetch("/api/nlp/translate-clinical", {
           method: "POST",
@@ -369,38 +417,15 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
       setLastActionExecuted(`Clinical NLP: ${finalResult.standardizedMedicalTerm}`);
 
-      // 3. Autonomous clinical routing and voice feedback
       if (finalResult.isLifeThreat) {
-        reply = `RED FLAG CLINICAL ALERT: Symptoms standardized to '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}). Severe clinical emergency detected! Immediately routing to Emergency Triage Desk.`;
+        reply = `RED FLAG CLINICAL ALERT: Symptoms standardized to '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}). Routing to Emergency Triage Desk.`;
         router.push("/his/registration");
         dispatchInAppAction("fill_form", {
           concern: finalResult.standardizedMedicalTerm,
           icd10: finalResult.icd10Code
         });
-
-        setQuickActions([
-          { label: "🚨 Proceed to ER Triage Desk", action: () => router.push("/his/registration"), isPrimary: true },
-          { label: "🧠 Inspect in Clinical RAG Console", action: () => router.push("/his/rag") }
-        ]);
       } else {
-        reply = `Clinical NLP Finding: Standardized as '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}, SNOMED: ${finalResult.snomedCode}). ${finalResult.patientFriendlyExplanation}`;
-        
-        setQuickActions([
-          { 
-            label: "🏥 Send to Registration Triage Desk", 
-            action: () => {
-              router.push("/his/registration");
-              dispatchInAppAction("fill_form", {
-                concern: finalResult.standardizedMedicalTerm,
-                icd10: finalResult.icd10Code
-              });
-            }, 
-            isPrimary: true 
-          },
-          { label: "🧠 Open in Clinical RAG Console", action: () => router.push("/his/rag") },
-          { label: "🩺 Physician OPD Consultation", action: () => router.push("/his/doctor") },
-          { label: "📋 Check Government Scheme Coverage", action: () => router.push("/his/schemes") }
-        ]);
+        reply = `Clinical NLP Finding: Standardized as '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}). ${finalResult.patientFriendlyExplanation}`;
       }
 
       setAssistantResponse(reply);
@@ -409,37 +434,13 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       return;
     }
 
-    // -------------------------------------------------------------
-    // INTENT 4: PATIENT DEMOGRAPHICS AUTO-FILL
-    // -------------------------------------------------------------
-    if (text.includes("register") || text.includes("name is") || text.includes("phone") || text.includes("patient named")) {
-      const nameMatch = text.match(/(?:named|name is|patient)\s+([a-zA-Z\s]+?)(?:\s+(?:with|phone|mobile|having|and)|$)/i);
-      const phoneMatch = text.match(/(?:phone|mobile|number|call)\s*(?:is)?\s*(\d{10})/i);
-      const extractedName = nameMatch ? nameMatch[1].trim() : "Ramesh Kumar";
-      const extractedPhone = phoneMatch ? phoneMatch[1] : "9876543210";
-
-      dispatchInAppAction("fill_form", { name: extractedName, phone: extractedPhone, concern: rawCmd });
-      router.push("/his/registration");
-      reply = `Pre-filled registration desk with patient '${extractedName}' and contact '${extractedPhone}'.`;
-      setLastActionExecuted(`Filled: ${extractedName}`);
-      setQuickActions([
-        { label: "Review at Registration Desk", action: () => router.push("/his/registration"), isPrimary: true }
-      ]);
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-
-    // -------------------------------------------------------------
-    // DEFAULT DISAMBIGUATION WITH DIRECT ACTIONS
-    // -------------------------------------------------------------
-    reply = `I processed "${rawCmd}". Here are the quickest clinical actions for your request:`;
+    // E. DEFAULT ACTION DISPATCH
+    reply = `I processed "${rawCmd}". What would you like me to do next?`;
     setQuickActions([
       { label: "🏥 Open Schemes", action: () => router.push("/his/schemes"), isPrimary: true },
-      { label: "🧠 Clinical RAG Co-Pilot", action: () => router.push("/his/rag") },
-      { label: "🆔 Ayushman Smart Card", action: () => router.push("/patient") },
-      { label: "🩺 Doctor Desk", action: () => router.push("/his/doctor") }
+      { label: "📄 Open OCR Scanner", action: () => router.push("/his/ocr") },
+      { label: "🩺 Doctor Desk", action: () => router.push("/his/doctor") },
+      { label: "📱 OPD Queue", action: () => router.push("/his/queue") }
     ]);
 
     setAssistantResponse(reply);
@@ -447,7 +448,9 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     setIsProcessing(false);
   };
 
-  // Real-time Web Speech Recognition
+  // -------------------------------------------------------------
+  // GEMINI LIVE REAL-TIME CONTINUOUS LISTENING ENGINE
+  // -------------------------------------------------------------
   const startListening = () => {
     if (typeof window === "undefined") return;
 
@@ -463,46 +466,71 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
         const persona = VOICE_PERSONAS.find(p => p.id === selectedPersona) || VOICE_PERSONAS[0];
         recognition.lang = persona.lang;
-        recognition.continuous = false;
+        recognition.continuous = true; // Continuous listening like Gemini Live
         recognition.interimResults = true;
 
         recognition.onstart = () => {
           setIsRecording(true);
-          setAssistantResponse("Listening live in your language... Speak your symptoms clearly.");
+          reset8sSilenceTimer();
+          setAssistantResponse("Gemini Live Active: Listening continuously... Speak naturally.");
         };
 
         recognition.onresult = (event: any) => {
-          let currentTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            currentTranscript += event.results[i][0].transcript;
-          }
-          setUserInput(currentTranscript);
+          // Voice detected! Reset 8s silence timer
+          reset8sSilenceTimer();
 
-          if (event.results[0].isFinal) {
-            recognition.stop();
-            setIsRecording(false);
-            processAutonomousCommand(currentTranscript);
+          let interimTranscript = "";
+          let finalTranscript = "";
+
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
           }
+
+          const currentText = finalTranscript || interimTranscript;
+          setUserInput(currentText);
+          lastTranscriptRef.current = currentText;
+
+          // Auto-process on stop speaking (1.4s debounce after speech pause)
+          if (speechDebounceRef.current) clearTimeout(speechDebounceRef.current);
+          speechDebounceRef.current = setTimeout(() => {
+            if (lastTranscriptRef.current.trim().length > 2) {
+              const cmd = lastTranscriptRef.current;
+              lastTranscriptRef.current = "";
+              stopListening();
+              processAutonomousCommand(cmd);
+            }
+          }, 1400);
         };
 
         recognition.onerror = (event: any) => {
           console.warn("Speech recognition error:", event.error);
-          setIsRecording(false);
           if (event.error === "not-allowed") {
-            setAssistantResponse("Microphone access denied. Please allow microphone permission in your browser.");
-          } else {
-            fallbackMediaRecorder();
+            stopListening();
+            setAssistantResponse("Microphone permission denied. Please allow microphone access in your browser.");
+          } else if (event.error === "no-speech") {
+            // No speech within recognition interval - let 8s timer manage it
           }
         };
 
         recognition.onend = () => {
-          setIsRecording(false);
+          // If still marked as recording, restart to maintain continuous stream unless 8s expired
+          if (isRecording) {
+            try {
+              recognition.start();
+            } catch (e) {
+              setIsRecording(false);
+            }
+          }
         };
 
         recognition.start();
         return;
       } catch (e) {
-        console.warn("Native SpeechRecognition start error, falling back:", e);
+        console.warn("SpeechRecognition init error:", e);
       }
     }
 
@@ -524,7 +552,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach(track => track.stop());
         setIsProcessing(true);
-        setAssistantResponse("Transcribing audio via Whisper Large v3...");
+        setAssistantResponse("Processing speech via Whisper...");
 
         try {
           const formData = new FormData();
@@ -535,10 +563,10 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             setUserInput(data.text);
             processAutonomousCommand(data.text);
           } else {
-            setAssistantResponse("Sorry, I could not catch that. Please type your symptoms below.");
+            setAssistantResponse("Sorry, I could not catch that. Please type below.");
           }
         } catch (err) {
-          setAssistantResponse("Audio transcription error. Please use the text input below.");
+          setAssistantResponse("Speech transcription error. Please type below.");
         } finally {
           setIsProcessing(false);
         }
@@ -546,7 +574,8 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
       mediaRecorder.start();
       setIsRecording(true);
-      setAssistantResponse("Recording via microphone... Speak now.");
+      reset8sSilenceTimer();
+      setAssistantResponse("Recording audio... Speak now.");
     } catch (err) {
       setIsRecording(false);
       setAssistantResponse("Microphone access unavailable. Please use the text bar below.");
@@ -554,13 +583,17 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   };
 
   const stopListening = () => {
-    if (recognitionRef.current && isRecording) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
+    clearSilenceTimers();
+    setIsRecording(false);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
     }
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    if (mediaRecorderRef.current) {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {}
     }
   };
 
@@ -577,6 +610,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     if (!userInput.trim()) return;
     const cmd = userInput;
     setUserInput("");
+    stopListening();
     processAutonomousCommand(cmd);
   };
 
@@ -589,14 +623,14 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 25, scale: 0.92 }}
             transition={{ duration: 0.2 }}
-            className="mb-4 w-96 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xl text-[#0f2942] font-sans overflow-hidden"
+            className="mb-4 w-96 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-2xl text-[#0f2942] font-sans overflow-hidden"
           >
-            {/* Header with Persona & Controls */}
+            {/* Header with Live Status & Controls */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="relative">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0f4c81] to-indigo-600 text-white flex items-center justify-center shadow-md">
-                    <Bot className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#0f4c81] via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md">
+                    <Sparkles className="w-5 h-5 animate-pulse" />
                   </div>
                   {isSpeaking && (
                     <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5">
@@ -607,13 +641,13 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <h4 className="text-xs font-bold text-[#0f2942]">Samanvaya Autonomous AI</h4>
-                    <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                      <Sparkles className="w-2.5 h-2.5" /> Kimi-K3 NLP
+                    <h4 className="text-xs font-bold text-[#0f2942]">Samanvaya Gemini Live</h4>
+                    <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                      <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" /> Sarvam AI
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500 font-medium">
-                    {isSpeaking ? "Speaking response..." : isRecording ? "Listening to voice..." : "Clinical Informaticist Active"}
+                    {isSpeaking ? "Speaking natural Indian voice..." : isRecording ? `Live Listening (Sleep in ${silenceSecondsLeft}s)` : "Autonomous Live Assistant Ready"}
                   </p>
                 </div>
               </div>
@@ -644,7 +678,10 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    stopListening();
+                    setIsOpen(false);
+                  }}
                   className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -652,22 +689,23 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
               </div>
             </div>
 
-            {/* Voice Settings Dropdown / Panel */}
+            {/* Voice Settings Panel (Sarvam AI Personas) */}
             <AnimatePresence>
               {showVoiceSettings && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 text-xs space-y-2.5 overflow-hidden"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-3 text-xs space-y-2.5 overflow-hidden"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-700">Select Voice Persona:</span>
+                    <span className="font-bold text-slate-700">Sarvam AI Natural Voices:</span>
                     <button
-                      onClick={() => speakResponse("Hello, I am testing the selected voice persona.")}
-                      className="text-[10px] text-[#0f4c81] font-bold hover:underline flex items-center gap-1"
+                      type="button"
+                      onClick={() => speakResponse("Namaste, I am testing the selected Sarvam AI voice.")}
+                      className="text-[10px] text-[#0f4c81] font-bold hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      <Play className="w-3 h-3" /> Test Voice
+                      <Play className="w-3 h-3" /> Test
                     </button>
                   </div>
                   
@@ -677,7 +715,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                         key={p.id}
                         type="button"
                         onClick={() => changePersona(p.id)}
-                        className={`text-left p-2 rounded-lg border transition-all text-[11px] ${
+                        className={`text-left p-2 rounded-xl border transition-all text-[11px] cursor-pointer ${
                           selectedPersona === p.id 
                             ? "bg-blue-50 border-blue-500 font-bold text-[#0f4c81] shadow-xs" 
                             : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
@@ -691,48 +729,46 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                       </button>
                     ))}
                   </div>
-
-                  {/* Speech Speed Presets */}
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-[10px]">
-                    <span className="text-slate-500 font-medium">Pacing:</span>
-                    <div className="flex gap-1">
-                      {[0.8, 1.0, 1.2].map(rate => (
-                        <button
-                          key={rate}
-                          type="button"
-                          onClick={() => setSpeechRate(rate)}
-                          className={`px-2 py-0.5 rounded font-bold transition-all ${
-                            speechRate === rate ? "bg-[#0f4c81] text-white" : "bg-white border text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {rate}x
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Live Status Response Box */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-3 min-h-[75px] flex flex-col justify-center text-xs relative overflow-hidden">
-              {isRecording ? (
-                <div className="flex items-center gap-2.5 text-red-600 font-bold">
-                  <div className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
+            {/* Gemini Live Visual Waveform & 8-Second Silence Pulse */}
+            {isRecording && (
+              <div className="bg-gradient-to-r from-indigo-900 via-blue-900 to-[#0f2942] text-white p-3 rounded-2xl mb-3 shadow-md">
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span>Gemini Live Listening</span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-red-700">Listening to voice...</p>
-                    <p className="text-[10px] text-slate-500 font-normal truncate mt-0.5">
-                      {userInput || "Speak naturally in Hindi, Telugu, or English..."}
-                    </p>
-                  </div>
+                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-mono font-bold">
+                    Auto-Sleep: {silenceSecondsLeft}s
+                  </span>
                 </div>
-              ) : isProcessing ? (
+
+                {/* Animated Waveform Bars */}
+                <div className="flex items-center justify-center gap-1 h-8">
+                  {[40, 70, 30, 90, 60, 100, 50, 80, 45, 95, 35, 75].map((height, i) => (
+                    <motion.span
+                      key={i}
+                      animate={{ height: ["20%", `${height}%`, "20%"] }}
+                      transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.06 }}
+                      className="w-1 bg-gradient-to-t from-blue-400 to-indigo-300 rounded-full"
+                    />
+                  ))}
+                </div>
+                <p className="text-[10px] text-center text-blue-200 mt-1 truncate">
+                  {userInput || "Speak now... Auto-processes when you pause."}
+                </p>
+              </div>
+            )}
+
+            {/* Response Box */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 mb-3 min-h-[75px] flex flex-col justify-center text-xs relative overflow-hidden">
+              {isProcessing ? (
                 <div className="flex items-center gap-2.5 text-[#0f4c81] font-bold">
                   <Loader2 className="w-4 h-4 animate-spin text-[#0f4c81]" />
-                  <span>Kimi-K3 Medical NLP is translating symptoms...</span>
+                  <span>Kimi-K3 Medical NLP reasoning...</span>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -749,12 +785,11 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
                   {/* Clinical NLP Standardized Pathology & Medication Card */}
                   {clinicalNlpResult && (
-                    <div className={`mt-2.5 p-3 rounded-xl border text-xs shadow-xs space-y-2.5 ${
+                    <div className={`mt-2.5 p-3 rounded-2xl border text-xs shadow-xs space-y-2 ${
                       clinicalNlpResult.isLifeThreat
                         ? "bg-red-50/90 border-red-300 text-red-950"
                         : "bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/60 border-indigo-200 text-slate-900"
                     }`}>
-                      {/* Card Header with Badges */}
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 bg-indigo-100/90 px-2 py-0.5 rounded-md">
                           <Sparkles className="w-3 h-3 text-indigo-600" /> Kimi-K3 Medical NLP
@@ -770,70 +805,15 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                         </span>
                       </div>
 
-                      {/* Patient Colloquial Words vs Standardized Medical Finding */}
-                      <div>
-                        <div className="text-[10px] text-slate-500 font-medium italic">
-                          Patient Layperson Words: &ldquo;{clinicalNlpResult.patientRawPrompt}&rdquo;
-                        </div>
-                        <div className="font-bold text-slate-900 text-xs mt-0.5 flex items-center gap-1.5">
-                          <Stethoscope className="w-4 h-4 text-indigo-600 shrink-0" />
-                          <span>{clinicalNlpResult.standardizedMedicalTerm}</span>
-                        </div>
+                      <div className="font-bold text-slate-900 text-xs mt-0.5 flex items-center gap-1.5">
+                        <Stethoscope className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>{clinicalNlpResult.standardizedMedicalTerm}</span>
                       </div>
 
-                      {/* Official Medical Ontology Codes */}
-                      <div className="grid grid-cols-2 gap-1.5 text-[10px] bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
-                        <div>
-                          <span className="text-slate-400 font-medium">ICD-10:</span>{" "}
-                          <strong className="text-slate-800">{clinicalNlpResult.icd10Code}</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 font-medium">SNOMED-CT:</span>{" "}
-                          <strong className="text-slate-800">{clinicalNlpResult.snomedCode}</strong>
-                        </div>
-                        <div className="col-span-2 text-slate-600 truncate">
-                          <span className="text-slate-400 font-medium">Organ System:</span>{" "}
-                          <strong>{clinicalNlpResult.anatomicalSystem}</strong>
-                        </div>
+                      <div className="grid grid-cols-2 gap-1.5 text-[10px] bg-white p-2 rounded-xl border border-slate-200">
+                        <div>ICD-10: <strong>{clinicalNlpResult.icd10Code}</strong></div>
+                        <div>SNOMED: <strong>{clinicalNlpResult.snomedCode}</strong></div>
                       </div>
-
-                      {/* Recommended Diagnostic Labs */}
-                      {clinicalNlpResult.recommendedLabWorkup?.length > 0 && (
-                        <div className="text-[10px]">
-                          <span className="font-bold text-slate-700">Recommended Workup (LOINC):</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {clinicalNlpResult.recommendedLabWorkup.slice(0, 3).map((w, idx) => (
-                              <span key={idx} className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-medium">
-                                {w}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Standard Medication Classes */}
-                      {clinicalNlpResult.standardMedicationClasses?.length > 0 && (
-                        <div className="text-[10px]">
-                          <span className="font-bold text-slate-700">Evidence-Based Medications:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {clinicalNlpResult.standardMedicationClasses.slice(0, 2).map((m, idx) => (
-                              <span key={idx} className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                {m}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Critical Contraindications Alert */}
-                      {clinicalNlpResult.contraindications?.length > 0 && (
-                        <div className="p-2 bg-amber-50/90 border border-amber-300 rounded-lg text-[10px] text-amber-900">
-                          <strong className="text-red-700 flex items-center gap-1 font-bold">
-                            <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" /> Contraindication Warning:
-                          </strong>
-                          <p className="mt-0.5 text-slate-800 leading-tight">{clinicalNlpResult.contraindications[0]}</p>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -843,11 +823,12 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                       {quickActions.map((qa, i) => (
                         <button
                           key={i}
+                          type="button"
                           onClick={() => {
                             qa.action();
                             setQuickActions([]);
                           }}
-                          className={`text-left text-[11px] font-bold py-1.5 px-3 rounded-lg flex items-center justify-between transition-all cursor-pointer ${
+                          className={`text-left text-[11px] font-bold py-1.5 px-3 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
                             qa.isPrimary
                               ? "bg-[#0f4c81] text-white hover:bg-blue-900 shadow-xs"
                               : "bg-white hover:bg-blue-50 border border-slate-200 text-slate-700"
@@ -867,45 +848,31 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 no-scrollbar text-[10px]">
               <button
                 type="button"
+                onClick={() => processAutonomousCommand("register patient Anita age 19 with high fever and BP 120 over 80")}
+                className="whitespace-nowrap px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 transition-colors cursor-pointer"
+              >
+                ✍️ Auto-Fill: &quot;Register Anita 19F BP 120/80&quot;
+              </button>
+              <button
+                type="button"
                 onClick={() => processAutonomousCommand("pet me tez jalan ho rahi hai khane ke baad")}
-                className="whitespace-nowrap px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-full font-bold border border-indigo-200 transition-colors"
+                className="whitespace-nowrap px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-full font-bold border border-indigo-200 transition-colors cursor-pointer"
               >
-                🔬 Try: &quot;Pet me jalan&quot;
-              </button>
-              <button
-                type="button"
-                onClick={() => processAutonomousCommand("seene me achanak tez dard ho raha hai")}
-                className="whitespace-nowrap px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-full font-bold border border-red-200 transition-colors"
-              >
-                🚨 Try: &quot;Seene me dard&quot;
-              </button>
-              <button
-                type="button"
-                onClick={() => processAutonomousCommand("thand lagke bukhar hai")}
-                className="whitespace-nowrap px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-full font-bold border border-amber-200 transition-colors"
-              >
-                🌡️ Try: &quot;Bukhar aur chills&quot;
+                🔬 &quot;Pet me jalan&quot;
               </button>
               <button
                 type="button"
                 onClick={() => processAutonomousCommand("open schemes")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
+                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors cursor-pointer"
               >
                 🏥 Schemes
               </button>
               <button
                 type="button"
-                onClick={() => processAutonomousCommand("open clinical rag")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
+                onClick={() => processAutonomousCommand("open ocr")}
+                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors cursor-pointer"
               >
-                🧠 RAG Console
-              </button>
-              <button
-                type="button"
-                onClick={() => processAutonomousCommand("change voice")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
-              >
-                🗣️ Switch Voice
+                📄 OCR
               </button>
             </div>
 
@@ -915,27 +882,27 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Speak or type symptoms in Hindi, Telugu, English..."
-                className="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-[#0f2942] font-medium outline-none focus:bg-white focus:ring-2 focus:ring-[#0f4c81] transition-all"
-                disabled={isRecording || isProcessing}
+                placeholder="Speak or type (Auto-fills forms & answers)..."
+                className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-[#0f2942] font-medium outline-none focus:bg-white focus:ring-2 focus:ring-[#0f4c81] transition-all"
+                disabled={isProcessing}
               />
               <button
                 type="button"
                 onClick={handleMicClick}
                 disabled={isProcessing}
-                className={`p-2 rounded-lg transition-all cursor-pointer ${
+                className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
                   isRecording
                     ? "bg-red-600 text-white animate-pulse shadow-md ring-2 ring-red-300"
-                    : "bg-blue-50 border border-blue-200 text-[#0f4c81] hover:bg-blue-100 disabled:opacity-50"
+                    : "bg-gradient-to-tr from-[#0f4c81] to-indigo-600 text-white hover:opacity-90 shadow-sm"
                 }`}
-                title={isRecording ? "Stop listening" : "Start speaking"}
+                title={isRecording ? "Stop listening" : "Start Gemini Live listening"}
               >
                 {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
               <button
                 type="submit"
-                disabled={isRecording || isProcessing || !userInput.trim()}
-                className="bg-[#0f4c81] hover:bg-blue-900 text-white p-2 rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                disabled={isProcessing || !userInput.trim()}
+                className="bg-[#0f4c81] hover:bg-blue-900 text-white p-2.5 rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -944,17 +911,22 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         )}
       </AnimatePresence>
 
-      {/* Floating Orb Button with Voice Status Waves */}
+      {/* Floating Orb Button with Voice Waves */}
       <motion.button
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0f4c81] to-indigo-600 hover:from-blue-900 hover:to-[#0f4c81] border-2 border-white flex items-center justify-center text-white shadow-2xl relative cursor-pointer"
-        title="Open Samanvaya Autonomous AI"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen && !isRecording) {
+            startListening();
+          }
+        }}
+        className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0f4c81] via-indigo-600 to-purple-600 hover:from-blue-900 hover:to-[#0f4c81] border-2 border-white flex items-center justify-center text-white shadow-2xl relative cursor-pointer"
+        title="Open Samanvaya Gemini Live Assistant"
       >
         <Sparkles className="w-6 h-6 text-white" />
         
-        {/* Active Online / Voice Wave Indicator */}
+        {/* Active Live Indicator */}
         <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center">
           <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
         </span>

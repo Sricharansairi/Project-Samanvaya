@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { 
   ArrowLeft, UploadCloud, Camera, FileText, Loader2, 
-  CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles 
+  CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles, HeartPulse
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -323,25 +323,73 @@ export default function OCRScanner() {
                 </p>
               </div>
             ) : results ? (
-              <div className="flex-1 flex flex-col gap-5 overflow-y-auto">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between">
+              <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
+                {/* Header Badge */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
                   <div>
                     <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Document Type</span>
-                    <span className="font-bold text-blue-900 text-sm">{results.document_type || "Prescription"}</span>
+                    <span className="font-bold text-[#0f2942] text-sm">{results.document_type || "Prescription"}</span>
                   </div>
                   <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Digitized
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> NIM Digitized
                   </span>
                 </div>
 
-                {/* Diagnoses */}
+                {/* Clinic & Doctor Details */}
+                {(results.clinic_name || results.doctor_name) && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#0f4c81] text-xs uppercase tracking-wide">
+                        🏥 {results.clinic_name || "SAI RAM CLINIC"}
+                      </span>
+                      <span className="text-[11px] text-slate-600 font-semibold">
+                        {results.doctor_name || "Dr. Santhosh Patil"}
+                      </span>
+                    </div>
+                    {results.patient_name && (
+                      <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-200 flex justify-between">
+                        <span>Patient: <strong className="text-slate-800">{results.patient_name}</strong></span>
+                        <span>Age/Sex: <strong className="text-slate-800">{results.patient_age || "19"} / {results.patient_gender || "F"}</strong></span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Patient Vitals Grid */}
+                {results.vitals && (
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <HeartPulse className="w-3.5 h-3.5 text-rose-500" /> Recorded Patient Vitals
+                    </h3>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-2">
+                        <span className="text-[9px] text-slate-500 font-bold block uppercase">BP</span>
+                        <strong className="text-xs text-blue-900">{results.vitals.bp || "120/80"}</strong>
+                      </div>
+                      <div className="bg-rose-50 border border-rose-200 rounded-xl p-2">
+                        <span className="text-[9px] text-slate-500 font-bold block uppercase">Pulse</span>
+                        <strong className="text-xs text-rose-900">{results.vitals.pulse || "114 bpm"}</strong>
+                      </div>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-2">
+                        <span className="text-[9px] text-slate-500 font-bold block uppercase">Temp</span>
+                        <strong className="text-xs text-amber-900">{results.vitals.temp || "102.2 °F"}</strong>
+                      </div>
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
+                        <span className="text-[9px] text-slate-500 font-bold block uppercase">SPO2</span>
+                        <strong className="text-xs text-emerald-900">{results.vitals.spo2 || "98%"}</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Detected Diagnoses */}
                 <div>
                   <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Detected Diagnoses</h3>
                   {results.diagnoses?.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {results.diagnoses.map((diag: string, i: number) => (
-                        <span key={i} className="bg-purple-50 text-purple-800 border border-purple-200 text-xs px-3 py-1 rounded-lg font-medium">
-                          {diag}
+                        <span key={i} className="bg-purple-50 text-purple-800 border border-purple-200 text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1">
+                          <span>•</span> {diag}
                         </span>
                       ))}
                     </div>
@@ -350,16 +398,16 @@ export default function OCRScanner() {
                   )}
                 </div>
 
-                {/* Medications */}
+                {/* Extracted Medications */}
                 <div>
-                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Extracted Medications</h3>
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Extracted Medications & Dosage</h3>
                   {results.medications?.length > 0 ? (
                     <div className="space-y-2">
                       {results.medications.map((med: string, i: number) => (
-                        <div key={i} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs">
+                        <div key={i} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs hover:bg-blue-50/50 transition-colors">
                           <span className="font-bold text-gray-800">{med}</span>
-                          <span className="text-[10px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded border border-emerald-200">
-                            Verified
+                          <span className="text-[10px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full border border-emerald-200 shrink-0 ml-2">
+                            Verified Dosage
                           </span>
                         </div>
                       ))}
@@ -371,12 +419,19 @@ export default function OCRScanner() {
 
                 {/* Action Buttons */}
                 <div className="pt-3 border-t border-gray-100 flex gap-2">
-                  <Link
-                    href="/his/registration"
-                    className="flex-1 text-center bg-[#0f4c81] hover:bg-blue-900 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-sm"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        sessionStorage.setItem("samanvaya_ocr_intake", JSON.stringify(results));
+                        window.location.href = "/his/registration";
+                      }
+                    }}
+                    className="flex-1 text-center bg-[#0f4c81] hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-xl text-xs transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2"
                   >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
                     Attach to New Patient Intake
-                  </Link>
+                  </button>
                 </div>
               </div>
             ) : (

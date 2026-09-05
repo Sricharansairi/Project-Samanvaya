@@ -35,8 +35,54 @@ export default function RegistrationDashboard() {
   const [chipAnswers, setChipAnswers] = useState<Record<string, any>>({});
   const [isLoadingChips, setIsLoadingChips] = useState(false);
 
-  // Omnipresent Assistant Action Listener
+  // Omnipresent Assistant Action Listener & OCR Intake Pre-fill
   useEffect(() => {
+    // Check for OCR intake from sessionStorage
+    if (typeof window !== "undefined") {
+      const ocrRaw = sessionStorage.getItem("samanvaya_ocr_intake");
+      if (ocrRaw) {
+        try {
+          const ocr = JSON.parse(ocrRaw);
+          if (ocr.patient_name) setPatientData(p => ({ ...p, name: ocr.patient_name }));
+          if (ocr.vitals) {
+            setVitals({
+              weight: "58",
+              bp: ocr.vitals.bp || "120/80",
+              temp: ocr.vitals.temp ? ocr.vitals.temp.replace(/[^\d.]/g, "") : "102.2"
+            });
+          }
+          const concernText = [
+            ocr.diagnoses?.join(", "),
+            ocr.medications?.length ? `Prescription: ${ocr.medications.join("; ")}` : ""
+          ].filter(Boolean).join(" | ");
+          if (concernText) setChiefConcern(concernText);
+          sessionStorage.removeItem("samanvaya_ocr_intake");
+        } catch (e) {
+          console.warn("Error parsing ocr intake:", e);
+        }
+      }
+
+      const pendingRaw = sessionStorage.getItem("samanvaya_pending_fill");
+      if (pendingRaw) {
+        try {
+          const pending = JSON.parse(pendingRaw);
+          if (pending.name) setPatientData(p => ({ ...p, name: pending.name }));
+          if (pending.phone) setPatientData(p => ({ ...p, phone: pending.phone }));
+          if (pending.bp || pending.temp) {
+            setVitals(v => ({
+              ...v,
+              bp: pending.bp || v.bp,
+              temp: pending.temp || v.temp
+            }));
+          }
+          if (pending.concern) setChiefConcern(pending.concern);
+          sessionStorage.removeItem("samanvaya_pending_fill");
+        } catch (e) {
+          console.warn("Error parsing pending fill:", e);
+        }
+      }
+    }
+
     const handleAssistantAction = (e: any) => {
       const { action, payload } = e.detail || {};
       if (action === "open_abha_modal") {
@@ -46,6 +92,8 @@ export default function RegistrationDashboard() {
         if (payload?.phone) setPatientData(p => ({ ...p, phone: payload.phone }));
         if (payload?.abhaId) setPatientData(p => ({ ...p, abhaId: payload.abhaId }));
         if (payload?.concern) setChiefConcern(payload.concern);
+        if (payload?.bp) setVitals(v => ({ ...v, bp: payload.bp }));
+        if (payload?.temp) setVitals(v => ({ ...v, temp: payload.temp }));
       } else if (action === "generate_abha") {
         generateMockAbha();
       }

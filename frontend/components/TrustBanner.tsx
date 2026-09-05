@@ -2,65 +2,136 @@
 
 import { Search, ShieldCheck, Phone, Globe, Eye, Volume2, Accessibility } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { INDIAN_LANGUAGES, Language } from "@/i18n/translations";
 
 interface TrustBannerProps {
-  currentTab: string;
-  onTabChange: (tab: string) => void;
+  currentTab?: string;
+  onTabChange?: (tab: string) => void;
   onLanguageChange?: (lang: string) => void;
 }
 
-export default function TrustBanner({ currentTab, onTabChange, onLanguageChange }: TrustBannerProps) {
+export default function TrustBanner({ currentTab = "home", onTabChange, onLanguageChange }: TrustBannerProps) {
+  const router = useRouter();
+  const { language, setLanguage, t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleTabClick = (tabKey: string, path: string) => {
+    if (onTabChange) {
+      onTabChange(tabKey);
+    }
+    router.push(path);
+  };
+
+  const handleLanguageSelect = (newLang: string) => {
+    const lang = newLang as Language;
+    setLanguage(lang);
+    if (onLanguageChange) {
+      onLanguageChange(newLang);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      if (q.includes("doctor") || q.includes("physician") || q.includes("consult")) {
+        router.push("/his/doctor");
+      } else if (q.includes("ocr") || q.includes("prescription") || q.includes("scan") || q.includes("parchi")) {
+        router.push("/his/ocr");
+      } else if (q.includes("scheme") || q.includes("pmjay") || q.includes("yojana") || q.includes("claim") || q.includes("insurance")) {
+        router.push(`/his/schemes?search=${encodeURIComponent(searchQuery)}`);
+      } else if (q.includes("ayush") || q.includes("prakriti") || q.includes("ayurveda") || q.includes("pariksha")) {
+        router.push("/his/ayush");
+      } else if (q.includes("queue") || q.includes("token") || q.includes("opd") || q.includes("wait")) {
+        router.push("/his/queue");
+      } else if (q.includes("kiosk") || q.includes("reg") || q.includes("admission") || q.includes("triage")) {
+        router.push("/his/registration");
+      } else if (q.includes("rag") || q.includes("ai") || q.includes("decision") || q.includes("guidelines")) {
+        router.push("/his/rag");
+      } else if (q.includes("dpdp") || q.includes("consent") || q.includes("privacy")) {
+        router.push("/his/dpdp");
+      } else if (q.includes("patient") || q.includes("card") || q.includes("abha") || q.includes("portal")) {
+        router.push("/patient");
+      } else {
+        router.push(`/his/schemes?search=${encodeURIComponent(searchQuery)}`);
+      }
+    }
+  };
+
+  const adjustFontSize = (scale: "small" | "normal" | "large") => {
+    if (typeof document !== "undefined") {
+      if (scale === "small") document.documentElement.style.fontSize = "14px";
+      else if (scale === "normal") document.documentElement.style.fontSize = "16px";
+      else if (scale === "large") document.documentElement.style.fontSize = "18px";
+    }
+  };
 
   return (
     <header className="w-full flex flex-col bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       {/* 1. Top Accessibility Strip (Official UIDAI Style Navy Bar) */}
       <div className="w-full bg-[#1d2d44] text-white text-[11px] py-1 px-4 sm:px-8 flex items-center justify-between font-sans">
         <div className="flex items-center gap-3">
-          <span className="text-gray-300 hover:text-white cursor-pointer">मुख्य सामग्री पर जाएं | Skip to Main Content</span>
+          <a href="#main-content" className="text-gray-300 hover:text-white cursor-pointer transition-colors">
+            {t("nav.skip_to_content")}
+          </a>
           <span className="text-gray-500 hidden sm:inline">•</span>
-          <span className="text-gray-300 hover:text-white cursor-pointer hidden sm:flex items-center gap-1">
-            <Accessibility className="w-3 h-3" /> Screen Reader Access
-          </span>
+          <button 
+            type="button"
+            onClick={() => {
+              const el = document.body;
+              el.classList.toggle("contrast-125");
+            }}
+            className="text-gray-300 hover:text-white cursor-pointer hidden sm:flex items-center gap-1 bg-transparent border-0"
+          >
+            <Accessibility className="w-3 h-3" /> {t("nav.screen_reader")}
+          </button>
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-gray-300">
-            <Globe className="w-3 h-3 text-[#f37021]" />
+          {/* Multi-Lingual Indian Language Selector */}
+          <div className="flex items-center gap-1.5 text-gray-300 bg-white/10 px-2 py-0.5 rounded-md border border-white/20">
+            <Globe className="w-3.5 h-3.5 text-[#f37021]" />
             <select 
-              onChange={(e) => onLanguageChange && onLanguageChange(e.target.value)}
-              className="bg-transparent text-white text-[11px] outline-none cursor-pointer"
+              value={language}
+              onChange={(e) => handleLanguageSelect(e.target.value)}
+              className="bg-transparent text-white text-[11px] font-semibold outline-none cursor-pointer pr-1"
             >
-              <option value="hi" className="bg-[#1d2d44] text-white">हिन्दी (Hindi)</option>
-              <option value="en" className="bg-[#1d2d44] text-white">English</option>
-              <option value="te" className="bg-[#1d2d44] text-white">తెలుగు (Telugu)</option>
-              <option value="ta" className="bg-[#1d2d44] text-white">தமிழ் (Tamil)</option>
-              <option value="bn" className="bg-[#1d2d44] text-white">বাংলা (Bengali)</option>
-              <option value="mr" className="bg-[#1d2d44] text-white">मराठी (Marathi)</option>
-              <option value="kn" className="bg-[#1d2d44] text-white">ಕನ್ನಡ (Kannada)</option>
+              {INDIAN_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code} className="bg-[#1d2d44] text-white">
+                  {lang.nativeName} ({lang.name})
+                </option>
+              ))}
             </select>
           </div>
 
+          {/* Text Size Accessibility Scaling */}
           <div className="hidden sm:flex items-center gap-1 font-mono text-[10px] text-gray-300 border-l border-gray-600 pl-3">
-            <button className="px-1 hover:text-white">A-</button>
-            <button className="px-1 hover:text-white font-bold">A</button>
-            <button className="px-1 hover:text-white">A+</button>
+            <button type="button" onClick={() => adjustFontSize("small")} className="px-1 hover:text-white cursor-pointer" title="Small text">A-</button>
+            <button type="button" onClick={() => adjustFontSize("normal")} className="px-1 hover:text-white font-bold cursor-pointer" title="Normal text">A</button>
+            <button type="button" onClick={() => adjustFontSize("large")} className="px-1 hover:text-white font-bold cursor-pointer text-[11px]" title="Large text">A+</button>
           </div>
         </div>
       </div>
 
-      {/* 2. Main Government Header (Crisp White with National Emblem & Saffron-Green Accent) */}
+      {/* 2. Main Government Header (National Emblem & Clickable Branding) */}
       <div className="w-full bg-white py-3 px-4 sm:px-8 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-gray-100">
-        {/* Emblem & Logo */}
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-[#f37021]/10 via-white to-[#138808]/10 border border-orange-200 text-2xl shadow-sm">
+        
+        {/* Emblem & Logo wrapped in Link to Home */}
+        <Link 
+          href="/" 
+          className="flex items-center gap-4 w-full md:w-auto group cursor-pointer hover:opacity-95 transition-opacity"
+          title="Return to Project Samanvaya Home"
+        >
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-[#f37021]/10 via-white to-[#138808]/10 border border-orange-200 text-2xl shadow-sm group-hover:scale-105 transition-transform">
             🇮🇳
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-[#f37021] tracking-wide">मेरा स्वास्थ्य, मेरी पहचान</span>
+              <span className="text-sm font-bold text-[#f37021] tracking-wide">{t("nav.motto")}</span>
               <span className="text-gray-300">|</span>
-              <span className="text-xs text-[#138808] font-semibold">My Health, My Identity</span>
+              <span className="text-xs text-[#138808] font-semibold">MoHFW & AYUSH</span>
             </div>
             <h1 className="text-base sm:text-xl font-bold text-[#0f2942] tracking-tight flex items-center gap-2">
               समन्वय • PROJECT SAMANVAYA
@@ -69,19 +140,20 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
               </span>
             </h1>
             <p className="text-[11px] text-gray-500 font-medium">
-              National Smart Case-Taking & AYUSH-Allopathic Bridge • MoHFW & Ministry of AYUSH
+              National Smart Case-Taking & AYUSH-Allopathic Bridge System
             </p>
           </div>
-        </div>
+        </Link>
 
-        {/* Live Search Bar & Help (UIDAI Style) */}
+        {/* Live Search Bar & Help */}
         <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:w-80">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search services, schemes, tokens..."
+              onKeyDown={handleSearchSubmit}
+              placeholder={t("nav.search_placeholder")}
               className="w-full bg-gray-50 border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0f4c81] focus:bg-white transition-all shadow-inner"
             />
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
@@ -90,66 +162,107 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
           {/* National Health Helpline Badge */}
           <div className="hidden lg:flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs text-emerald-800 font-medium shadow-sm">
             <Phone className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Helpline: <strong>104 / 108</strong></span>
+            <span>{t("nav.helpline")}</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Primary Navigation Tabs (Official UIDAI Navigation Menu) */}
+      {/* 3. Primary Navigation Tabs with Live Next.js Routing */}
       <nav className="w-full bg-white px-4 sm:px-8 flex items-center gap-1 overflow-x-auto py-1 border-t border-gray-100 text-xs font-medium text-gray-700">
         <button
-          onClick={() => onTabChange("home")}
-          className={`px-4 py-2 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+          type="button"
+          onClick={() => handleTabClick("home", "/")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
             currentTab === "home"
               ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
               : "hover:bg-gray-100 text-gray-700"
           }`}
         >
-          🏛️ Home / मुख्य पृष्ठ
+          🏛️ {t("nav.home")}
         </button>
 
         <button
-          onClick={() => onTabChange("kiosk")}
-          className={`px-4 py-2 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+          type="button"
+          onClick={() => handleTabClick("kiosk", "/his/registration")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
             currentTab === "kiosk"
               ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
               : "hover:bg-gray-100 text-gray-700"
           }`}
         >
-          🏥 Patient Kiosk / स्मार्ट पर्ची
+          🏥 {t("nav.kiosk")}
         </button>
 
         <button
-          onClick={() => onTabChange("doctor")}
-          className={`px-4 py-2 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+          type="button"
+          onClick={() => handleTabClick("doctor", "/his/doctor")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
             currentTab === "doctor"
               ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
               : "hover:bg-gray-100 text-gray-700"
           }`}
         >
-          🩺 Physician Desk / चिकित्सक पटल
+          🩺 {t("nav.doctor")}
         </button>
 
         <button
-          onClick={() => onTabChange("ayush")}
-          className={`px-4 py-2 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+          type="button"
+          onClick={() => handleTabClick("ayush", "/his/ayush")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
             currentTab === "ayush"
               ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
               : "hover:bg-gray-100 text-gray-700"
           }`}
         >
-          🌿 AYUSH Pariksha / आयुष परीक्षा
+          🌿 {t("nav.ayush")}
         </button>
 
         <button
-          onClick={() => onTabChange("schemes")}
-          className={`px-4 py-2 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+          type="button"
+          onClick={() => handleTabClick("schemes", "/his/schemes")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
             currentTab === "schemes"
               ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
               : "hover:bg-gray-100 text-gray-700"
           }`}
         >
-          🛡️ Govt Schemes / सरकारी योजनाएं
+          🛡️ {t("nav.schemes")}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabClick("ocr", "/his/ocr")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            currentTab === "ocr"
+              ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          📄 {t("nav.ocr")}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabClick("queue", "/his/queue")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            currentTab === "queue"
+              ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          📱 {t("nav.queue")}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabClick("rag", "/his/rag")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            currentTab === "rag"
+              ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          🧠 {t("nav.rag")}
         </button>
       </nav>
     </header>
