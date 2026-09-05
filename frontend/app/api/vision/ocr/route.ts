@@ -285,16 +285,16 @@ CRITICAL RULES:
       diagnoses: Array.isArray(parsed.diagnoses) ? parsed.diagnoses : [],
       medications: Array.isArray(parsed.medications) ? parsed.medications : [],
       abnormal_labs: Array.isArray(parsed.abnormal_labs) ? parsed.abnormal_labs : [],
-      ocr_engine: "Nemotron OCR v2",
+      ocr_engine: "ABDM Clinical OCR Engine",
       raw_ocr_lines: detectedWords,
       total_words_detected: detectedWords.length,
-      raw_ocr_summary: ocrResultText.slice(0, 400) || "Nemotron OCR v2 text extraction complete."
+      raw_ocr_summary: ocrResultText.slice(0, 400) || "Clinical optical text extraction complete."
     });
 
   } catch (error: any) {
-    console.error("Nemotron OCR pipeline error:", error);
+    console.error("Clinical OCR pipeline error:", error);
     return NextResponse.json({
-      error: error.message || "Failed to process image with Nemotron OCR v2",
+      error: error.message || "Failed to process document with Clinical OCR engine",
       document_type: "Doctor Prescription (OPD)",
       clinic_name: null,
       doctor_name: null,
@@ -304,7 +304,7 @@ CRITICAL RULES:
       vitals: { bp: null, pulse: null, temp: null, spo2: null },
       diagnoses: [],
       medications: [],
-      ocr_engine: "Nemotron OCR v2",
+      ocr_engine: "ABDM Clinical OCR Engine",
       raw_ocr_lines: []
     }, { status: 500 });
   }

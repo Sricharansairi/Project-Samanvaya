@@ -264,6 +264,30 @@ export default function TrustBanner({ currentTab = "home", onTabChange, onLangua
         >
           🧠 {t("nav.rag")}
         </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabClick("patient", "/patient")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            currentTab === "patient"
+              ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          🪪 My ABHA
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabClick("dpdp", "/his/dpdp")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            currentTab === "dpdp"
+              ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          🔒 {t("nav.dpdp")}
+        </button>
       </nav>
     </header>
   );

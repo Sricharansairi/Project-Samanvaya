@@ -60,7 +60,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   const [clinicalNlpResult, setClinicalNlpResult] = useState<ClinicalTranslationResult | null>(null);
 
   const [assistantResponse, setAssistantResponse] = useState<string>(
-    "Namaste! I am Samanvaya Autonomous Clinical AI with Gemini Live intelligence and Sarvam AI natural Indian voice. I can auto-fill web forms, translate colloquial symptoms, and navigate the hospital system autonomously."
+    "Namaste! I am your Samanvaya Autonomous Clinical Co-Pilot. I can assist with clinical intake, translate colloquial symptoms into medical terms, and navigate the hospital system autonomously."
   );
 
   const recognitionRef = useRef<any>(null);
@@ -94,7 +94,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     setSelectedPersona(personaId);
     localStorage.setItem("samanvaya_voice_persona", personaId);
     const persona = VOICE_PERSONAS.find(p => p.id === personaId);
-    const msg = `Voice changed to ${persona?.name} (${persona?.role}). Powered by Sarvam AI.`;
+    const msg = `Voice changed to ${persona?.name} (${persona?.role}).`;
     setAssistantResponse(msg);
     speakResponse(msg, personaId);
   };
@@ -200,7 +200,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   };
 
   // -------------------------------------------------------------
-  // GEMINI LIVE 8-SECOND SILENCE INACTIVITY TIMER
+  // AUTONOMOUS 8-SECOND SILENCE INACTIVITY TIMER
   // -------------------------------------------------------------
   const reset8sSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -412,7 +412,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
           }
         }
       } catch (err) {
-        console.warn("Kimi-K3 async inference fallback:", err);
+        console.warn("Clinical NLP async inference fallback:", err);
       }
 
       setLastActionExecuted(`Clinical NLP: ${finalResult.standardizedMedicalTerm}`);
@@ -449,7 +449,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   };
 
   // -------------------------------------------------------------
-  // GEMINI LIVE REAL-TIME CONTINUOUS LISTENING ENGINE
+  // REAL-TIME CONTINUOUS LISTENING SPEECH ENGINE
   // -------------------------------------------------------------
   const startListening = () => {
     if (typeof window === "undefined") return;
@@ -466,13 +466,13 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
         const persona = VOICE_PERSONAS.find(p => p.id === selectedPersona) || VOICE_PERSONAS[0];
         recognition.lang = persona.lang;
-        recognition.continuous = true; // Continuous listening like Gemini Live
+        recognition.continuous = true; // Continuous listening
         recognition.interimResults = true;
 
         recognition.onstart = () => {
           setIsRecording(true);
           reset8sSilenceTimer();
-          setAssistantResponse("Gemini Live Active: Listening continuously... Speak naturally.");
+          setAssistantResponse("Voice Assistant Active: Listening continuously... Speak naturally.");
         };
 
         recognition.onresult = (event: any) => {
@@ -641,9 +641,9 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <h4 className="text-xs font-bold text-[#0f2942]">Samanvaya Gemini Live</h4>
+                    <h4 className="text-xs font-bold text-[#0f2942]">Samanvaya Clinical Assistant</h4>
                     <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                      <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" /> Sarvam AI
+                      <Radio className="w-2.5 h-2.5 text-indigo-600 animate-pulse" /> Indian Voice
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500 font-medium">
@@ -699,10 +699,10 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                   className="bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-3 text-xs space-y-2.5 overflow-hidden"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-700">Sarvam AI Natural Voices:</span>
+                    <span className="font-bold text-slate-700">Clinical Voice Personas:</span>
                     <button
                       type="button"
-                      onClick={() => speakResponse("Namaste, I am testing the selected Sarvam AI voice.")}
+                      onClick={() => speakResponse("Namaste, I am testing the selected clinical voice.")}
                       className="text-[10px] text-[#0f4c81] font-bold hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Play className="w-3 h-3" /> Test
@@ -733,13 +733,13 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
               )}
             </AnimatePresence>
 
-            {/* Gemini Live Visual Waveform & 8-Second Silence Pulse */}
+            {/* Visual Waveform & 8-Second Silence Pulse */}
             {isRecording && (
               <div className="bg-gradient-to-r from-indigo-900 via-blue-900 to-[#0f2942] text-white p-3 rounded-2xl mb-3 shadow-md">
                 <div className="flex items-center justify-between text-xs mb-2">
                   <div className="flex items-center gap-1.5 font-bold">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span>Gemini Live Listening</span>
+                    <span>Voice Listening Active</span>
                   </div>
                   <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-mono font-bold">
                     Auto-Sleep: {silenceSecondsLeft}s
@@ -768,7 +768,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
               {isProcessing ? (
                 <div className="flex items-center gap-2.5 text-[#0f4c81] font-bold">
                   <Loader2 className="w-4 h-4 animate-spin text-[#0f4c81]" />
-                  <span>Kimi-K3 Medical NLP reasoning...</span>
+                  <span>Clinical NLP reasoning...</span>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -792,7 +792,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                     }`}>
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 bg-indigo-100/90 px-2 py-0.5 rounded-md">
-                          <Sparkles className="w-3 h-3 text-indigo-600" /> Kimi-K3 Medical NLP
+                          <Sparkles className="w-3 h-3 text-indigo-600" /> Clinical NLP Co-Pilot
                         </span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           clinicalNlpResult.clinicalSeverity === "Critical" 
@@ -895,7 +895,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                     ? "bg-red-600 text-white animate-pulse shadow-md ring-2 ring-red-300"
                     : "bg-gradient-to-tr from-[#0f4c81] to-indigo-600 text-white hover:opacity-90 shadow-sm"
                 }`}
-                title={isRecording ? "Stop listening" : "Start Gemini Live listening"}
+                title={isRecording ? "Stop listening" : "Start voice assistant listening"}
               >
                 {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
@@ -922,7 +922,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
           }
         }}
         className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0f4c81] via-indigo-600 to-purple-600 hover:from-blue-900 hover:to-[#0f4c81] border-2 border-white flex items-center justify-center text-white shadow-2xl relative cursor-pointer"
-        title="Open Samanvaya Gemini Live Assistant"
+        title="Open Samanvaya Clinical Assistant"
       >
         <Sparkles className="w-6 h-6 text-white" />
         

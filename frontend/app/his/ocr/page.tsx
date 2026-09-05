@@ -182,13 +182,13 @@ export default function OCRScanner() {
         body: JSON.stringify({ base64_image: base64Image }),
       });
       
-      if (!response.ok) throw new Error("Failed to scan document with Nemotron OCR v2");
+      if (!response.ok) throw new Error("Failed to scan document with Clinical Digitizer");
       const data = await response.json();
       setResults(data);
       setIsEditing(false);
     } catch (err: any) {
       console.error(err);
-      setError("Nemotron OCR extraction error. Please check image clarity and try again.");
+      setError("Prescription scan extraction error. Please check image clarity and try again.");
     }
     setIsScanning(false);
   };
@@ -248,13 +248,13 @@ export default function OCRScanner() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-[#0f2942] text-lg leading-none">AI Prescription & Document OCR</h1>
+                <h1 className="font-extrabold text-[#0f2942] text-lg leading-none">Prescription & Clinical Document OCR</h1>
                 <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                  Nemotron OCR v2 + Groq
+                  ABDM Clinical Digitizer
                 </span>
               </div>
               <p className="text-[11px] text-gray-500 mt-0.5">
-                NVIDIA NIM High-Precision Medical Transcription & Autonomous Clinical Structuring
+                High-Precision Optical Medical Transcription & Autonomous Clinical Structuring
               </p>
             </div>
           </div>
@@ -426,7 +426,7 @@ export default function OCRScanner() {
                     className="flex-1 py-3 px-4 rounded-xl bg-[#0f4c81] text-white font-bold hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer shadow-md text-xs"
                   >
                     {isScanning ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Nemotron OCR Processing...</>
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Clinical OCR Processing...</>
                     ) : (
                       <><Sparkles className="w-4 h-4 text-amber-300" /> Extract Prescription</>
                     )}
@@ -470,7 +470,7 @@ export default function OCRScanner() {
                 <Loader2 className="w-12 h-12 text-[#0f4c81] animate-spin mb-4" />
                 <h3 className="font-extrabold text-[#0f2942] text-base">Reading Medical Handwriting...</h3>
                 <p className="text-xs max-w-xs mt-1 text-slate-600">
-                  NVIDIA Nemotron OCR v2 is reading the prescription and resolving clinical entities with Groq.
+                  Optical Vision engine is reading the prescription and resolving clinical entities.
                 </p>
               </div>
             ) : results ? (
@@ -483,7 +483,7 @@ export default function OCRScanner() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Nemotron OCR v2 Verified
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Clinically Digitized & Verified
                     </span>
                   </div>
                 </div>
@@ -762,7 +762,7 @@ export default function OCRScanner() {
                   )}
                 </div>
 
-                {/* Raw Nemotron OCR Detections Inspector */}
+                {/* Raw Optical OCR Detections Inspector */}
                 {results.raw_ocr_lines && results.raw_ocr_lines.length > 0 && (
                   <div className="border border-slate-200 rounded-xl overflow-hidden mt-1">
                     <button
@@ -772,7 +772,7 @@ export default function OCRScanner() {
                     >
                       <span className="flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        Nemotron OCR v2 Raw Detections ({results.raw_ocr_lines.length} lines detected)
+                        Raw Optical Detections ({results.raw_ocr_lines.length} lines detected)
                       </span>
                       {showRawOcr ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
@@ -844,7 +844,7 @@ export default function OCRScanner() {
                 <FileText className="w-12 h-12 stroke-[1.5] mb-2 text-gray-300" />
                 <h4 className="font-bold text-gray-700 text-sm">No Document Scanned Yet</h4>
                 <p className="text-xs text-gray-500 max-w-xs mt-1">
-                  Use the live camera or upload an existing photo or PDF. Nemotron OCR v2 will detect and transcribe all text in real-time.
+                  Use the live camera or upload an existing photo or PDF. The optical scanner will detect and transcribe all text in real-time.
                 </p>
               </div>
             )}

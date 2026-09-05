@@ -15,7 +15,7 @@ export const translations = {
     "nav.doctor": "Physician Desk",
     "nav.ayush": "AYUSH Pariksha",
     "nav.schemes": "Govt Schemes",
-    "nav.ocr": "AI OCR Scanner",
+    "nav.ocr": "Prescription OCR",
     "nav.queue": "OPD Queue",
     "nav.rag": "Clinical RAG",
     "nav.dpdp": "DPDP Privacy",

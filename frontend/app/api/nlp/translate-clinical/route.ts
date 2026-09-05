@@ -116,7 +116,7 @@ DO NOT wrap in markdown fences. Return ONLY valid JSON.`;
 
         return NextResponse.json({
           success: true,
-          engine: "Moonshot Kimi-K3 via NVIDIA NIM + Samanvaya Ontology",
+          engine: "Samanvaya Clinical NLP + SNOMED-CT Ontology",
           result: mergedResult
         });
       }
