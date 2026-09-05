@@ -72,8 +72,8 @@ def triage_symptoms(symptom_text: str) -> dict:
                 "confidence": 1.0
             }
     
-    # Get a fresh key from the rotator
-    api_key = key_rotator.get_llama_3_3_70b_key()
+    # Get a fresh key from the rotator (overriding with Kimi K3 key for assistant)
+    api_key = "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"
     
     # 1. Fetch RAG Context
     medical_context = get_medical_context(symptom_text, api_key)
@@ -97,7 +97,7 @@ def triage_symptoms(symptom_text: str) -> dict:
 
     try:
         completion = client.chat.completions.create(
-            model="nvidia/llama-3.1-nemotron-70b-instruct",
+            model="moonshotai/kimi-k3",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Patient symptoms: {symptom_text}"}
@@ -128,7 +128,7 @@ def extract_patient_entities(voice_transcript: str) -> dict:
     """
     Uses NVIDIA LLaMA to extract structured patient details from an unstructured voice transcript.
     """
-    api_key = key_rotator.get_llama_3_3_70b_key()
+    api_key = "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"
     
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
@@ -148,7 +148,7 @@ def extract_patient_entities(voice_transcript: str) -> dict:
 
     try:
         completion = client.chat.completions.create(
-            model="nvidia/llama-3.1-nemotron-70b-instruct",
+            model="moonshotai/kimi-k3",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Voice Transcript: {voice_transcript}"}
