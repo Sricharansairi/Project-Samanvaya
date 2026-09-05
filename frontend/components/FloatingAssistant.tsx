@@ -121,7 +121,19 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
       reply = "Language switched to English.";
     }
     // 2. Navigation Commands
-    else if (text.includes("scheme") || text.includes("yojana") || text.includes("pmjay") || text.includes("aarogyasri") || text.includes("insurance") || text.includes("claim")) {
+    else if (text.includes("ayush") || text.includes("prakriti") || text.includes("ayurveda") || text.includes("dosha")) {
+      router.push("/his/ayush");
+      if (onAction) onAction("open_ayush");
+      reply = "Opening AYUSH Pariksha & Prakriti Profiler.";
+    } else if (text.includes("dpdp") || text.includes("privacy") || text.includes("consent") || text.includes("data protection")) {
+      router.push("/his/dpdp");
+      if (onAction) onAction("open_dpdp");
+      reply = "Opening DPDP 2023 Patient Consent Manager.";
+    } else if (text.includes("queue") || text.includes("calling board") || text.includes("token board") || text.includes("opd status")) {
+      router.push("/his/queue");
+      if (onAction) onAction("open_queue");
+      reply = "Opening Live Hospital OPD Queue Board.";
+    } else if (text.includes("scheme") || text.includes("yojana") || text.includes("pmjay") || text.includes("aarogyasri") || text.includes("insurance") || text.includes("claim")) {
       router.push("/his/schemes");
       if (onAction) onAction("open_scheme");
       reply = "Opening Government Health Scheme & Claim Navigator across 36 States.";
@@ -133,7 +145,7 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
       router.push("/his/registration");
       if (onAction) onAction("open_registration");
       reply = "Opening Patient Registration & Triage Desk.";
-    } else if (text.includes("doctor") || text.includes("clinic") || text.includes("physician") || text.includes("queue")) {
+    } else if (text.includes("doctor") || text.includes("clinic") || text.includes("physician")) {
       router.push("/his/doctor");
       if (onAction) onAction("doctor_view");
       reply = "Opening Physician Consultation Desk.";

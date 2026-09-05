@@ -21,6 +21,7 @@ export async function POST(request: Request) {
       key: dq.key,
       label: dq.question,
       question: dq.question,
+      category: dq.category,
       options: dq.options.map(opt => ({
         label: opt.label,
         value: opt.value,
@@ -36,15 +37,21 @@ export async function POST(request: Request) {
         id: guideline.id,
         condition: guideline.condition,
         source: guideline.source,
+        sourceCitation: guideline.sourceCitation,
         department: guideline.department,
         urgency: guideline.urgency,
+        icd10: guideline.icd10,
         snomedCode: guideline.snomedCode,
         snomedDisplay: guideline.snomedDisplay,
         preliminaryAdvice: guideline.preliminaryAdvice,
-        contraindications: guideline.contraindications
+        emergencyAction: guideline.emergencyAction,
+        contraindications: guideline.contraindications,
+        recommendedWorkup: guideline.recommendedWorkup
       },
       parameterConfigs,
-      relevanceScore: ragResult.relevanceScore
+      relevanceScore: ragResult.relevanceScore,
+      retrievalArchitecture: ragResult.retrievalArchitecture,
+      differentialDiagnoses: ragResult.differentialDiagnoses
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
