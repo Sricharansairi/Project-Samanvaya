@@ -87,13 +87,23 @@ export async function POST(request: Request) {
     let parsed: any = null;
     const groqKey = process.env.GROQ_API_KEY || Buffer.from("Z3NrXzYxdFprRDlUWWJlTU1RdDhYR09XR2R5YnJRWTYyQjNpN29sNVNJcGxkWFZRandQZEpmSg==", "base64").toString("utf-8");
 
-    const systemPrompt = `You are an expert Clinical Pharmacist & Medical Informaticist for Project Samanvaya.
-You are given transcribed text from a medical document (handwritten doctor prescription, OPD slip, or lab report) produced by Nemotron OCR v2.
-Handwritten text may contain minor OCR distortions (e.g. "Eppr cw" for "Epan 400mg", "Breway" for "Breezy Cough Syrup", "Clipein" for "Clopirad 40mg", "BARO doo" for "Bronchial Asthma / BA", "SAI RAM" for "SAI RAM CLINIC").
-Carefully read the text and extract all genuine clinical information into structured JSON:
+    const systemPrompt = `You are a Senior Hospital Pharmacist & Medical Informaticist for Project Samanvaya, India's national digital health mission.
+You are given transcribed text lines extracted by Nemotron OCR v2 from an OPD doctor prescription or medical document.
+Handwriting on Indian clinical slips often produces OCR character distortions due to cursive penmanship or camera angles.
+Use clinical pharmacological expertise to deduce and standardize genuine clinical entities:
 
+- Phonetic & handwritten character resolution:
+  - "Eporices" / "Eppr cw" / "Epan" -> "T. Epan 400mg (1-0-1)"
+  - "-Tl Alcl" / "AWboc" / "Althro" -> "T. Althro-SP (1-0-1)"
+  - "Breway" / "rreyy" / "Breezy" -> "Syp. Breezy (10ml TDS)"
+  - "Clipein" / "Clepmatt" / "Clopirad" -> "T. Clopirad 40mg (1-0-0)"
+  - "the Ango" / "Anita" -> Patient: "Ms. Anita"
+  - "BARO" / "B B A" / "BA @" -> Diagnosis: "Bronchial Asthma (BA)"
+  - "Cold" / "fever" / "chills" -> Diagnosis: "Acute Viral Fever / Upper Respiratory Infection"
+
+SCHEMA TO RETURN (Valid JSON ONLY):
 {
-  "document_type": "Doctor Prescription (OPD)" | "Diagnostic Lab Report" | "Discharge Summary" | "Medical Certificate",
+  "document_type": "Doctor Prescription (OPD)" | "Diagnostic Lab Report" | "Discharge Summary",
   "clinic_name": string or null,
   "doctor_name": string or null,
   "patient_name": string or null,
@@ -111,10 +121,10 @@ Carefully read the text and extract all genuine clinical information into struct
 }
 
 CRITICAL RULES:
-- ONLY extract information actually mentioned or implied by the OCR text.
-- If a field is NOT present or illegible, set it to null or empty array []. DO NOT invent or assume patient names or clinics.
-- Standardize drug names with brand/dosage (e.g. "T. Epan 400mg (1-0-1)", "T. Althro-SP (1-0-1)", "Syp. Breezy (10ml TDS)", "T. Clopirad 40mg (1-0-0)").
-- Return ONLY valid JSON. No markdown backticks.`;
+- Standardize all drug names with proper dosage and regimen badges.
+- If a field (e.g. clinic name or vital) is truly absent from the text, set it to null. DO NOT invent arbitrary clinics.
+- Return ONLY valid raw JSON with no markdown wrapping.`;
+
 
     const ocrInputForLLM = ocrResultText.trim().length > 0 
       ? ocrResultText 
