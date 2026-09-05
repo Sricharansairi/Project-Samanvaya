@@ -155,6 +155,26 @@ def test_clinical_nlp_engine():
     assert any("Aspirin" in c for c in res_fever["contraindications"]), "Missing Dengue NSAID/Aspirin contraindication"
     print(f"[PASS] Test 3 Passed: Bone-Breaking Febrile presentation mapped to Pyrexia/Dengue (ICD-10: {res_fever['icd10_code']}) with NSAID contraindication.")
 
+from app.services.vision_service import process_medical_image
+from PIL import Image, ImageDraw
+import io, base64
+
+def test_nemotron_ocr_pipeline():
+    print("\n--- 6. Testing Nemotron OCR v2 Prescription Extraction Engine ---")
+    img = Image.new('RGB', (350, 120), color=(255, 255, 255))
+    d = ImageDraw.Draw(img)
+    d.text((10, 10), 'SAI RAM CLINIC', fill=(0, 0, 0))
+    d.text((10, 40), 'Dr. Santhosh Patil', fill=(0, 0, 0))
+    d.text((10, 70), 'T. Epan 400mg 1-0-1', fill=(0, 0, 0))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG')
+    b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    res = process_medical_image(b64)
+    assert res["ocr_engine"] == "Nemotron OCR v2", "OCR engine identifier mismatch"
+    assert len(res["medications"]) > 0, "No medications extracted by Nemotron OCR pipeline"
+    print(f"[PASS] Nemotron OCR v2 verified: extracted {len(res['medications'])} medications and {len(res['diagnoses'])} clinical diagnoses.")
+
 def test_all():
     print("==================================================")
     print("  PROJECT SAMANVAYA - PRODUCTION SUITE AUDIT")
@@ -164,10 +184,12 @@ def test_all():
     test_chip_parameter_generation()
     test_ayush_and_dpdp_modules()
     test_clinical_nlp_engine()
+    test_nemotron_ocr_pipeline()
     print("\n==================================================")
     print("  ALL TESTS PASSED WITH 100% SUCCESS RATE! [SUCCESS]")
     print("==================================================")
 
 if __name__ == "__main__":
     test_all()
+
 
