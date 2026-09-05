@@ -128,6 +128,33 @@ def test_ayush_and_dpdp_modules():
     assert len(sha) == 64, "SHA-256 hash length mismatch"
     print("[PASS] DPDP 2023 Cryptographic SHA-256 consent digest validated.")
 
+from app.services.clinical_nlp import translate_patient_prompt_local
+
+def test_clinical_nlp_engine():
+    print("\n--- 5. Testing Clinical NLP & Layperson-to-Medical Standardization ---")
+    
+    # Test 1: Colloquial Hindi Dyspepsia (Layperson vernacular)
+    res_dyspepsia = translate_patient_prompt_local("mere pet me bahut jalan aur khatti dakar aa rahi hai khane ke baad")
+    assert "Dyspepsia" in res_dyspepsia["standardized_medical_term"], "Failed to standardize dyspepsia"
+    assert res_dyspepsia["icd10_code"] == "K21.9", "ICD-10 mismatch for dyspepsia"
+    assert res_dyspepsia["snomed_code"] == "16331000", "SNOMED code mismatch"
+    assert any("NSAID" in c for c in res_dyspepsia["contraindications"]), "Missing NSAID contraindication warning"
+    print(f"[PASS] Test 1 Passed: Vernacular Hindi '{res_dyspepsia['patient_raw_prompt'][:30]}...' mapped to '{res_dyspepsia['standardized_medical_term']}' (ICD-10: {res_dyspepsia['icd10_code']}).")
+
+    # Test 2: Acute Chest Pain (Emergency Life Threat Interception)
+    res_cardiac = translate_patient_prompt_local("chhati par pathar jaisa bojh hai aur bayen haath me dard jaa raha hai")
+    assert res_cardiac["is_life_threat"] == True, "Failed to flag life threat for cardiac chest pain"
+    assert res_cardiac["icd10_code"] == "I21.9", "ICD-10 mismatch for ACS"
+    assert res_cardiac["snomed_code"] == "29857009", "SNOMED mismatch for chest pain"
+    assert res_cardiac["suggested_route"] == "/his/registration", "Emergency routing mismatch"
+    print(f"[PASS] Test 2 Passed: Colloquial Chest Distress mapped to ACS (SNOMED: {res_cardiac['snomed_code']}) with Emergency ER Route.")
+
+    # Test 3: Dengue Bone Breaking Fever with Strict NSAID Contraindication
+    res_fever = translate_patient_prompt_local("thand lagke bahut tez bukhar hai aur shareer toot raha hai haddiyo me dard")
+    assert res_fever["icd10_code"] == "A90", "ICD-10 mismatch for Dengue / Pyrexia"
+    assert any("Aspirin" in c for c in res_fever["contraindications"]), "Missing Dengue NSAID/Aspirin contraindication"
+    print(f"[PASS] Test 3 Passed: Bone-Breaking Febrile presentation mapped to Pyrexia/Dengue (ICD-10: {res_fever['icd10_code']}) with NSAID contraindication.")
+
 def test_all():
     print("==================================================")
     print("  PROJECT SAMANVAYA - PRODUCTION SUITE AUDIT")
@@ -136,6 +163,7 @@ def test_all():
     test_medical_rag_engine()
     test_chip_parameter_generation()
     test_ayush_and_dpdp_modules()
+    test_clinical_nlp_engine()
     print("\n==================================================")
     print("  ALL TESTS PASSED WITH 100% SUCCESS RATE! [SUCCESS]")
     print("==================================================")

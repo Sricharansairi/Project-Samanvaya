@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Mic, MicOff, Sparkles, X, Send, Bot, Loader2, Volume2, VolumeX, 
-  Settings2, UserCheck, Stethoscope, Compass, ChevronRight, AlertTriangle, 
-  CheckCircle2, ArrowUpRight, Play, RefreshCw
+  Settings2, Stethoscope, ChevronRight, AlertTriangle, 
+  CheckCircle2, ArrowUpRight, Play, HeartPulse, ShieldAlert
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { queryMedicalRAG } from "@/services/medical_rag";
 import { ALL_INDIA_SCHEMES } from "@/services/schemes_repository";
+import { translatePatientToClinical, ClinicalTranslationResult } from "@/services/clinical_nlp";
 
 interface FloatingAssistantProps {
   currentStep?: number;
@@ -58,19 +59,11 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   // Disambiguation / Quick Action suggestions
   const [quickActions, setQuickActions] = useState<{ label: string; action: () => void; isPrimary?: boolean }[]>([]);
 
-  // Clinical RAG Rich Card State
-  const [clinicalCard, setClinicalCard] = useState<{
-    condition: string;
-    snomed: string;
-    icd10: string;
-    urgency: string;
-    advice: string;
-    differentials: string[];
-    isEmergency: boolean;
-  } | null>(null);
+  // Clinical NLP Standardized Result State (Powered by Kimi-K3 + Samanvaya Ontology)
+  const [clinicalNlpResult, setClinicalNlpResult] = useState<ClinicalTranslationResult | null>(null);
 
   const [assistantResponse, setAssistantResponse] = useState<string>(
-    "Namaste! I am Samanvaya Autonomous Clinical AI. Speak or type any command like 'Open Schemes', 'Check chest pain in RAG', 'Doctor view', 'Flip ABHA card', or 'Change voice'."
+    "Namaste! I am Samanvaya Autonomous Clinical AI. Speak or type in any language—even colloquial terms like 'seene me dabav', 'pet me jalan', or 'bukhar'—and I will translate it into formal medical terms, ICD-10, and clinical workflows."
   );
 
   const recognitionRef = useRef<any>(null);
@@ -111,7 +104,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     if (!systemVoices.length) return null;
     const persona = VOICE_PERSONAS.find(p => p.id === personaId) || VOICE_PERSONAS[0];
 
-    // Priority 1: Exact language match + name match
+    // Language match + name match
     if (persona.lang === "hi-IN") {
       const hiVoice = systemVoices.find(v => v.lang.startsWith("hi") || v.name.toLowerCase().includes("hindi") || v.name.includes("हिन्दी"));
       if (hiVoice) return hiVoice;
@@ -135,7 +128,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       }
     }
 
-    // Fallback: Default or first voice matching language
+    // Fallback: First voice matching language prefix
     const langMatch = systemVoices.find(v => v.lang.startsWith(persona.lang.slice(0, 2)));
     return langMatch || systemVoices[0] || null;
   };
@@ -174,20 +167,20 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     }
   };
 
-  // Omnipresent Autonomous Intent Analyzer & Executor
+  // Omnipresent Autonomous Intent Analyzer & Clinical NLP Pipeline
   const processAutonomousCommand = async (rawCmd: string) => {
     const text = rawCmd.toLowerCase().trim();
     if (!text) return;
 
     setIsProcessing(true);
-    setClinicalCard(null);
+    setClinicalNlpResult(null);
     setQuickActions([]);
     setLastActionExecuted(null);
 
     let reply = "";
 
     // -------------------------------------------------------------
-    // INTENT 0: VOICE CHANGER COMMANDS
+    // INTENT 0: VOICE PERSONA CHANGER
     // -------------------------------------------------------------
     if (text.includes("change voice") || text.includes("switch voice") || text.includes("different voice")) {
       const nextIdx = (VOICE_PERSONAS.findIndex(p => p.id === selectedPersona) + 1) % VOICE_PERSONAS.length;
@@ -219,33 +212,196 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     }
 
     // -------------------------------------------------------------
-    // INTENT 1: CRITICAL RED FLAG CLINICAL INTERCEPTOR
+    // INTENT 1: IN-PAGE DOM COMPONENT AUTOMATION (ABHA, FLIP, TOKENS)
     // -------------------------------------------------------------
-    if (
-      text.includes("chest pain") || text.includes("heart attack") || 
-      text.includes("stroke") || text.includes("paralysis") || 
-      text.includes("heavy bleeding") || text.includes("unconscious") || 
-      text.includes("choking") || text.includes("breathless")
-    ) {
-      reply = "RED FLAG EMERGENCY ALERT: Severe acute symptom detected! Immediately proceeding to Emergency Triage Registration.";
-      setLastActionExecuted("🚨 Emergency ER Routing Active");
-      router.push("/his/registration");
-      
-      const rag = queryMedicalRAG(text);
-      setClinicalCard({
-        condition: rag.matchedGuideline.condition,
-        snomed: `${rag.matchedGuideline.snomedCode} (${rag.matchedGuideline.snomedDisplay})`,
-        icd10: rag.matchedGuideline.icd10,
-        urgency: "CRITICAL LIFE-THREAT",
-        advice: rag.matchedGuideline.preliminaryAdvice,
-        differentials: rag.differentialDiagnoses,
-        isEmergency: true
-      });
+    if (text.includes("open abha") || text.includes("create abha") || text.includes("aadhaar e-kyc") || text.includes("ekyc") || text.includes("scan and share")) {
+      dispatchInAppAction("open_abha_modal");
+      setLastActionExecuted("Opened ABHA e-KYC Modal");
+      reply = "Opening the interactive ABDM Ayushman Bharat Creation & Verification Modal.";
+      if (pathname !== "/his/registration" && pathname !== "/patient") {
+        router.push("/his/registration");
+      }
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text.includes("flip card") || text.includes("show emergency card") || text.includes("show blood group") || text.includes("organ donor")) {
+      dispatchInAppAction("flip_card");
+      setLastActionExecuted("Flipped Ayushman Card");
+      reply = "Flipping Ayushman Smart Card to display the Emergency Health Record and organ donor pledge.";
+      if (pathname !== "/patient") {
+        router.push("/patient");
+      }
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text.includes("next patient") || text.includes("call next") || text.includes("next token") || text.includes("chime")) {
+      dispatchInAppAction("call_next_token");
+      setLastActionExecuted("Called Next OPD Token");
+      reply = "Dispatched calling chime and SMS notification for the next patient in queue.";
+      if (pathname !== "/his/queue") {
+        router.push("/his/queue");
+      }
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
 
+    // -------------------------------------------------------------
+    // INTENT 2: DIRECT SYSTEM NAVIGATION
+    // -------------------------------------------------------------
+    if (text.includes("open scheme") || text.includes("check scheme") || text.includes("pmjay") || text.includes("aarogyasri") || text.includes("insurance") || text.includes("claim")) {
+      router.push("/his/schemes");
+      setLastActionExecuted("Navigated to Schemes");
+      reply = "Opening Government Health Scheme & Claim Navigator across 36 States.";
       setQuickActions([
-        { label: "Proceed to ER Desk", action: () => router.push("/his/registration"), isPrimary: true },
-        { label: "View Clinical RAG", action: () => router.push("/his/rag") }
+        { label: "Check All Schemes", action: () => router.push("/his/schemes"), isPrimary: true }
       ]);
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text === "open rag" || text === "clinical rag" || text === "decision support" || text === "medical rag") {
+      router.push("/his/rag");
+      setLastActionExecuted("Navigated to Clinical RAG");
+      reply = "Opening Clinical RAG Co-Pilot & Decision Support Console.";
+      setQuickActions([
+        { label: "Open RAG Console", action: () => router.push("/his/rag"), isPrimary: true }
+      ]);
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text === "open doctor" || text === "doctor view" || text === "physician desk") {
+      router.push("/his/doctor");
+      setLastActionExecuted("Navigated to Doctor Desk");
+      reply = "Opening Physician OPD Consultation Desk.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text === "patient portal" || text === "my card" || text === "abha card") {
+      router.push("/patient");
+      setLastActionExecuted("Navigated to Patient Portal");
+      reply = "Opening Patient Self-Service Portal with 3D Ayushman Smart Card.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text === "ocr scanner" || text === "scan prescription" || text === "camera") {
+      router.push("/his/ocr");
+      setLastActionExecuted("Navigated to OCR Scanner");
+      reply = "Opening Prescription & Document OCR Scanner.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text === "ayush" || text === "prakriti test") {
+      router.push("/his/ayush");
+      setLastActionExecuted("Navigated to AYUSH");
+      reply = "Opening AYUSH Prakriti Pariksha.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+    else if (text === "dpdp" || text === "consent manager") {
+      router.push("/his/dpdp");
+      setLastActionExecuted("Navigated to DPDP");
+      reply = "Opening DPDP 2023 Patient Consent Manager.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // -------------------------------------------------------------
+    // INTENT 3: CLINICAL NLP ENGINE (KIMI-K3 MEDICAL STANDARDIZATION)
+    // Patient expresses symptoms in layperson / vernacular terms
+    // -------------------------------------------------------------
+    const isClinicalPrompt = 
+      text.includes("dard") || text.includes("pain") || text.includes("jalan") || 
+      text.includes("bukhar") || text.includes("fever") || text.includes("jwaram") || 
+      text.includes("noppi") || text.includes("cough") || text.includes("khansi") || 
+      text.includes("sar") || text.includes("head") || text.includes("pet") || 
+      text.includes("stomach") || text.includes("seene") || text.includes("chest") || 
+      text.includes("vomit") || text.includes("ulti") || text.includes("chakkar") || 
+      text.includes("dizzy") || text.includes("balgam") || text.includes("blood") || 
+      text.includes("peshab") || text.includes("urine") || text.includes("ghutna") || 
+      text.includes("knee") || text.includes("dengue") || text.includes("asthma") || 
+      text.includes("stroke") || text.includes("attack") || text.includes("chhati") ||
+      text.includes("kadupu") || text.includes("tala") || text.includes("daggu") ||
+      text.includes("weak") || text.includes("kamzori") || text.includes("breath");
+
+    if (isClinicalPrompt) {
+      // 1. Instant local ontology translation for 0 ms responsiveness
+      const baselineResult = translatePatientToClinical(rawCmd);
+      setClinicalNlpResult(baselineResult);
+
+      let finalResult = baselineResult;
+
+      // 2. Asynchronous call to Moonshot Kimi-K3 via NVIDIA NIM for deep medical reasoning
+      try {
+        const nlpRes = await fetch("/api/nlp/translate-clinical", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: rawCmd })
+        });
+        if (nlpRes.ok) {
+          const nlpData = await nlpRes.json();
+          if (nlpData.result) {
+            finalResult = nlpData.result;
+            setClinicalNlpResult(nlpData.result);
+          }
+        }
+      } catch (err) {
+        console.warn("Kimi-K3 async inference fallback:", err);
+      }
+
+      setLastActionExecuted(`Clinical NLP: ${finalResult.standardizedMedicalTerm}`);
+
+      // 3. Autonomous clinical routing and voice feedback
+      if (finalResult.isLifeThreat) {
+        reply = `RED FLAG CLINICAL ALERT: Symptoms standardized to '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}). Severe clinical emergency detected! Immediately routing to Emergency Triage Desk.`;
+        router.push("/his/registration");
+        dispatchInAppAction("fill_form", {
+          concern: finalResult.standardizedMedicalTerm,
+          icd10: finalResult.icd10Code
+        });
+
+        setQuickActions([
+          { label: "🚨 Proceed to ER Triage Desk", action: () => router.push("/his/registration"), isPrimary: true },
+          { label: "🧠 Inspect in Clinical RAG Console", action: () => router.push("/his/rag") }
+        ]);
+      } else {
+        reply = `Clinical NLP Finding: Standardized as '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}, SNOMED: ${finalResult.snomedCode}). ${finalResult.patientFriendlyExplanation}`;
+        
+        setQuickActions([
+          { 
+            label: "🏥 Send to Registration Triage Desk", 
+            action: () => {
+              router.push("/his/registration");
+              dispatchInAppAction("fill_form", {
+                concern: finalResult.standardizedMedicalTerm,
+                icd10: finalResult.icd10Code
+              });
+            }, 
+            isPrimary: true 
+          },
+          { label: "🧠 Open in Clinical RAG Console", action: () => router.push("/his/rag") },
+          { label: "🩺 Physician OPD Consultation", action: () => router.push("/his/doctor") },
+          { label: "📋 Check Government Scheme Coverage", action: () => router.push("/his/schemes") }
+        ]);
+      }
 
       setAssistantResponse(reply);
       speakResponse(reply);
@@ -254,184 +410,9 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     }
 
     // -------------------------------------------------------------
-    // INTENT 2: IN-PAGE COMPONENT ACTIONS (ABHA, FLIP, TOKENS)
+    // INTENT 4: PATIENT DEMOGRAPHICS AUTO-FILL
     // -------------------------------------------------------------
-    if (text.includes("open abha") || text.includes("create abha") || text.includes("aadhaar e-kyc") || text.includes("ekyc") || text.includes("scan and share")) {
-      dispatchInAppAction("open_abha_modal");
-      setLastActionExecuted("Opened ABHA e-KYC Modal");
-      reply = "Opening the interactive ABDM Ayushman Bharat Creation & Verification Modal.";
-      
-      if (pathname !== "/his/registration" && pathname !== "/patient") {
-        router.push("/his/registration");
-      }
-    }
-    else if (text.includes("flip card") || text.includes("show emergency card") || text.includes("show blood group") || text.includes("organ donor")) {
-      dispatchInAppAction("flip_card");
-      setLastActionExecuted("Flipped Ayushman Card");
-      reply = "Flipping Ayushman Smart Card to display the Emergency Health Record and organ donor pledge.";
-      
-      if (pathname !== "/patient") {
-        router.push("/patient");
-      }
-    }
-    else if (text.includes("next patient") || text.includes("call next") || text.includes("next token") || text.includes("chime")) {
-      dispatchInAppAction("call_next_token");
-      setLastActionExecuted("Called Next OPD Token");
-      reply = "Dispatched calling chime and SMS notification for the next patient in queue.";
-      
-      if (pathname !== "/his/queue") {
-        router.push("/his/queue");
-      }
-    }
-
-    // -------------------------------------------------------------
-    // INTENT 3: LANGUAGE SWITCHING
-    // -------------------------------------------------------------
-    else if (text.includes("hindi") || text.includes("हिन्दी")) {
-      if (onLanguageChange) onLanguageChange("hi");
-      if (onAction) onAction("change_language", "hi");
-      setLastActionExecuted("Language: Hindi (हिन्दी)");
-      reply = "भाषा बदलकर हिन्दी कर दी गई है। आप अब हिन्दी में पूछ सकते हैं।";
-      changePersona("pooja");
-    } 
-    else if (text.includes("telugu") || text.includes("తెలుగు")) {
-      if (onLanguageChange) onLanguageChange("te");
-      if (onAction) onAction("change_language", "te");
-      setLastActionExecuted("Language: Telugu (తెలుగు)");
-      reply = "భాష తెలుగులోకి మార్చబడింది. మీరు ఇప్పుడు మీ ఆరోగ్య వివరాలను అడగవచ్చు.";
-      changePersona("kavya");
-    } 
-    else if (text.includes("english") || text.includes("अंग्रेजी")) {
-      if (onLanguageChange) onLanguageChange("en");
-      if (onAction) onAction("change_language", "en");
-      setLastActionExecuted("Language: English");
-      reply = "Language switched to English.";
-      changePersona("neerja");
-    }
-
-    // -------------------------------------------------------------
-    // INTENT 4: AUTONOMOUS MODULE NAVIGATION
-    // -------------------------------------------------------------
-    else if (text.includes("rag") || text.includes("decision support") || text.includes("clinical ai") || text.includes("medical knowledge") || text.includes("guideline")) {
-      router.push("/his/rag");
-      setLastActionExecuted("Navigated to Clinical RAG");
-      reply = "Opening Clinical RAG Co-Pilot & Decision Support Console with dense-sparse vector telemetry.";
-      setQuickActions([
-        { label: "Open RAG Console", action: () => router.push("/his/rag"), isPrimary: true }
-      ]);
-    }
-    else if (text.includes("scheme") || text.includes("yojana") || text.includes("pmjay") || text.includes("aarogyasri") || text.includes("insurance") || text.includes("claim") || text.includes("cashless") || text.includes("eligib")) {
-      router.push("/his/schemes");
-      setLastActionExecuted("Navigated to Schemes");
-      reply = "Opening Government Health Scheme & Claim Navigator covering Central PM-JAY and all 36 States.";
-      setQuickActions([
-        { label: "Evaluate PM-JAY", action: () => router.push("/his/schemes"), isPrimary: true },
-        { label: "Check Senior 70+ Coverage", action: () => router.push("/his/schemes") }
-      ]);
-    }
-    else if (text.includes("doctor") || text.includes("clinic") || text.includes("physician") || text.includes("consult")) {
-      router.push("/his/doctor");
-      setLastActionExecuted("Navigated to Doctor Clinic");
-      reply = "Opening Physician OPD Consultation Desk and prescription pad.";
-      setQuickActions([
-        { label: "Open Doctor Clinic", action: () => router.push("/his/doctor"), isPrimary: true }
-      ]);
-    }
-    else if (text.includes("registration") || text.includes("register") || text.includes("triage") || text.includes("intake") || text.includes("vitals desk")) {
-      router.push("/his/registration");
-      setLastActionExecuted("Navigated to Registration");
-      reply = "Opening Patient Registration & Vitals Triage Desk with ABDM Ayushman Suite.";
-      setQuickActions([
-        { label: "Register Patient", action: () => router.push("/his/registration"), isPrimary: true },
-        { label: "Create ABHA", action: () => { router.push("/his/registration"); dispatchInAppAction("open_abha_modal"); } }
-      ]);
-    }
-    else if (text.includes("queue") || text.includes("calling board") || text.includes("token board") || text.includes("opd status") || text.includes("waiting")) {
-      router.push("/his/queue");
-      setLastActionExecuted("Navigated to OPD Queue");
-      reply = "Opening Live Hospital OPD Queue Board with voice chime announcements.";
-      setQuickActions([
-        { label: "View OPD Board", action: () => router.push("/his/queue"), isPrimary: true }
-      ]);
-    }
-    else if (text.includes("patient") || text.includes("records") || text.includes("health locker") || text.includes("my card") || text.includes("abha card")) {
-      router.push("/patient");
-      setLastActionExecuted("Navigated to Patient Portal");
-      reply = "Opening Patient Self-Service Portal with 3D Ayushman Bharat Card & ABDM Locker.";
-      setQuickActions([
-        { label: "View Ayushman Card", action: () => router.push("/patient"), isPrimary: true }
-      ]);
-    }
-    else if (text.includes("prescription") || text.includes("ocr") || text.includes("scan") || text.includes("camera") || text.includes("photo")) {
-      router.push("/his/ocr");
-      setLastActionExecuted("Navigated to OCR Scanner");
-      reply = "Opening Prescription & Document OCR Camera Scanner.";
-      setQuickActions([
-        { label: "Open Camera Scanner", action: () => router.push("/his/ocr"), isPrimary: true }
-      ]);
-    }
-    else if (text.includes("ayush") || text.includes("prakriti") || text.includes("ayurveda") || text.includes("dosha") || text.includes("vata") || text.includes("pitta") || text.includes("kapha")) {
-      router.push("/his/ayush");
-      setLastActionExecuted("Navigated to AYUSH Profiler");
-      reply = "Opening AYUSH Pariksha & Tridosha Prakriti Profiler.";
-      setQuickActions([
-        { label: "Start Prakriti Test", action: () => router.push("/his/ayush"), isPrimary: true }
-      ]);
-    }
-    else if (text.includes("dpdp") || text.includes("privacy") || text.includes("consent") || text.includes("data protection") || text.includes("legal")) {
-      router.push("/his/dpdp");
-      setLastActionExecuted("Navigated to DPDP Manager");
-      reply = "Opening DPDP 2023 Patient Consent Manager.";
-      setQuickActions([
-        { label: "Inspect Consent Tokens", action: () => router.push("/his/dpdp"), isPrimary: true }
-      ]);
-    }
-    else if (text.includes("home") || text.includes("main") || text.includes("start") || text.includes("kiosk")) {
-      router.push("/");
-      setLastActionExecuted("Navigated to Home");
-      reply = "Returning to Samanvaya Home Kiosk.";
-    }
-
-    // -------------------------------------------------------------
-    // INTENT 5: CLINICAL KNOWLEDGE Q&A VIA MEDICAL RAG
-    // -------------------------------------------------------------
-    else if (
-      text.includes("fever") || text.includes("pain") || text.includes("headache") || 
-      text.includes("cough") || text.includes("rash") || text.includes("vomit") || 
-      text.includes("dengue") || text.includes("covid") || text.includes("diabetes") ||
-      text.includes("bp") || text.includes("symptom") || text.includes("treatment") ||
-      text.includes("what is") || text.includes("how to treat")
-    ) {
-      const rag = queryMedicalRAG(text);
-      const g = rag.matchedGuideline;
-      reply = `Clinical RAG Insight: Grounded in ${g.source} for ${g.condition}. Preliminary advice: ${g.preliminaryAdvice}`;
-      setLastActionExecuted(`Synthesized RAG: ${g.condition}`);
-
-      setClinicalCard({
-        condition: g.condition,
-        snomed: `${g.snomedCode} (${g.snomedDisplay})`,
-        icd10: g.icd10,
-        urgency: g.urgency,
-        advice: g.preliminaryAdvice,
-        differentials: rag.differentialDiagnoses,
-        isEmergency: rag.isEmergency
-      });
-
-      setQuickActions([
-        { label: "Open Full RAG Console", action: () => router.push("/his/rag"), isPrimary: true },
-        { label: "Send to Registration Triage", action: () => {
-            router.push("/his/registration");
-            dispatchInAppAction("fill_form", { concern: text });
-          } 
-        }
-      ]);
-    }
-
-    // -------------------------------------------------------------
-    // INTENT 6: PATIENT DETAILS AUTO-FILL (INSTANT NLP EXTRACTION)
-    // -------------------------------------------------------------
-    else if (text.includes("register") || text.includes("name is") || text.includes("phone") || text.includes("patient named")) {
-      // Regex entity extraction for instant client-side execution
+    if (text.includes("register") || text.includes("name is") || text.includes("phone") || text.includes("patient named")) {
       const nameMatch = text.match(/(?:named|name is|patient)\s+([a-zA-Z\s]+?)(?:\s+(?:with|phone|mobile|having|and)|$)/i);
       const phoneMatch = text.match(/(?:phone|mobile|number|call)\s*(?:is)?\s*(\d{10})/i);
       const extractedName = nameMatch ? nameMatch[1].trim() : "Ramesh Kumar";
@@ -439,25 +420,27 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
       dispatchInAppAction("fill_form", { name: extractedName, phone: extractedPhone, concern: rawCmd });
       router.push("/his/registration");
-      reply = `Got it. Pre-filling patient registration with name '${extractedName}' and phone '${extractedPhone}'.`;
+      reply = `Pre-filled registration desk with patient '${extractedName}' and contact '${extractedPhone}'.`;
       setLastActionExecuted(`Filled: ${extractedName}`);
       setQuickActions([
         { label: "Review at Registration Desk", action: () => router.push("/his/registration"), isPrimary: true }
       ]);
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
     }
 
     // -------------------------------------------------------------
-    // DEFAULT DISAMBIGUATION WITH RICH ACTION PILLS
+    // DEFAULT DISAMBIGUATION WITH DIRECT ACTIONS
     // -------------------------------------------------------------
-    else {
-      reply = `I processed "${rawCmd}". Here are the quickest actions for your request:`;
-      setQuickActions([
-        { label: "🏥 Open Schemes", action: () => router.push("/his/schemes"), isPrimary: true },
-        { label: "🧠 Clinical RAG Co-Pilot", action: () => router.push("/his/rag") },
-        { label: "🆔 Ayushman Smart Card", action: () => router.push("/patient") },
-        { label: "🩺 Doctor Consultation", action: () => router.push("/his/doctor") }
-      ]);
-    }
+    reply = `I processed "${rawCmd}". Here are the quickest clinical actions for your request:`;
+    setQuickActions([
+      { label: "🏥 Open Schemes", action: () => router.push("/his/schemes"), isPrimary: true },
+      { label: "🧠 Clinical RAG Co-Pilot", action: () => router.push("/his/rag") },
+      { label: "🆔 Ayushman Smart Card", action: () => router.push("/patient") },
+      { label: "🩺 Doctor Desk", action: () => router.push("/his/doctor") }
+    ]);
 
     setAssistantResponse(reply);
     speakResponse(reply);
@@ -468,7 +451,6 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   const startListening = () => {
     if (typeof window === "undefined") return;
 
-    // Check for native browser SpeechRecognition
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
@@ -486,7 +468,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
         recognition.onstart = () => {
           setIsRecording(true);
-          setAssistantResponse("Listening live... Speak your command clearly.");
+          setAssistantResponse("Listening live in your language... Speak your symptoms clearly.");
         };
 
         recognition.onresult = (event: any) => {
@@ -507,9 +489,8 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
           console.warn("Speech recognition error:", event.error);
           setIsRecording(false);
           if (event.error === "not-allowed") {
-            setAssistantResponse("Microphone permission denied. Please allow mic access in your browser settings.");
+            setAssistantResponse("Microphone access denied. Please allow microphone permission in your browser.");
           } else {
-            // Fallback to MediaRecorder
             fallbackMediaRecorder();
           }
         };
@@ -554,7 +535,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             setUserInput(data.text);
             processAutonomousCommand(data.text);
           } else {
-            setAssistantResponse("Sorry, I could not catch that. Please type your command below.");
+            setAssistantResponse("Sorry, I could not catch that. Please type your symptoms below.");
           }
         } catch (err) {
           setAssistantResponse("Audio transcription error. Please use the text input below.");
@@ -565,7 +546,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
       mediaRecorder.start();
       setIsRecording(true);
-      setAssistantResponse("Recording via microphone... Click mic to complete.");
+      setAssistantResponse("Recording via microphone... Speak now.");
     } catch (err) {
       setIsRecording(false);
       setAssistantResponse("Microphone access unavailable. Please use the text bar below.");
@@ -614,7 +595,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="relative">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0f4c81] to-blue-600 text-white flex items-center justify-center shadow-md">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0f4c81] to-indigo-600 text-white flex items-center justify-center shadow-md">
                     <Bot className="w-5 h-5" />
                   </div>
                   {isSpeaking && (
@@ -627,12 +608,12 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                 <div>
                   <div className="flex items-center gap-1.5">
                     <h4 className="text-xs font-bold text-[#0f2942]">Samanvaya Autonomous AI</h4>
-                    <span className="text-[10px] bg-blue-100 text-[#0f4c81] font-bold px-1.5 py-0.5 rounded">
-                      {VOICE_PERSONAS.find(p => p.id === selectedPersona)?.name}
+                    <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5" /> Kimi-K3 NLP
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500 font-medium">
-                    {isSpeaking ? "Speaking response..." : isRecording ? "Listening to voice..." : "Omnipresent Clinical Agent"}
+                    {isSpeaking ? "Speaking response..." : isRecording ? "Listening to voice..." : "Clinical Informaticist Active"}
                   </p>
                 </div>
               </div>
@@ -683,7 +664,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-700">Select Voice Persona:</span>
                     <button
-                      onClick={() => speakResponse("Hello, I am testing the selected voice.")}
+                      onClick={() => speakResponse("Hello, I am testing the selected voice persona.")}
                       className="text-[10px] text-[#0f4c81] font-bold hover:underline flex items-center gap-1"
                     >
                       <Play className="w-3 h-3" /> Test Voice
@@ -744,14 +725,14 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                   <div className="flex-1">
                     <p className="text-xs text-red-700">Listening to voice...</p>
                     <p className="text-[10px] text-slate-500 font-normal truncate mt-0.5">
-                      {userInput || "Speak now, words will stream in real-time."}
+                      {userInput || "Speak naturally in Hindi, Telugu, or English..."}
                     </p>
                   </div>
                 </div>
               ) : isProcessing ? (
                 <div className="flex items-center gap-2.5 text-[#0f4c81] font-bold">
                   <Loader2 className="w-4 h-4 animate-spin text-[#0f4c81]" />
-                  <span>Processing autonomous clinical action...</span>
+                  <span>Kimi-K3 Medical NLP is translating symptoms...</span>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -766,28 +747,91 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                     {assistantResponse}
                   </p>
 
-                  {/* Clinical RAG Diagnostic Card */}
-                  {clinicalCard && (
-                    <div className={`mt-2.5 p-2.5 rounded-lg border text-[11px] ${
-                      clinicalCard.isEmergency 
-                        ? "bg-red-50 border-red-200 text-red-900" 
-                        : "bg-blue-50 border-blue-200 text-slate-800"
+                  {/* Clinical NLP Standardized Pathology & Medication Card */}
+                  {clinicalNlpResult && (
+                    <div className={`mt-2.5 p-3 rounded-xl border text-xs shadow-xs space-y-2.5 ${
+                      clinicalNlpResult.isLifeThreat
+                        ? "bg-red-50/90 border-red-300 text-red-950"
+                        : "bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/60 border-indigo-200 text-slate-900"
                     }`}>
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="truncate">{clinicalCard.condition}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                          clinicalCard.isEmergency ? "bg-red-600 text-white" : "bg-blue-600 text-white"
+                      {/* Card Header with Badges */}
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 bg-indigo-100/90 px-2 py-0.5 rounded-md">
+                          <Sparkles className="w-3 h-3 text-indigo-600" /> Kimi-K3 Medical NLP
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          clinicalNlpResult.clinicalSeverity === "Critical" 
+                            ? "bg-red-600 text-white animate-pulse" 
+                            : clinicalNlpResult.clinicalSeverity === "High"
+                            ? "bg-amber-600 text-white"
+                            : "bg-blue-600 text-white"
                         }`}>
-                          {clinicalCard.urgency}
+                          {clinicalNlpResult.clinicalSeverity}
                         </span>
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5 flex gap-2">
-                        <span>ICD-10: <strong>{clinicalCard.icd10}</strong></span>
-                        <span>SNOMED: <strong>{clinicalCard.snomed}</strong></span>
+
+                      {/* Patient Colloquial Words vs Standardized Medical Finding */}
+                      <div>
+                        <div className="text-[10px] text-slate-500 font-medium italic">
+                          Patient Layperson Words: &ldquo;{clinicalNlpResult.patientRawPrompt}&rdquo;
+                        </div>
+                        <div className="font-bold text-slate-900 text-xs mt-0.5 flex items-center gap-1.5">
+                          <Stethoscope className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <span>{clinicalNlpResult.standardizedMedicalTerm}</span>
+                        </div>
                       </div>
-                      {clinicalCard.differentials?.length > 0 && (
-                        <div className="mt-1 text-[10px] text-slate-600">
-                          <strong>Differentials:</strong> {clinicalCard.differentials.slice(0, 2).join(", ")}
+
+                      {/* Official Medical Ontology Codes */}
+                      <div className="grid grid-cols-2 gap-1.5 text-[10px] bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                        <div>
+                          <span className="text-slate-400 font-medium">ICD-10:</span>{" "}
+                          <strong className="text-slate-800">{clinicalNlpResult.icd10Code}</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium">SNOMED-CT:</span>{" "}
+                          <strong className="text-slate-800">{clinicalNlpResult.snomedCode}</strong>
+                        </div>
+                        <div className="col-span-2 text-slate-600 truncate">
+                          <span className="text-slate-400 font-medium">Organ System:</span>{" "}
+                          <strong>{clinicalNlpResult.anatomicalSystem}</strong>
+                        </div>
+                      </div>
+
+                      {/* Recommended Diagnostic Labs */}
+                      {clinicalNlpResult.recommendedLabWorkup?.length > 0 && (
+                        <div className="text-[10px]">
+                          <span className="font-bold text-slate-700">Recommended Workup (LOINC):</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {clinicalNlpResult.recommendedLabWorkup.slice(0, 3).map((w, idx) => (
+                              <span key={idx} className="bg-slate-100 border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                                {w}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Standard Medication Classes */}
+                      {clinicalNlpResult.standardMedicationClasses?.length > 0 && (
+                        <div className="text-[10px]">
+                          <span className="font-bold text-slate-700">Evidence-Based Medications:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {clinicalNlpResult.standardMedicationClasses.slice(0, 2).map((m, idx) => (
+                              <span key={idx} className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Critical Contraindications Alert */}
+                      {clinicalNlpResult.contraindications?.length > 0 && (
+                        <div className="p-2 bg-amber-50/90 border border-amber-300 rounded-lg text-[10px] text-amber-900">
+                          <strong className="text-red-700 flex items-center gap-1 font-bold">
+                            <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" /> Contraindication Warning:
+                          </strong>
+                          <p className="mt-0.5 text-slate-800 leading-tight">{clinicalNlpResult.contraindications[0]}</p>
                         </div>
                       )}
                     </div>
@@ -823,43 +867,43 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 no-scrollbar text-[10px]">
               <button
                 type="button"
-                onClick={() => processAutonomousCommand("Open schemes")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#0f4c81] text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
+                onClick={() => processAutonomousCommand("pet me tez jalan ho rahi hai khane ke baad")}
+                className="whitespace-nowrap px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-full font-bold border border-indigo-200 transition-colors"
+              >
+                🔬 Try: &quot;Pet me jalan&quot;
+              </button>
+              <button
+                type="button"
+                onClick={() => processAutonomousCommand("seene me achanak tez dard ho raha hai")}
+                className="whitespace-nowrap px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-full font-bold border border-red-200 transition-colors"
+              >
+                🚨 Try: &quot;Seene me dard&quot;
+              </button>
+              <button
+                type="button"
+                onClick={() => processAutonomousCommand("thand lagke bukhar hai")}
+                className="whitespace-nowrap px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-full font-bold border border-amber-200 transition-colors"
+              >
+                🌡️ Try: &quot;Bukhar aur chills&quot;
+              </button>
+              <button
+                type="button"
+                onClick={() => processAutonomousCommand("open schemes")}
+                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
               >
                 🏥 Schemes
               </button>
               <button
                 type="button"
-                onClick={() => processAutonomousCommand("Open clinical RAG")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#0f4c81] text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
+                onClick={() => processAutonomousCommand("open clinical rag")}
+                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
               >
-                🧠 Clinical RAG
+                🧠 RAG Console
               </button>
               <button
                 type="button"
-                onClick={() => processAutonomousCommand("Open ABHA creation")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#0f4c81] text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
-              >
-                🆔 ABHA Modal
-              </button>
-              <button
-                type="button"
-                onClick={() => processAutonomousCommand("Doctor view")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#0f4c81] text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
-              >
-                🩺 Doctor
-              </button>
-              <button
-                type="button"
-                onClick={() => processAutonomousCommand("Open camera OCR")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#0f4c81] text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
-              >
-                📸 Scan OCR
-              </button>
-              <button
-                type="button"
-                onClick={() => processAutonomousCommand("Change voice")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-[#0f4c81] text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
+                onClick={() => processAutonomousCommand("change voice")}
+                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors"
               >
                 🗣️ Switch Voice
               </button>
@@ -871,7 +915,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Speak or type command..."
+                placeholder="Speak or type symptoms in Hindi, Telugu, English..."
                 className="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-[#0f2942] font-medium outline-none focus:bg-white focus:ring-2 focus:ring-[#0f4c81] transition-all"
                 disabled={isRecording || isProcessing}
               />
@@ -905,7 +949,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0f4c81] to-blue-600 hover:from-blue-900 hover:to-[#0f4c81] border-2 border-white flex items-center justify-center text-white shadow-2xl relative cursor-pointer"
+        className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0f4c81] to-indigo-600 hover:from-blue-900 hover:to-[#0f4c81] border-2 border-white flex items-center justify-center text-white shadow-2xl relative cursor-pointer"
         title="Open Samanvaya Autonomous AI"
       >
         <Sparkles className="w-6 h-6 text-white" />
