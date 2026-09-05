@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, User, FileText, HeartPulse, Stethoscope, ShieldCheck, QrCode, FileCheck, UploadCloud, Loader2, Check } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
-import FloatingAssistant from "@/components/FloatingAssistant";
+
 
 export default function PatientPortal() {
   const { t, setLanguage } = useLanguage();
@@ -318,15 +318,7 @@ export default function PatientPortal() {
         </div>
       )}
 
-      {/* Floating Autonomous Assistant for Patients */}
-      {isAuthenticated && (
-        <FloatingAssistant 
-          currentStep={assistantStep}
-          onNavigate={(s) => setAssistantStep(s)}
-          onLanguageChange={(lang: any) => setLanguage(lang)}
-          onAction={handleAssistantAction}
-        />
-      )}
+
     </main>
   );
 }

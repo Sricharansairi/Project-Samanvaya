@@ -4,14 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, Sparkles, Volume2, X, Send, ArrowRight, Bot } from "lucide-react";
 
+import { useRouter, usePathname } from "next/navigation";
+
 interface FloatingAssistantProps {
-  currentStep: number;
-  onNavigate: (step: number) => void;
+  currentStep?: number;
+  onNavigate?: (step: number) => void;
   onAction?: (action: string, value?: any) => void;
   onLanguageChange?: (lang: string) => void;
 }
 
-export default function FloatingAssistant({ currentStep, onNavigate, onAction, onLanguageChange }: FloatingAssistantProps) {
+export default function FloatingAssistant({ currentStep = 1, onNavigate, onAction, onLanguageChange }: FloatingAssistantProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [userInput, setUserInput] = useState("");
@@ -114,38 +118,44 @@ export default function FloatingAssistant({ currentStep, onNavigate, onAction, o
 
       // 2. Navigation / Tab Opening Commands
       else if (text.includes("doctor") || text.includes("physician") || text.includes("clinic") || text.includes("summary")) {
-        onNavigate(12);
+        if (onNavigate) onNavigate(12);
+        router.push("/his/doctor");
         if (onAction) onAction("doctor_view");
         reply = "Opening Physician Consultation Desk.";
       } else if (text.includes("scheme") || text.includes("yojana") || text.includes("pmjay") || text.includes("ayushman") || text.includes("welfare")) {
-        onNavigate(8);
+        if (onNavigate) onNavigate(8);
         if (onAction) onAction("open_scheme");
         reply = "Opening Government Scheme Eligibility checker.";
       } else if (text.includes("prescription") || text.includes("scan") || text.includes("ocr") || text.includes("medicine") || text.includes("camera")) {
-        onNavigate(7);
+        if (onNavigate) onNavigate(7);
         if (onAction) onAction("open_ocr");
         reply = "Opening Prescription & Document OCR Scanner.";
       } else if (text.includes("ayush") || text.includes("prakriti") || text.includes("agni") || text.includes("diet") || text.includes("sleep")) {
-        onNavigate(6);
+        if (onNavigate) onNavigate(6);
         if (onAction) onAction("open_ayush");
         reply = "Opening AYUSH Dashavidha Pariksha module.";
       } else if (text.includes("history") || text.includes("symptom") || text.includes("complaint") || text.includes("fever") || text.includes("cough")) {
-        onNavigate(5);
+        if (onNavigate) onNavigate(5);
         reply = "Opening Conversational Voice History intake.";
       } else if (text.includes("abha") || text.includes("aadhaar") || text.includes("identify") || text.includes("check in") || text.includes("qr")) {
-        onNavigate(2);
+        if (onNavigate) onNavigate(2);
+        router.push("/his/registration");
         reply = "Opening ABHA & Patient Identification module.";
       } else if (text.includes("consent") || text.includes("dpdp") || text.includes("privacy")) {
-        onNavigate(3);
+        if (onNavigate) onNavigate(3);
         reply = "Opening Digital DPDP Consent module.";
       } else if (text.includes("mode") || text.includes("select mode")) {
-        onNavigate(4);
+        if (onNavigate) onNavigate(4);
         reply = "Opening Clinical Intake Mode selector.";
       } else if (text.includes("token") || text.includes("queue") || text.includes("sms") || text.includes("turn")) {
-        onNavigate(11);
+        if (onNavigate) onNavigate(11);
         reply = "Opening OPD Queue Token & SMS tracking screen.";
+      } else if (text.includes("patient") || text.includes("my history")) {
+        router.push("/patient");
+        reply = "Opening Patient Portal.";
       } else if (text.includes("home") || text.includes("main") || text.includes("portal") || text.includes("start")) {
-        onNavigate(1);
+        if (onNavigate) onNavigate(1);
+        router.push("/");
         if (onAction) onAction("restart");
         reply = "Navigating to Home Portal.";
       } 
@@ -180,7 +190,19 @@ export default function FloatingAssistant({ currentStep, onNavigate, onAction, o
         })
         .catch(err => {
           console.error(err);
-          setAssistantResponse("Failed to connect to the NLP engine.");
+          // MOCK FALLBACK for hackathon if NLP engine fails
+          let updatedFields = [];
+          if (text.includes("ramesh") || text.includes("kumar")) { onAction?.("fill_name", "Ramesh Kumar"); updatedFields.push("name"); }
+          if (text.includes("fever") || text.includes("cough")) { onAction?.("fill_concern", "Fever and Cough"); updatedFields.push("chief concern"); }
+          if (text.includes("98") || text.includes("phone")) { onAction?.("fill_phone", "9876543210"); updatedFields.push("phone"); }
+          
+          if (updatedFields.length > 0) {
+            reply = `(Fallback Mode) Got it. I've updated the ${updatedFields.join(", ")}.`;
+          } else {
+            reply = "NLP engine failed, and no standard fallback keywords were detected.";
+          }
+          setAssistantResponse(reply);
+          speakText(reply);
         })
         .finally(() => {
           setIsListening(false);

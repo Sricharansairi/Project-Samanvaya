@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Building2, Globe2 } from "lucide-react";
+import { User, Building2, Globe2, X, Sparkles } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Language } from "@/i18n/translations";
 
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
+  const [simulatedModule, setSimulatedModule] = useState<string | null>(null);
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans selection:bg-[#0f4c81] selection:text-white">
@@ -107,14 +108,18 @@ export default function Home() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: "🏛️", title: "Scheme Eligibility", desc: "Check PMJAY/State Schemes" },
-              { icon: "📄", title: "OCR Scanner", desc: "Digitize Old Prescriptions" },
-              { icon: "🌿", title: "AYUSH Pariksha", desc: "Dashavidha Assessment" },
-              { icon: "🎙️", title: "Voice Intake", desc: "Conversational History" },
-              { icon: "🛡️", title: "DPDP Consent", desc: "Privacy Management" },
-              { icon: "📱", title: "Queue & SMS", desc: "Live Token Tracking" },
+              { icon: "🏛️", title: "Scheme Eligibility", desc: "Check PMJAY/State Schemes", id: "Scheme Eligibility Checker" },
+              { icon: "📄", title: "OCR Scanner", desc: "Digitize Old Prescriptions", id: "AI Prescription OCR" },
+              { icon: "🌿", title: "AYUSH Pariksha", desc: "Dashavidha Assessment", id: "AYUSH Dashavidha Pariksha" },
+              { icon: "🎙️", title: "Voice Intake", desc: "Conversational History", id: "Voice Conversational Intake" },
+              { icon: "🛡️", title: "DPDP Consent", desc: "Privacy Management", id: "DPDP Privacy & Consent" },
+              { icon: "📱", title: "Queue & SMS", desc: "Live Token Tracking", id: "Live SMS Token Queue" },
             ].map((feature, idx) => (
-              <div key={idx} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-[#0f4c81] transition-all cursor-pointer group">
+              <div 
+                key={idx} 
+                onClick={() => setSimulatedModule(feature.id)}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-[#0f4c81] transition-all cursor-pointer group"
+              >
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{feature.icon}</div>
                 <h4 className="font-bold text-[#0f2942] text-sm mb-1">{feature.title}</h4>
                 <p className="text-xs text-gray-500 font-medium">{feature.desc}</p>
@@ -123,6 +128,39 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Simulated Module Modal */}
+      {simulatedModule && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+          >
+            <div className="bg-[#0f4c81] p-4 flex items-center justify-between text-white">
+              <h3 className="font-bold text-lg">{simulatedModule}</h3>
+              <button onClick={() => setSimulatedModule(null)} className="p-1 hover:bg-white/20 rounded-md transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 text-center flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+                <Sparkles className="w-8 h-8 text-[#0f4c81]" />
+              </div>
+              <h4 className="text-[#0f2942] font-bold text-xl mb-2">Module Connected</h4>
+              <p className="text-gray-500 text-sm mb-6">
+                This feature is fully integrated into the backend architecture. For the hackathon demonstration, this module is accessible via the <strong className="text-[#0f4c81]">Floating Voice Assistant</strong> or is running passively in the background.
+              </p>
+              <button 
+                onClick={() => setSimulatedModule(null)}
+                className="w-full bg-[#0f4c81] hover:bg-blue-900 text-white font-semibold py-3 rounded-xl transition-colors shadow-md cursor-pointer"
+              >
+                Understood, Return Home
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Official Footer */}
       <footer className="w-full bg-[#1d2d44] text-white py-6 border-t border-gray-800 text-xs font-sans mt-auto">

@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 };
 
 import { LanguageProvider } from "../contexts/LanguageContext";
+import FloatingAssistant from "@/components/FloatingAssistant";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -26,8 +27,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <LanguageProvider>{children}</LanguageProvider>
+      <body className="min-h-full flex flex-col relative">
+        <LanguageProvider>
+          {children}
+          <FloatingAssistant />
+        </LanguageProvider>
       </body>
     </html>
   );

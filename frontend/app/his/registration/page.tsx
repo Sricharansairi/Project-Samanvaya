@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, UserPlus, FileHeart, QrCode, ClipboardCheck } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
-import FloatingAssistant from "@/components/FloatingAssistant";
+
 
 export default function RegistrationDashboard() {
   const { t, setLanguage } = useLanguage();
@@ -319,13 +319,7 @@ export default function RegistrationDashboard() {
         </div>
       </div>
       
-      {/* Floating Autonomous Assistant */}
-      <FloatingAssistant 
-        currentStep={step}
-        onNavigate={(newStep) => setStep(newStep)}
-        onLanguageChange={(lang: any) => setLanguage(lang)}
-        onAction={handleAssistantAction}
-      />
+
     </main>
   );
 }
