@@ -117,7 +117,13 @@ export default function Home() {
             ].map((feature, idx) => (
               <div 
                 key={idx} 
-                onClick={() => setSimulatedModule(feature.id)}
+                onClick={() => {
+                  if (feature.id === "AI Prescription OCR") {
+                    window.location.href = "/his/ocr";
+                  } else {
+                    setSimulatedModule(feature.id);
+                  }
+                }}
                 className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-[#0f4c81] transition-all cursor-pointer group"
               >
                 <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{feature.icon}</div>
