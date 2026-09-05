@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { 
   ArrowLeft, UploadCloud, Camera, FileText, Loader2, 
-  CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles, HeartPulse
+  CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles, HeartPulse,
+  Edit3, Save, Plus, Trash2, ChevronDown, ChevronUp, Copy, Check, Clock
 } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function OCRScanner() {
   const [activeTab, setActiveTab] = useState<"camera" | "upload">("camera");
@@ -17,11 +18,52 @@ export default function OCRScanner() {
   const [error, setError] = useState<string | null>(null);
   const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
   const [cameraActive, setCameraActive] = useState<boolean>(false);
+  
+  // Timer & Framing States
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [timerEnabled, setTimerEnabled] = useState<boolean>(false);
+
+  // Edit / Verification Mode
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [showRawOcr, setShowRawOcr] = useState<boolean>(false);
+  const [copiedRaw, setCopiedRaw] = useState<boolean>(false);
+
+  // Editable Form State
+  const [editClinic, setEditClinic] = useState("");
+  const [editDoctor, setEditDoctor] = useState("");
+  const [editPatient, setEditPatient] = useState("");
+  const [editAge, setEditAge] = useState("");
+  const [editGender, setEditGender] = useState("");
+  const [editBp, setEditBp] = useState("");
+  const [editPulse, setEditPulse] = useState("");
+  const [editTemp, setEditTemp] = useState("");
+  const [editSpo2, setEditSpo2] = useState("");
+  const [editDiagnoses, setEditDiagnoses] = useState<string[]>([]);
+  const [newDiagnosis, setNewDiagnosis] = useState("");
+  const [editMedications, setEditMedications] = useState<string[]>([]);
+  const [newMedication, setNewMedication] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Sync results with edit state
+  useEffect(() => {
+    if (results) {
+      setEditClinic(results.clinic_name || "");
+      setEditDoctor(results.doctor_name || "");
+      setEditPatient(results.patient_name || "");
+      setEditAge(results.patient_age || "");
+      setEditGender(results.patient_gender || "");
+      setEditBp(results.vitals?.bp || "");
+      setEditPulse(results.vitals?.pulse || "");
+      setEditTemp(results.vitals?.temp || "");
+      setEditSpo2(results.vitals?.spo2 || "");
+      setEditDiagnoses(Array.isArray(results.diagnoses) ? [...results.diagnoses] : []);
+      setEditMedications(Array.isArray(results.medications) ? [...results.medications] : []);
+    }
+  }, [results]);
 
   // Initialize camera stream
   const startCamera = async () => {
@@ -46,7 +88,6 @@ export default function OCRScanner() {
     } catch (err: any) {
       console.warn("Camera access failed:", err);
       setCameraActive(false);
-      // Fallback to upload tab if camera not available
       setActiveTab("upload");
     }
   };
@@ -74,22 +115,43 @@ export default function OCRScanner() {
     setCameraFacing(prev => (prev === "environment" ? "user" : "environment"));
   };
 
-  const handleCapturePhoto = () => {
+  const captureCanvasFrame = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = video.videoWidth || 1920;
+    canvas.height = video.videoHeight || 1080;
     const ctx = canvas.getContext("2d");
     if (ctx) {
+      // Apply contrast and sharpness enhancement filter for OCR
+      ctx.filter = "contrast(1.35) brightness(1.04)";
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
       setImagePreview(dataUrl);
       setBase64Image(dataUrl.split(",")[1]);
       setResults(null);
       setError(null);
       stopCamera();
+    }
+  };
+
+  const handleCapturePhoto = () => {
+    if (timerEnabled) {
+      setCountdown(3);
+      let count = 3;
+      const interval = setInterval(() => {
+        count -= 1;
+        if (count > 0) {
+          setCountdown(count);
+        } else {
+          clearInterval(interval);
+          setCountdown(null);
+          captureCanvasFrame();
+        }
+      }, 1000);
+    } else {
+      captureCanvasFrame();
     }
   };
 
@@ -120,18 +182,13 @@ export default function OCRScanner() {
         body: JSON.stringify({ base64_image: base64Image }),
       });
       
-      if (!response.ok) throw new Error("Failed to scan document");
+      if (!response.ok) throw new Error("Failed to scan document with Nemotron OCR v2");
       const data = await response.json();
       setResults(data);
+      setIsEditing(false);
     } catch (err: any) {
       console.error(err);
-      setError("Vision OCR service encountered an issue. Displaying parsed preview.");
-      setResults({
-        document_type: "Doctor Prescription (OPD Slip)",
-        diagnoses: ["Acute Bronchitis", "Mild Viral Fever"],
-        medications: ["Amoxicillin 500mg TDS x 5 days", "Paracetamol 650mg SOS", "Levocetirizine 5mg HS"],
-        abnormal_labs: []
-      });
+      setError("Nemotron OCR extraction error. Please check image clarity and try again.");
     }
     setIsScanning(false);
   };
@@ -141,39 +198,75 @@ export default function OCRScanner() {
     setBase64Image(null);
     setResults(null);
     setError(null);
-    if (activeTab === "camera") {
-      startCamera();
+    setIsEditing(false);
+    setShowRawOcr(false);
+  };
+
+  const saveEdits = () => {
+    if (!results) return;
+    setResults({
+      ...results,
+      clinic_name: editClinic || null,
+      doctor_name: editDoctor || null,
+      patient_name: editPatient || null,
+      patient_age: editAge || null,
+      patient_gender: editGender || null,
+      vitals: {
+        bp: editBp || null,
+        pulse: editPulse || null,
+        temp: editTemp || null,
+        spo2: editSpo2 || null
+      },
+      diagnoses: editDiagnoses,
+      medications: editMedications
+    });
+    setIsEditing(false);
+  };
+
+  const copyRawOcr = () => {
+    if (results?.raw_ocr_lines) {
+      navigator.clipboard.writeText(results.raw_ocr_lines.join("\n"));
+      setCopiedRaw(true);
+      setTimeout(() => setCopiedRaw(false), 2000);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-gray-500 hover:text-[#0f4c81] p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-[#0f2942]">AI Prescription & Document OCR</h1>
-              <span className="text-[10px] font-extrabold bg-blue-100 text-[#0f4c81] px-2 py-0.5 rounded-full">
-                Nemotron OCR v2 + Moonshot Kimi-K3
-              </span>
+      {/* Hidden processing canvas */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Top Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link 
+              href="/"
+              className="p-2 -ml-2 rounded-xl text-gray-500 hover:text-[#0f4c81] hover:bg-slate-100 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-extrabold text-[#0f2942] text-lg leading-none">AI Prescription & Document OCR</h1>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                  Nemotron OCR v2 + Groq
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                NVIDIA NIM High-Precision Medical Transcription & Autonomous Clinical Structuring
+              </p>
             </div>
-            <p className="text-xs text-gray-500">Live Camera Photo Capture & Multimodal Prescription Extraction</p>
           </div>
         </div>
       </header>
 
-      {/* Hidden canvas for snapshot rasterization */}
-      <canvas ref={canvasRef} className="hidden" />
-
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Main Content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 items-start">
           
-          {/* Capture / Upload Section */}
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col h-full">
+          {/* Document Capture / Intake Section */}
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col h-full min-h-[520px]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-[#0f2942] flex items-center gap-2">
                 <Camera className="w-5 h-5 text-[#0f4c81]" />
@@ -181,22 +274,28 @@ export default function OCRScanner() {
               </h2>
 
               {!imagePreview && (
-                <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-gray-200">
                   <button
+                    type="button"
                     onClick={() => setActiveTab("camera")}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      activeTab === "camera" ? "bg-white text-[#0f4c81] shadow-xs" : "text-gray-600 hover:text-gray-900"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      activeTab === "camera" 
+                        ? "bg-white text-[#0f4c81] shadow-xs" 
+                        : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
                     Live Camera
                   </button>
                   <button
+                    type="button"
                     onClick={() => setActiveTab("upload")}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      activeTab === "upload" ? "bg-white text-[#0f4c81] shadow-xs" : "text-gray-600 hover:text-gray-900"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      activeTab === "upload" 
+                        ? "bg-white text-[#0f4c81] shadow-xs" 
+                        : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
-                    File Upload
+                    Upload File
                   </button>
                 </div>
               )}
@@ -207,7 +306,7 @@ export default function OCRScanner() {
               activeTab === "camera" ? (
                 /* Live WebRTC Camera Stream */
                 <div className="flex flex-col flex-1">
-                  <div className="relative rounded-2xl overflow-hidden bg-black flex-1 min-h-[320px] flex items-center justify-center border border-gray-200">
+                  <div className="relative rounded-2xl overflow-hidden bg-black flex-1 min-h-[360px] flex items-center justify-center border border-gray-200">
                     <video
                       ref={videoRef}
                       playsInline
@@ -216,36 +315,67 @@ export default function OCRScanner() {
                       className="w-full h-full object-cover"
                     />
 
-                    {/* Framing Guidelines Overlay */}
-                    <div className="absolute inset-6 border-2 border-dashed border-white/60 rounded-xl pointer-events-none flex flex-col justify-between p-3">
-                      <span className="text-[10px] text-white/80 font-bold tracking-wider uppercase bg-black/40 px-2 py-0.5 rounded backdrop-blur-xs self-start">
-                        Align Prescription in Frame
-                      </span>
-                      <div className="text-[10px] text-white/70 text-center bg-black/40 px-2 py-0.5 rounded self-center">
-                        Ensure doctor’s handwriting is well lit
+                    {/* High-Visibility Framing Guidelines Overlay */}
+                    <div className="absolute inset-8 border-2 border-dashed border-emerald-400/80 rounded-2xl pointer-events-none flex flex-col justify-between p-3">
+                      <div className="flex justify-between">
+                        <div className="w-8 h-8 border-t-4 border-l-4 border-emerald-400 -mt-1 -ml-1 rounded-tl-lg" />
+                        <div className="w-8 h-8 border-t-4 border-r-4 border-emerald-400 -mt-1 -mr-1 rounded-tr-lg" />
+                      </div>
+                      <div className="text-center">
+                        <span className="text-[11px] font-bold text-white bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full shadow-lg inline-flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          Position prescription flat inside frame
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <div className="w-8 h-8 border-b-4 border-l-4 border-emerald-400 -mb-1 -ml-1 rounded-bl-lg" />
+                        <div className="w-8 h-8 border-b-4 border-r-4 border-emerald-400 -mb-1 -mr-1 rounded-br-lg" />
                       </div>
                     </div>
 
-                    {/* Camera Flip Control */}
-                    <button
-                      type="button"
-                      onClick={toggleCameraFacing}
-                      className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm transition-colors cursor-pointer"
-                      title="Switch Camera"
-                    >
-                      <SwitchCamera className="w-5 h-5" />
-                    </button>
+                    {/* Countdown indicator overlay */}
+                    {countdown !== null && (
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-10">
+                        <div className="w-24 h-24 rounded-full bg-emerald-500/90 text-white font-extrabold text-5xl flex items-center justify-center shadow-2xl animate-pulse">
+                          {countdown}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top Controls: Camera Flip & Timer */}
+                    <div className="absolute top-3 right-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTimerEnabled(prev => !prev)}
+                        className={`p-2 rounded-full backdrop-blur-md transition-colors cursor-pointer text-xs flex items-center gap-1 ${
+                          timerEnabled ? "bg-emerald-500 text-white font-bold" : "bg-black/50 hover:bg-black/70 text-white"
+                        }`}
+                        title="Toggle 3s Timer"
+                      >
+                        <Clock className="w-4 h-4" />
+                        <span className="text-[10px]">3s</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleCameraFacing}
+                        className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm transition-colors cursor-pointer"
+                        title="Switch Camera"
+                      >
+                        <SwitchCamera className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Capture Button */}
-                  <div className="mt-4 flex items-center justify-center">
+                  <div className="mt-4 flex items-center justify-center gap-3">
                     <button
                       type="button"
                       onClick={handleCapturePhoto}
-                      className="flex items-center gap-2 bg-[#0f4c81] hover:bg-blue-900 text-white font-bold py-3.5 px-8 rounded-full shadow-lg hover:shadow-xl transition-all scale-100 hover:scale-105 active:scale-95 cursor-pointer"
+                      disabled={countdown !== null}
+                      className="flex-1 flex items-center justify-center gap-2 bg-[#0f4c81] hover:bg-blue-900 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all cursor-pointer"
                     >
                       <Camera className="w-5 h-5" />
-                      Capture Prescription Photo
+                      {timerEnabled ? "Start 3s Capture Timer" : "Capture Prescription Photo"}
                     </button>
                   </div>
                 </div>
@@ -255,16 +385,18 @@ export default function OCRScanner() {
                   className="border-2 border-dashed border-gray-300 rounded-2xl bg-slate-50 flex flex-col items-center justify-center p-10 flex-1 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mb-4">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mb-4 shadow-xs">
                     <UploadCloud className="w-8 h-8" />
                   </div>
-                  <h3 className="font-bold text-gray-700 text-center">Click to upload prescription</h3>
-                  <p className="text-xs text-gray-500 text-center mt-2">Supports JPG, PNG, WEBP, PDF (Max 10MB)</p>
+                  <h3 className="font-bold text-gray-800 text-center">Click or Drag to Upload Prescription</h3>
+                  <p className="text-xs text-gray-500 text-center mt-2 max-w-xs">
+                    Supports high-resolution camera photos, scans, and PDFs (JPG, PNG, WEBP up to 10MB)
+                  </p>
                   <input 
                     type="file" 
                     ref={fileInputRef} 
                     onChange={handleImageUpload} 
-                    accept="image/*" 
+                    accept="image/*,.pdf" 
                     className="hidden" 
                   />
                 </div>
@@ -272,25 +404,29 @@ export default function OCRScanner() {
             ) : (
               /* Image Captured / Selected Preview */
               <div className="flex flex-col h-full">
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 flex-1 min-h-[300px] bg-black/5">
-                  <img src={imagePreview} alt="Captured Document" className="w-full h-full object-contain absolute inset-0" />
+                <div className="relative rounded-xl overflow-hidden border border-gray-200 flex-1 min-h-[340px] bg-slate-900 flex items-center justify-center">
+                  <img 
+                    src={imagePreview} 
+                    alt="Captured Prescription Document" 
+                    className="max-h-[380px] w-auto max-w-full object-contain shadow-md rounded-lg" 
+                  />
                 </div>
                 <div className="flex gap-3 mt-4">
                   <button 
                     type="button"
                     onClick={handleRetake}
-                    className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center gap-1.5 text-xs"
                   >
-                    <RefreshCw className="w-4 h-4" /> Retake Photo
+                    <RefreshCw className="w-4 h-4" /> Retake / Choose Another
                   </button>
                   <button 
                     type="button"
                     onClick={handleScan}
                     disabled={isScanning}
-                    className="flex-1 py-3 px-4 rounded-xl bg-[#0f4c81] text-white font-semibold hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer shadow-md"
+                    className="flex-1 py-3 px-4 rounded-xl bg-[#0f4c81] text-white font-bold hover:bg-blue-900 transition-colors flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer shadow-md text-xs"
                   >
                     {isScanning ? (
-                      <><Loader2 className="w-5 h-5 animate-spin" /> Digitizing with NIM...</>
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Nemotron OCR Processing...</>
                     ) : (
                       <><Sparkles className="w-4 h-4 text-amber-300" /> Extract Prescription</>
                     )}
@@ -300,122 +436,375 @@ export default function OCRScanner() {
             )}
 
             {error && (
-              <div className="mt-4 p-4 rounded-xl bg-red-50 text-red-700 flex gap-3 text-xs border border-red-100">
+              <div className="mt-4 p-4 rounded-xl bg-red-50 text-red-700 flex gap-3 text-xs border border-red-200">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <p>{error}</p>
               </div>
             )}
           </section>
 
-          {/* Results Section */}
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col">
-            <h2 className="text-base font-bold text-[#0f2942] mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#0f4c81]" />
-              Structured Medical Extraction
-            </h2>
+          {/* Results & Verification Section */}
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[520px]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-[#0f2942] flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#0f4c81]" />
+                Structured Medical Extraction
+              </h2>
+              {results && (
+                <button
+                  type="button"
+                  onClick={() => isEditing ? saveEdits() : setIsEditing(true)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    isEditing 
+                      ? "bg-emerald-600 text-white border-emerald-700 shadow-xs" 
+                      : "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"
+                  }`}
+                >
+                  {isEditing ? <><Save className="w-3.5 h-3.5" /> Save Changes</> : <><Edit3 className="w-3.5 h-3.5" /> Edit / Verify</>}
+                </button>
+              )}
+            </div>
 
             {isScanning ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-gray-500">
-                <Loader2 className="w-10 h-10 text-[#0f4c81] animate-spin mb-4" />
-                <h3 className="font-bold text-[#0f2942] text-base">Reading Medical Handwriting...</h3>
-                <p className="text-xs max-w-xs mt-1">
-                  Nemotron OCR v2 is reading the script and Moonshot Kimi-K3 is structuring drugs and dosages into FHIR format.
+                <Loader2 className="w-12 h-12 text-[#0f4c81] animate-spin mb-4" />
+                <h3 className="font-extrabold text-[#0f2942] text-base">Reading Medical Handwriting...</h3>
+                <p className="text-xs max-w-xs mt-1 text-slate-600">
+                  NVIDIA Nemotron OCR v2 is reading the prescription and resolving clinical entities with Groq.
                 </p>
               </div>
             ) : results ? (
               <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-1">
                 {/* Header Badge */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between shadow-2xs">
                   <div>
                     <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Document Type</span>
                     <span className="font-bold text-[#0f2942] text-sm">{results.document_type || "Prescription"}</span>
                   </div>
-                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> NIM Digitized
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Nemotron OCR v2 Verified
+                    </span>
+                  </div>
                 </div>
 
-                {/* Clinic & Doctor Details */}
-                {(results.clinic_name || results.doctor_name) && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#0f4c81] text-xs uppercase tracking-wide">
-                        🏥 {results.clinic_name || "SAI RAM CLINIC"}
-                      </span>
-                      <span className="text-[11px] text-slate-600 font-semibold">
-                        {results.doctor_name || "Dr. Santhosh Patil"}
-                      </span>
+                {/* Clinic & Doctor Details (Editable) */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase block mb-0.5">Clinic / Hospital</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editClinic}
+                          onChange={e => setEditClinic(e.target.value)}
+                          placeholder="e.g. SAI RAM CLINIC"
+                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-xs font-bold text-slate-800"
+                        />
+                      ) : (
+                        <span className="font-extrabold text-[#0f4c81] text-xs uppercase tracking-wide">
+                          🏥 {results.clinic_name || <span className="text-gray-400 italic">Not detected (click edit to set)</span>}
+                        </span>
+                      )}
                     </div>
-                    {results.patient_name && (
-                      <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-200 flex justify-between">
-                        <span>Patient: <strong className="text-slate-800">{results.patient_name}</strong></span>
-                        <span>Age/Sex: <strong className="text-slate-800">{results.patient_age || "19"} / {results.patient_gender || "F"}</strong></span>
-                      </div>
-                    )}
-                  </div>
-                )}
 
-                {/* Patient Vitals Grid */}
-                {results.vitals && (
-                  <div>
-                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <HeartPulse className="w-3.5 h-3.5 text-rose-500" /> Recorded Patient Vitals
-                    </h3>
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-2">
-                        <span className="text-[9px] text-slate-500 font-bold block uppercase">BP</span>
-                        <strong className="text-xs text-blue-900">{results.vitals.bp || "120/80"}</strong>
-                      </div>
-                      <div className="bg-rose-50 border border-rose-200 rounded-xl p-2">
-                        <span className="text-[9px] text-slate-500 font-bold block uppercase">Pulse</span>
-                        <strong className="text-xs text-rose-900">{results.vitals.pulse || "114 bpm"}</strong>
-                      </div>
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-2">
-                        <span className="text-[9px] text-slate-500 font-bold block uppercase">Temp</span>
-                        <strong className="text-xs text-amber-900">{results.vitals.temp || "102.2 °F"}</strong>
-                      </div>
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
-                        <span className="text-[9px] text-slate-500 font-bold block uppercase">SPO2</span>
-                        <strong className="text-xs text-emerald-900">{results.vitals.spo2 || "98%"}</strong>
-                      </div>
+                    <div className="flex-1 text-right">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase block mb-0.5">Prescribing Doctor</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editDoctor}
+                          onChange={e => setEditDoctor(e.target.value)}
+                          placeholder="e.g. Dr. Santhosh Patil"
+                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-slate-800"
+                        />
+                      ) : (
+                        <span className="text-[11px] text-slate-700 font-bold">
+                          {results.doctor_name || <span className="text-gray-400 italic">Not detected</span>}
+                        </span>
+                      )}
                     </div>
                   </div>
-                )}
+
+                  {/* Patient Info */}
+                  <div className="text-[11px] text-slate-600 pt-2 border-t border-slate-200 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <span className="text-slate-500 font-semibold">Patient:</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editPatient}
+                          onChange={e => setEditPatient(e.target.value)}
+                          placeholder="Patient name"
+                          className="bg-white border border-gray-300 rounded px-2 py-0.5 text-xs font-bold flex-1"
+                        />
+                      ) : (
+                        <strong className="text-slate-800">{results.patient_name || <span className="text-gray-400 italic font-normal">Not detected</span>}</strong>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-500 font-semibold">Age/Sex:</span>
+                      {isEditing ? (
+                        <div className="flex gap-1">
+                          <input
+                            type="text"
+                            value={editAge}
+                            onChange={e => setEditAge(e.target.value)}
+                            placeholder="Age"
+                            className="w-12 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold text-center"
+                          />
+                          <input
+                            type="text"
+                            value={editGender}
+                            onChange={e => setEditGender(e.target.value)}
+                            placeholder="M/F"
+                            className="w-12 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold text-center"
+                          />
+                        </div>
+                      ) : (
+                        <strong className="text-slate-800">
+                          {results.patient_age ? `${results.patient_age} yrs` : "--"} / {results.patient_gender || "--"}
+                        </strong>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Patient Vitals Grid (Editable) */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <HeartPulse className="w-3.5 h-3.5 text-rose-500" /> Recorded Patient Vitals
+                  </h3>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-2">
+                      <span className="text-[9px] text-slate-500 font-bold block uppercase">BP</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editBp}
+                          onChange={e => setEditBp(e.target.value)}
+                          placeholder="120/80"
+                          className="w-full bg-white border border-blue-300 rounded text-center text-xs font-bold text-blue-900 mt-1 py-0.5"
+                        />
+                      ) : (
+                        <strong className="text-xs text-blue-900">{results.vitals?.bp || "--"}</strong>
+                      )}
+                    </div>
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-2">
+                      <span className="text-[9px] text-slate-500 font-bold block uppercase">Pulse</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editPulse}
+                          onChange={e => setEditPulse(e.target.value)}
+                          placeholder="72"
+                          className="w-full bg-white border border-rose-300 rounded text-center text-xs font-bold text-rose-900 mt-1 py-0.5"
+                        />
+                      ) : (
+                        <strong className="text-xs text-rose-900">{results.vitals?.pulse || "--"}</strong>
+                      )}
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2">
+                      <span className="text-[9px] text-slate-500 font-bold block uppercase">Temp</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editTemp}
+                          onChange={e => setEditTemp(e.target.value)}
+                          placeholder="98.6"
+                          className="w-full bg-white border border-amber-300 rounded text-center text-xs font-bold text-amber-900 mt-1 py-0.5"
+                        />
+                      ) : (
+                        <strong className="text-xs text-amber-900">{results.vitals?.temp || "--"}</strong>
+                      )}
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
+                      <span className="text-[9px] text-slate-500 font-bold block uppercase">SPO2</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editSpo2}
+                          onChange={e => setEditSpo2(e.target.value)}
+                          placeholder="98%"
+                          className="w-full bg-white border border-emerald-300 rounded text-center text-xs font-bold text-emerald-900 mt-1 py-0.5"
+                        />
+                      ) : (
+                        <strong className="text-xs text-emerald-900">{results.vitals?.spo2 || "--"}</strong>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 {/* Detected Diagnoses */}
                 <div>
-                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Detected Diagnoses</h3>
-                  {results.diagnoses?.length > 0 ? (
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Detected Diagnoses & Clinical Signs
+                  </h3>
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newDiagnosis}
+                          onChange={e => setNewDiagnosis(e.target.value)}
+                          placeholder="Add diagnosis (e.g. Acute Viral Fever)"
+                          className="flex-1 bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs"
+                          onKeyDown={e => {
+                            if (e.key === "Enter" && newDiagnosis.trim()) {
+                              setEditDiagnoses(prev => [...prev, newDiagnosis.trim()]);
+                              setNewDiagnosis("");
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newDiagnosis.trim()) {
+                              setEditDiagnoses(prev => [...prev, newDiagnosis.trim()]);
+                              setNewDiagnosis("");
+                            }
+                          }}
+                          className="bg-purple-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-purple-700"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {editDiagnoses.map((diag, i) => (
+                          <span key={i} className="bg-purple-50 text-purple-800 border border-purple-200 text-xs px-2 py-1 rounded-lg font-medium flex items-center gap-1.5">
+                            {diag}
+                            <button
+                              type="button"
+                              onClick={() => setEditDiagnoses(prev => prev.filter((_, idx) => idx !== i))}
+                              className="text-purple-400 hover:text-purple-700 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : results.diagnoses?.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {results.diagnoses.map((diag: string, i: number) => (
-                        <span key={i} className="bg-purple-50 text-purple-800 border border-purple-200 text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1">
-                          <span>•</span> {diag}
+                        <span key={i} className="bg-purple-50 text-purple-800 border border-purple-200 text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500" /> {diag}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-400 italic">No formal diagnosis noted</p>
+                    <p className="text-xs text-gray-400 italic">No formal diagnosis noted in document</p>
                   )}
                 </div>
 
                 {/* Extracted Medications */}
                 <div>
-                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Extracted Medications & Dosage</h3>
-                  {results.medications?.length > 0 ? (
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Extracted Medications & Regimen
+                  </h3>
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newMedication}
+                          onChange={e => setNewMedication(e.target.value)}
+                          placeholder="Add medication (e.g. T. Epan 400mg 1-0-1)"
+                          className="flex-1 bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs"
+                          onKeyDown={e => {
+                            if (e.key === "Enter" && newMedication.trim()) {
+                              setEditMedications(prev => [...prev, newMedication.trim()]);
+                              setNewMedication("");
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newMedication.trim()) {
+                              setEditMedications(prev => [...prev, newMedication.trim()]);
+                              setNewMedication("");
+                            }
+                          }}
+                          className="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-blue-700"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {editMedications.map((med, i) => (
+                          <div key={i} className="p-2.5 bg-slate-50 border border-gray-200 rounded-lg flex items-center justify-between text-xs">
+                            <span className="font-semibold text-gray-800">{med}</span>
+                            <button
+                              type="button"
+                              onClick={() => setEditMedications(prev => prev.filter((_, idx) => idx !== i))}
+                              className="text-red-400 hover:text-red-700 cursor-pointer p-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : results.medications?.length > 0 ? (
                     <div className="space-y-2">
                       {results.medications.map((med: string, i: number) => (
-                        <div key={i} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs hover:bg-blue-50/50 transition-colors">
+                        <div key={i} className="p-3 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between text-xs hover:bg-blue-50/50 transition-colors shadow-2xs">
                           <span className="font-bold text-gray-800">{med}</span>
                           <span className="text-[10px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full border border-emerald-200 shrink-0 ml-2">
-                            Verified Dosage
+                            Verified Clinical Entity
                           </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-400 italic">No medications found</p>
+                    <p className="text-xs text-gray-400 italic">No medications found in document</p>
                   )}
                 </div>
+
+                {/* Raw Nemotron OCR Detections Inspector */}
+                {results.raw_ocr_lines && results.raw_ocr_lines.length > 0 && (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowRawOcr(prev => !prev)}
+                      className="w-full bg-slate-100 hover:bg-slate-200 px-3.5 py-2.5 text-xs font-semibold text-slate-700 flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        Nemotron OCR v2 Raw Detections ({results.raw_ocr_lines.length} lines detected)
+                      </span>
+                      {showRawOcr ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                    <AnimatePresence>
+                      {showRawOcr && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="p-3 bg-slate-900 text-slate-200 text-[11px] font-mono leading-relaxed max-h-48 overflow-y-auto"
+                        >
+                          <div className="flex justify-between items-center mb-2 pb-1 border-b border-slate-700">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold">Raw Transcribed Stream</span>
+                            <button
+                              type="button"
+                              onClick={copyRawOcr}
+                              className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedRaw ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy Lines</>}
+                            </button>
+                          </div>
+                          {results.raw_ocr_lines.map((line: string, idx: number) => (
+                            <div key={idx} className="py-0.5 border-b border-slate-800/60 last:border-0 flex gap-2">
+                              <span className="text-slate-500 w-5 text-right shrink-0">{idx + 1}.</span>
+                              <span className="text-emerald-300 font-semibold">{line}</span>
+                            </div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="pt-3 border-t border-gray-100 flex gap-2">
@@ -423,23 +812,39 @@ export default function OCRScanner() {
                     type="button"
                     onClick={() => {
                       if (typeof window !== "undefined") {
-                        sessionStorage.setItem("samanvaya_ocr_intake", JSON.stringify(results));
+                        const verifiedPayload = {
+                          ...results,
+                          clinic_name: editClinic || results.clinic_name,
+                          doctor_name: editDoctor || results.doctor_name,
+                          patient_name: editPatient || results.patient_name,
+                          patient_age: editAge || results.patient_age,
+                          patient_gender: editGender || results.patient_gender,
+                          vitals: {
+                            bp: editBp || results.vitals?.bp,
+                            pulse: editPulse || results.vitals?.pulse,
+                            temp: editTemp || results.vitals?.temp,
+                            spo2: editSpo2 || results.vitals?.spo2
+                          },
+                          diagnoses: editDiagnoses.length > 0 ? editDiagnoses : results.diagnoses,
+                          medications: editMedications.length > 0 ? editMedications : results.medications
+                        };
+                        sessionStorage.setItem("samanvaya_ocr_intake", JSON.stringify(verifiedPayload));
                         window.location.href = "/his/registration";
                       }
                     }}
-                    className="flex-1 text-center bg-[#0f4c81] hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-xl text-xs transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2"
+                    className="flex-1 text-center bg-[#0f4c81] hover:bg-blue-900 text-white font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2"
                   >
                     <Sparkles className="w-4 h-4 text-amber-300" />
-                    Attach to New Patient Intake
+                    Attach Verified Data to New Patient Intake
                   </button>
                 </div>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
                 <FileText className="w-12 h-12 stroke-[1.5] mb-2 text-gray-300" />
-                <h4 className="font-bold text-gray-600 text-sm">No Document Scanned Yet</h4>
-                <p className="text-xs text-gray-400 max-w-xs mt-1">
-                  Use the camera to take a photo of any handwritten prescription or upload an existing photo to digitize it.
+                <h4 className="font-bold text-gray-700 text-sm">No Document Scanned Yet</h4>
+                <p className="text-xs text-gray-500 max-w-xs mt-1">
+                  Use the live camera or upload an existing photo or PDF. Nemotron OCR v2 will detect and transcribe all text in real-time.
                 </p>
               </div>
             )}

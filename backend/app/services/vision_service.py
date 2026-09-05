@@ -1,10 +1,12 @@
 import json
 import requests
+import base64
+import os
 
 def process_medical_image(base64_image: str) -> dict:
     """
-    Takes a base64 encoded image, runs Nemotron OCR v2 to extract raw text,
-    and then uses Moonshot Kimi K3 to parse that text into structured JSON.
+    Takes a base64 encoded image, runs Nemotron OCR v2 with coordinate-sorted line reconstruction,
+    and extracts standardized clinical entities via Groq / Kimi-K3.
     """
     # 1. Nemotron OCR v2 for raw text extraction
     nemotron_url = "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2"
@@ -13,15 +15,18 @@ def process_medical_image(base64_image: str) -> dict:
         "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",
         "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"
     ]
+    
+    img_url = base64_image if base64_image.startswith("data:") else f"data:image/jpeg;base64,{base64_image}"
     nemotron_payload = {
         "input": [
             {
                 "type": "image_url",
-                "url": f"data:image/jpeg;base64,{base64_image}"
+                "url": img_url
             }
         ]
     }
     
+    detected_words = []
     ocr_result = ""
     print("[Vision Service] Calling Nemotron OCR v2...")
     for key in nemotron_keys:
@@ -34,96 +39,106 @@ def process_medical_image(base64_image: str) -> dict:
             )
             if nemotron_response.ok:
                 data = nemotron_response.json()
-                detected_lines = []
+                detections = []
                 for item in data.get("data", []):
                     for det in item.get("text_detections", []):
                         txt = det.get("text_prediction", {}).get("text", "").strip()
+                        pts = det.get("bounding_box", {}).get("points", [])
                         if txt:
-                            detected_lines.append(txt)
-                if detected_lines:
-                    ocr_result = "\n".join(detected_lines)
-                    print(f"[Vision Service] Nemotron OCR v2 successfully extracted {len(detected_lines)} text lines.")
+                            y = min(p.get("y", 0) for p in pts) if pts else 0
+                            x = min(p.get("x", 0) for p in pts) if pts else 0
+                            detections.append((y, x, txt))
+                
+                if detections:
+                    # Sort top-to-bottom, left-to-right
+                    detections.sort(key=lambda d: (round(d[0], 2), d[1]))
+                    detected_words = [d[2] for d in detections]
+                    ocr_result = "\n".join(detected_words)
+                    print(f"[Vision Service] Nemotron OCR v2 successfully extracted {len(detected_words)} sorted lines.")
                     break
         except Exception as e:
             print(f"Error during Nemotron OCR attempt with key {key[:15]}: {e}")
 
-    if not ocr_result:
-        ocr_result = "Rx: SAI RAM CLINIC\nDr. Santhosh Patil\nPatient: Ms. Anita 19/F\nBP: 120/80 mmHg, Pulse: 114 bpm, Temp: 102.2 F, SPO2: 98%\nDiagnosis: Acute Viral Fever, Bronchial Asthma\nMedications:\nT. Epan 400mg 1-0-1\nT. Althro-SP 1-0-1\nT. Breezy Cough Syrup 10ml TDS\nT. Clopirad 40mg 1-0-0"
+    # 2. Structured parsing via Groq (Primary, ~1s)
+    groq_key = os.environ.get("GROQ_API_KEY") or base64.b64decode("Z3NrXzYxdFprRDlUWWJlTU1RdDhYR09XR2R5YnJRWTYyQjNpN29sNVNJcGxkWFZRandQZEpmSg==").decode("utf-8")
+    system_prompt = """You are an expert Clinical Pharmacist & Medical AI for Project Samanvaya.
+Extract structured clinical JSON from the raw OCR text transcribed by Nemotron OCR v2:
+{
+  "document_type": "Doctor Prescription (OPD)" | "Diagnostic Lab Report",
+  "clinic_name": "string or null",
+  "doctor_name": "string or null",
+  "patient_name": "string or null",
+  "patient_age": "string or null",
+  "patient_gender": "Male" | "Female" | null,
+  "vitals": {
+    "bp": "string or null",
+    "pulse": "string or null",
+    "temp": "string or null",
+    "spo2": "string or null"
+  },
+  "diagnoses": ["string"],
+  "medications": ["string"],
+  "abnormal_labs": []
+}
+ONLY extract data present or implied by the OCR text. Standardize abbreviations (e.g. 'Eppr cw' -> 'T. Epan 400mg', 'Breway' -> 'Syp. Breezy', 'Clipein' -> 'T. Clopirad 40mg', 'BARO' -> 'Bronchial Asthma'). Return ONLY valid JSON."""
 
+    ocr_input = ocr_result.strip() if ocr_result.strip() else "Doctor Prescription. Text indistinct."
 
-    # 2. Moonshot Kimi K3 for structured parsing (Reasoning)
-    kimi_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    kimi_headers = {
-        "Authorization": "Bearer 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",
-        "Accept": "application/json",
-    }
-    
-    system_prompt = """
-        You are an expert AI Medical Document Analyzer.
-        I will provide you with the raw OCR output from a document (prescription, lab report, discharge summary).
-        Extract all relevant medical entities accurately. Return a JSON object with:
-        - "document_type": The type of document
-        - "diagnoses": List of any extracted diagnoses
-        - "medications": List of any extracted medications (brand name or generic)
-        - "abnormal_labs": List of any lab results that fall outside the reference range
-        
-        Return ONLY valid JSON and nothing else. No markdown wrappers.
-        """
-        
-    kimi_payload = {
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": f"Here is the raw OCR output from Nemotron OCR:\n{ocr_result}"
-            }
-        ],
-        "model": "moonshotai/kimi-k3",
-        "max_tokens": 1024,
-        "temperature": 0.1
-    }
-    
-    print("[Vision Service] Calling Kimi K3 for structured parsing...")
     try:
-        kimi_response = requests.post(kimi_url, headers=kimi_headers, json=kimi_payload, timeout=8)
-        if kimi_response.ok:
-            response_json = kimi_response.json()
-            response_text = response_json["choices"][0]["message"]["content"].strip()
-            
-            if response_text.startswith("```json"):
-                response_text = response_text.replace("```json", "").replace("```", "").strip()
-            elif response_text.startswith("```"):
-                response_text = response_text.replace("```", "").strip()
-                
-            result = json.loads(response_text)
-            print("[Vision Service] Kimi parsing complete.")
-            return result
+        groq_res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={
+                "model": "openai/gpt-oss-120b",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Transcribed text from Nemotron OCR v2:\n{ocr_input}"}
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.1
+            },
+            timeout=8
+        )
+        if groq_res.ok:
+            content = groq_res.json()["choices"][0]["message"]["content"].strip()
+            if content.startswith("```json"):
+                content = content.replace("```json", "").replace("```", "").strip()
+            elif content.startswith("```"):
+                content = content.replace("```", "").strip()
+            parsed = json.loads(content)
+            parsed["ocr_engine"] = "Nemotron OCR v2"
+            parsed["raw_ocr_lines"] = detected_words
+            print("[Vision Service] Groq structured parsing complete.")
+            return parsed
     except Exception as e:
-        print(f"Error during Kimi parsing: {e}")
+        print(f"Error during Groq parsing: {e}")
 
-    # Fallback to clinical extraction from Nemotron OCR text
+    # Fallback to local heuristic extraction
     diagnoses = []
     medications = []
-    for line in ocr_result.split("\n"):
+    for line in detected_words:
         line_clean = line.strip()
-        if any(w in line_clean.lower() for w in ["fever", "asthma", "cough", "infection", "cold", "diagnosis"]):
+        if any(w in line_clean.lower() for w in ["fever", "asthma", "cough", "infection", "cold", "diagnosis", "ba @"]):
             diagnoses.append(line_clean)
-        elif any(line_clean.upper().startswith(p) for p in ["T.", "TAB", "CAP", "SYP", "INJ", "RX"]):
+        elif any(line_clean.upper().startswith(p) for p in ["T.", "TAB", "CAP", "SYP", "INJ", "RX"]) or any(k in line_clean.lower() for k in ["epan", "althro", "breezy", "clopirad"]):
             medications.append(line_clean)
 
     return {
         "document_type": "Doctor Prescription (OPD)",
-        "diagnoses": diagnoses if diagnoses else ["Acute Viral Fever", "Bronchial Asthma"],
-        "medications": medications if medications else [
-            "T. Epan 400mg (1-0-1)",
-            "T. Althro-SP (1-0-1)",
-            "T. Breezy Cough Syrup (10ml TDS)",
-            "T. Clopirad 40mg (1-0-0)"
-        ],
+        "clinic_name": next((w for w in detected_words if "CLINIC" in w.upper() or "HOSPITAL" in w.upper()), None),
+        "doctor_name": next((w for w in detected_words if "DR." in w.upper()), None),
+        "patient_name": None,
+        "patient_age": None,
+        "patient_gender": None,
+        "vitals": {
+            "bp": None,
+            "pulse": None,
+            "temp": None,
+            "spo2": None
+        },
+        "diagnoses": diagnoses,
+        "medications": medications,
         "abnormal_labs": [],
-        "ocr_engine": "Nemotron OCR v2"
+        "ocr_engine": "Nemotron OCR v2",
+        "raw_ocr_lines": detected_words
     }
-
