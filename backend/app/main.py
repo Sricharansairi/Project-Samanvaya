@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import json
 from app.services.triage_service import triage_symptoms
 from app.services.vision_service import process_medical_image
-from app.services.sarvam_service import sarvam_service
+from app.services.audio_service import transcribe_audio, generate_speech
 from app.services.pii_service import strip_pii
 from app.services.fhir_service import convert_to_fhir_r4
 from app.services.clinical_automation import evaluate_overdose_guard, generate_ayurvedic_regimen, generate_patient_questions
@@ -88,14 +88,19 @@ async def handle_ocr(request: OCRRequest):
     result = process_medical_image(request.base64_image)
     return result
 
+from fastapi import UploadFile, File
+import base64
+
 @app.post("/api/voice/transcribe")
-async def handle_voice_transcribe(request: TranscribeRequest):
-    text = sarvam_service.transcribe_audio(request.base64_audio, request.source_language)
+async def handle_voice_transcribe(file: UploadFile = File(...)):
+    audio_bytes = await file.read()
+    text = transcribe_audio(audio_bytes)
     return {"text": text}
 
 @app.post("/api/voice/speak")
 async def handle_voice_speak(request: SpeakRequest):
-    base64_audio = sarvam_service.generate_speech(request.text, request.target_language, request.gender)
+    audio_bytes = generate_speech(request.text)
+    base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
     return {"base64_audio": base64_audio}
 
 class VoiceTranscriptRequest(BaseModel):
