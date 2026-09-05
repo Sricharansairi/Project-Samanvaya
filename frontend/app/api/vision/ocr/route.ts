@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const maxDuration = 30;
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
               }
             ]
           }),
-          signal: AbortSignal.timeout(12000)
+          signal: AbortSignal.timeout(5000)
         });
 
         if (nemotronRes.ok) {
@@ -108,7 +111,7 @@ Return ONLY valid JSON and nothing else. No markdown wrappers.`;
             max_tokens: 1024,
             temperature: 0.1
           }),
-          signal: AbortSignal.timeout(10000)
+          signal: AbortSignal.timeout(4000)
         });
 
         if (kimiRes.ok) {
