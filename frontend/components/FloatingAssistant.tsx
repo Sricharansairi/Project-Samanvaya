@@ -47,7 +47,7 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
       const formData = new FormData();
       formData.append("file", blob, "audio.webm");
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/voice/transcribe`, {
+      const res = await fetch(`/api/voice/transcribe`, {
         method: "POST",
         body: formData,
       });
@@ -61,16 +61,16 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
       }
     } catch (err) {
       console.error("Transcription error:", err);
-      setAssistantResponse("Error transcribing audio. Check API connection.");
+      setAssistantResponse("Could not transcribe audio. You can also type your command below.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Speak text using backend (NVIDIA NIM Magpie TTS)
+  // Speak text using backend (NVIDIA NIM Magpie TTS with browser speech fallback)
   const speakText = async (text: string) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/voice/speak`, {
+      const res = await fetch(`/api/voice/speak`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text })
@@ -78,9 +78,18 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
       const data = await res.json();
       if (data.base64_audio) {
         playAudioBase64(data.base64_audio);
+        return;
       }
     } catch (err) {
-      console.error("TTS error:", err);
+      console.warn("NIM Magpie TTS unavailable, falling back to Web Speech:", err);
+    }
+
+    // Fallback: Browser Web Speech API
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-IN";
+      window.speechSynthesis.speak(utterance);
     }
   };
 
@@ -92,8 +101,13 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
     let reply = "";
     setAmbiguousOptions([]);
 
+    // 0. Red Flag Clinical Emergency Interceptor
+    if (text.includes("chest pain") || text.includes("heart attack") || text.includes("stroke") || text.includes("paralysis") || text.includes("heavy bleeding")) {
+      reply = "RED FLAG ALERT: Severe acute symptom detected. Please proceed to the Hospital Emergency Room immediately without delay.";
+      router.push("/his/registration");
+    }
     // 1. Language Switching Commands
-    if (text.includes("hindi") || text.includes("हिन्दी")) {
+    else if (text.includes("hindi") || text.includes("हिन्दी")) {
       if (onLanguageChange) onLanguageChange("hi");
       if (onAction) onAction("change_language", "hi");
       reply = "Switched language to Hindi.";
@@ -107,22 +121,27 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
       reply = "Language switched to English.";
     }
     // 2. Navigation Commands
-    else if (text.includes("doctor") || text.includes("clinic") || text.includes("physician")) {
-      if (onNavigate) onNavigate(12);
+    else if (text.includes("scheme") || text.includes("yojana") || text.includes("pmjay") || text.includes("aarogyasri") || text.includes("insurance") || text.includes("claim")) {
+      router.push("/his/schemes");
+      if (onAction) onAction("open_scheme");
+      reply = "Opening Government Health Scheme & Claim Navigator across 36 States.";
+    } else if (text.includes("prescription") || text.includes("ocr") || text.includes("scan") || text.includes("camera") || text.includes("photo")) {
+      router.push("/his/ocr");
+      if (onAction) onAction("open_ocr");
+      reply = "Opening Prescription & Document OCR Scanner.";
+    } else if (text.includes("registration") || text.includes("token") || text.includes("triage") || text.includes("intake") || text.includes("admit")) {
+      router.push("/his/registration");
+      if (onAction) onAction("open_registration");
+      reply = "Opening Patient Registration & Triage Desk.";
+    } else if (text.includes("doctor") || text.includes("clinic") || text.includes("physician") || text.includes("queue")) {
       router.push("/his/doctor");
       if (onAction) onAction("doctor_view");
       reply = "Opening Physician Consultation Desk.";
-    } else if (text.includes("scheme") || text.includes("yojana")) {
-      if (onNavigate) onNavigate(8);
-      if (onAction) onAction("open_scheme");
-      reply = "Opening Government Scheme Eligibility checker.";
-    } else if (text.includes("prescription") || text.includes("ocr") || text.includes("scan")) {
-      if (onNavigate) onNavigate(7);
-      if (onAction) onAction("open_ocr");
-      router.push("/his/ocr");
-      reply = "Opening Prescription OCR Scanner.";
-    } else if (text.includes("home") || text.includes("main")) {
-      if (onNavigate) onNavigate(1);
+    } else if (text.includes("patient") || text.includes("history") || text.includes("records") || text.includes("my prescriptions")) {
+      router.push("/patient");
+      if (onAction) onAction("patient_portal");
+      reply = "Opening Patient Health Records Portal.";
+    } else if (text.includes("home") || text.includes("main") || text.includes("start")) {
       router.push("/");
       if (onAction) onAction("restart");
       reply = "Navigating to Home Portal.";
@@ -130,9 +149,9 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
     // 3. Form Filling / Entity Extraction (True NLP)
     else if (text.length > 20) {
       setIsProcessing(true);
-      setAssistantResponse("Analyzing clinical data using Kimi K3...");
+      setAssistantResponse("Analyzing clinical entities via Kimi-K3...");
       
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/voice/extract-entities`, {
+      fetch(`/api/voice/extract-entities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript: text })

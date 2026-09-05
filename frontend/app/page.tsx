@@ -118,7 +118,9 @@ export default function Home() {
               <div 
                 key={idx} 
                 onClick={() => {
-                  if (feature.id === "AI Prescription OCR") {
+                  if (feature.id === "Scheme Eligibility Checker") {
+                    window.location.href = "/his/schemes";
+                  } else if (feature.id === "AI Prescription OCR") {
                     window.location.href = "/his/ocr";
                   } else {
                     setSimulatedModule(feature.id);

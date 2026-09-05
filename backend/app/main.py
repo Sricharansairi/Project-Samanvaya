@@ -249,6 +249,43 @@ async def get_festival_stats(postal_code: str):
 async def get_cost_estimate(department: str, scheme_eligible: bool = False):
     return estimate_rough_cost(department, scheme_eligible)
 
+from typing import Optional
+
+class SchemeEvaluationRequest(BaseModel):
+    state: str = "CENTRAL"
+    age: int = 35
+    gender: str = "Any"
+    income: Optional[int] = None
+    ration_card_type: str = "WHITE"
+    clinical_condition: str = "ANY"
+    is_migrant: bool = False
+
+@app.post("/api/schemes/evaluate")
+async def handle_evaluate_schemes(request: SchemeEvaluationRequest):
+    from app.services.schemes_repository import evaluate_patient_schemes
+    return evaluate_patient_schemes(
+        state_code=request.state,
+        age=request.age,
+        gender=request.gender,
+        annual_income=request.income,
+        ration_card=request.ration_card_type,
+        clinical_condition=request.clinical_condition,
+        is_migrant=request.is_migrant
+    )
+
+@app.get("/api/schemes/catalog")
+async def handle_schemes_catalog():
+    from app.services.schemes_repository import ALL_INDIA_SCHEMES
+    return {"schemes": ALL_INDIA_SCHEMES}
+
+class ClinicalInterrogateRequest(BaseModel):
+    complaint: str
+
+@app.post("/api/rag/clinical-interrogate")
+async def handle_clinical_interrogation(request: ClinicalInterrogateRequest):
+    from app.services.medical_rag import retrieve_medical_guideline
+    return retrieve_medical_guideline(request.complaint)
+
 class RemoteAssistRequest(BaseModel):
     patient_id: str
     relative_phone: str

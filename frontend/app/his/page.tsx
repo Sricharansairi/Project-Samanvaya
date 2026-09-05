@@ -62,6 +62,23 @@ export default function HisSelectionPage() {
             </p>
           </motion.a>
 
+          {/* Arogya Mitra & Scheme Desk Card */}
+          <motion.a
+            href="/his/schemes"
+            whileHover={{ y: -4, scale: 1.01 }}
+            className="group md:col-span-2 flex flex-col items-center text-center bg-white border-2 border-gray-100 hover:border-emerald-500 rounded-2xl p-8 shadow-sm hover:shadow-xl transition-all cursor-pointer"
+          >
+            <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <span className="text-2xl">🏛️</span>
+            </div>
+            <h2 className="text-xl font-bold text-[#0f2942] mb-1">
+              Arogya Mitra & Scheme Desk
+            </h2>
+            <p className="text-gray-500 text-sm font-medium max-w-lg">
+              Check real-time eligibility for PM-JAY and State Schemes, verify documents, and process cashless hospitalization pre-authorizations.
+            </p>
+          </motion.a>
+
         </div>
       </div>
     </main>

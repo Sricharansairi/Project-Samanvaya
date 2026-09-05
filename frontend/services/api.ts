@@ -3,7 +3,7 @@
  * Seamlessly connects the Next.js UI to the FastAPI Backend (/api/...)
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = typeof window !== "undefined" ? "" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
 
 export const api = {
   // 1. Dynamic Per-Complaint Follow-up Chips

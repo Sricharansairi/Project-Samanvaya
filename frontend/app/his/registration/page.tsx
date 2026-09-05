@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, UserPlus, FileHeart, QrCode, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, UserPlus, FileHeart, QrCode, ClipboardCheck, Sparkles, Loader2 } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { ChipParameterModal, ParamConfig } from "@/components/ChipParameterModal";
 
 
 export default function RegistrationDashboard() {
@@ -22,6 +23,14 @@ export default function RegistrationDashboard() {
   const [chiefConcern, setChiefConcern] = useState("");
   const [isGeneratingAbha, setIsGeneratingAbha] = useState(false);
   const [tokenData, setTokenData] = useState<any>(null);
+
+  // Dynamic Chip Parameter States
+  const [isChipModalOpen, setIsChipModalOpen] = useState(false);
+  const [chipConfigs, setChipConfigs] = useState<ParamConfig[]>([]);
+  const [chipStep, setChipStep] = useState(1);
+  const [chipConditionName, setChipConditionName] = useState("Diagnostic Questions");
+  const [chipAnswers, setChipAnswers] = useState<Record<string, any>>({});
+  const [isLoadingChips, setIsLoadingChips] = useState(false);
 
   const generateMockAbha = async () => {
     setIsGeneratingAbha(true);
@@ -92,6 +101,42 @@ export default function RegistrationDashboard() {
         room: "Room 4, Floor 1"
       });
     }
+  };
+
+  // Dynamic Chip Interrogator Handlers
+  const handleOpenChipInterrogator = async () => {
+    if (!chiefConcern.trim()) {
+      alert("Please enter patient symptoms first to generate targeted questions.");
+      return;
+    }
+    setIsLoadingChips(true);
+    try {
+      const res = await fetch("/api/rag/interrogate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ complaint: chiefConcern })
+      });
+      const data = await res.json();
+      if (data.success && data.parameterConfigs?.length > 0) {
+        setChipConfigs(data.parameterConfigs);
+        setChipConditionName(data.guideline?.condition || "Clinical Follow-up");
+        setChipStep(1);
+        setChipAnswers({});
+        setIsChipModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Chip interrogator error:", err);
+    } finally {
+      setIsLoadingChips(false);
+    }
+  };
+
+  const handleChipComplete = (allAnswers: Record<string, any>) => {
+    setIsChipModalOpen(false);
+    const formattedAnswers = Object.entries(allAnswers)
+      .map(([k, v]) => `${k.toUpperCase()}: ${v}`)
+      .join(" | ");
+    setChiefConcern(prev => `${prev}\n[AI Clinical Notes: ${formattedAnswers}]`);
   };
 
   // Autonomous Form Filling Router
@@ -245,13 +290,28 @@ export default function RegistrationDashboard() {
                 </div>
 
                 <div className="mt-6">
-                  <label className="block text-sm font-semibold text-[#0f2942] mb-2">Chief Concern / Symptoms</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-[#0f2942]">Chief Concern / Symptoms</label>
+                    <button
+                      type="button"
+                      onClick={handleOpenChipInterrogator}
+                      disabled={isLoadingChips}
+                      className="flex items-center gap-1.5 text-xs font-bold text-[#0f4c81] hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition-colors cursor-pointer shadow-xs"
+                    >
+                      {isLoadingChips ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      )}
+                      ✨ Clarify with AI Diagnostic Chips (RAG)
+                    </button>
+                  </div>
                   <textarea 
                     rows={4}
                     value={chiefConcern}
                     onChange={(e) => setChiefConcern(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg p-4 focus:outline-none focus:border-[#0f4c81]"
-                    placeholder="Enter patient symptoms here..."
+                    placeholder="Enter patient symptoms here (e.g. Chest pain radiating to arm, Severe fever with petechial spots, or Stomach pain)..."
                   />
                 </div>
 
@@ -318,8 +378,24 @@ export default function RegistrationDashboard() {
           </div>
         </div>
       </div>
-      
 
+      {/* Dynamic AI Clinical Chip Parameter Modal */}
+      <ChipParameterModal
+        isOpen={isChipModalOpen}
+        onClose={() => setIsChipModalOpen(false)}
+        conditionName={chipConditionName}
+        parameterConfigs={chipConfigs}
+        currentStep={chipStep}
+        totalSteps={chipConfigs.length}
+        onNext={(stepAnswer) => {
+          setChipStep(prev => Math.min(prev + 1, chipConfigs.length));
+        }}
+        onPrevious={() => {
+          setChipStep(prev => Math.max(prev - 1, 1));
+        }}
+        onComplete={handleChipComplete}
+        currentAnswers={chipAnswers}
+      />
     </main>
   );
 }
