@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { 
   ArrowLeft, UploadCloud, Camera, FileText, Loader2, 
   CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles, HeartPulse,
-  Edit3, Save, Plus, Trash2, ChevronDown, ChevronUp, Copy, Check, Clock
+  Edit3, Save, Plus, Trash2, ChevronDown, ChevronUp, Copy, Check, Clock,
+  Sun, ZoomIn, ShieldAlert, Activity
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function OCRScanner() {
   const [activeTab, setActiveTab] = useState<"camera" | "upload">("camera");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [rawCapturedImage, setRawCapturedImage] = useState<string | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [results, setResults] = useState<any | null>(null);
@@ -19,7 +21,10 @@ export default function OCRScanner() {
   const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   
-  // Timer & Framing States
+  // Camera Controls: Zoom, Exposure & Timer
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [exposureMode, setExposureMode] = useState<"normal" | "bright" | "autolevel">("normal");
+  const [previewBrightness, setPreviewBrightness] = useState<number>(1.0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [timerEnabled, setTimerEnabled] = useState<boolean>(false);
 
@@ -124,16 +129,55 @@ export default function OCRScanner() {
     canvas.height = video.videoHeight || 1080;
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      // Apply contrast and sharpness enhancement filter for OCR
-      ctx.filter = "contrast(1.35) brightness(1.04)";
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Apply clean natural or boosted filter (NO over-darkening)
+      let filter = "none";
+      if (exposureMode === "bright") filter = "brightness(1.20) contrast(1.05)";
+      else if (exposureMode === "autolevel") filter = "brightness(1.35) contrast(1.10)";
+      ctx.filter = filter;
+
+      if (zoomLevel === 1) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      } else {
+        // Digital zoom: center-crop region to maximize prescription resolution
+        const cropW = canvas.width / zoomLevel;
+        const cropH = canvas.height / zoomLevel;
+        const startX = (canvas.width - cropW) / 2;
+        const startY = (canvas.height - cropH) / 2;
+        ctx.drawImage(video, startX, startY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      }
+
       const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+      setRawCapturedImage(dataUrl);
       setImagePreview(dataUrl);
+      setPreviewBrightness(1.0);
       setBase64Image(dataUrl.split(",")[1]);
       setResults(null);
       setError(null);
       stopCamera();
     }
+  };
+
+  // Adjust brightness on the captured photo before scanning
+  const adjustPreviewBrightness = (factor: number) => {
+    if (!rawCapturedImage || !canvasRef.current) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.filter = factor === 1.0 ? "none" : `brightness(${factor}) contrast(1.06)`;
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+        setImagePreview(dataUrl);
+        setBase64Image(dataUrl.split(",")[1]);
+        setPreviewBrightness(factor);
+      }
+    };
+    img.src = rawCapturedImage;
   };
 
   const handleCapturePhoto = () => {
@@ -161,7 +205,9 @@ export default function OCRScanner() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result as string;
+        setRawCapturedImage(base64);
         setImagePreview(base64);
+        setPreviewBrightness(1.0);
         const base64Data = base64.split(",")[1];
         setBase64Image(base64Data);
         setResults(null);
@@ -173,8 +219,10 @@ export default function OCRScanner() {
 
   const handleScan = async () => {
     if (!base64Image) return;
+
     setIsScanning(true);
     setError(null);
+
     try {
       const response = await fetch("/api/vision/ocr", {
         method: "POST",
@@ -195,27 +243,30 @@ export default function OCRScanner() {
 
   const handleRetake = () => {
     setImagePreview(null);
+    setRawCapturedImage(null);
     setBase64Image(null);
     setResults(null);
     setError(null);
-    setIsEditing(false);
-    setShowRawOcr(false);
+    setPreviewBrightness(1.0);
+    if (activeTab === "camera") {
+      startCamera();
+    }
   };
 
   const saveEdits = () => {
     if (!results) return;
     setResults({
       ...results,
-      clinic_name: editClinic || null,
-      doctor_name: editDoctor || null,
-      patient_name: editPatient || null,
-      patient_age: editAge || null,
-      patient_gender: editGender || null,
+      clinic_name: editClinic,
+      doctor_name: editDoctor,
+      patient_name: editPatient,
+      patient_age: editAge,
+      patient_gender: editGender,
       vitals: {
-        bp: editBp || null,
-        pulse: editPulse || null,
-        temp: editTemp || null,
-        spo2: editSpo2 || null
+        bp: editBp,
+        pulse: editPulse,
+        temp: editTemp,
+        spo2: editSpo2
       },
       diagnoses: editDiagnoses,
       medications: editMedications
@@ -232,12 +283,11 @@ export default function OCRScanner() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Hidden processing canvas */}
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Top Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link 
@@ -306,13 +356,14 @@ export default function OCRScanner() {
               activeTab === "camera" ? (
                 /* Live WebRTC Camera Stream */
                 <div className="flex flex-col flex-1">
-                  <div className="relative rounded-2xl overflow-hidden bg-black flex-1 min-h-[360px] flex items-center justify-center border border-gray-200">
+                  <div className="relative rounded-2xl overflow-hidden bg-black flex-1 min-h-[380px] flex items-center justify-center border border-gray-200">
                     <video
                       ref={videoRef}
                       playsInline
                       autoPlay
                       muted
                       className="w-full h-full object-cover"
+                      style={{ transform: zoomLevel > 1 ? `scale(${zoomLevel})` : "none", transformOrigin: "center center" }}
                     />
 
                     {/* High-Visibility Framing Guidelines Overlay */}
@@ -324,7 +375,7 @@ export default function OCRScanner() {
                       <div className="text-center">
                         <span className="text-[11px] font-bold text-white bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full shadow-lg inline-flex items-center gap-1.5">
                           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                          Position prescription flat inside frame
+                          Fit prescription flat inside frame
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -342,27 +393,69 @@ export default function OCRScanner() {
                       </div>
                     )}
 
-                    {/* Top Controls: Camera Flip & Timer */}
-                    <div className="absolute top-3 right-3 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTimerEnabled(prev => !prev)}
-                        className={`p-2 rounded-full backdrop-blur-md transition-colors cursor-pointer text-xs flex items-center gap-1 ${
-                          timerEnabled ? "bg-emerald-500 text-white font-bold" : "bg-black/50 hover:bg-black/70 text-white"
-                        }`}
-                        title="Toggle 3s Timer"
-                      >
-                        <Clock className="w-4 h-4" />
-                        <span className="text-[10px]">3s</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={toggleCameraFacing}
-                        className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm transition-colors cursor-pointer"
-                        title="Switch Camera"
-                      >
-                        <SwitchCamera className="w-4 h-4" />
-                      </button>
+                    {/* Top Viewfinder Bar: Zoom, Lighting & Timer */}
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
+                      {/* Zoom Controls */}
+                      <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md p-1 rounded-xl border border-white/20 text-white text-xs">
+                        <ZoomIn className="w-3.5 h-3.5 ml-1 text-slate-300" />
+                        {[1, 1.5, 2].map(z => (
+                          <button
+                            key={z}
+                            type="button"
+                            onClick={() => setZoomLevel(z)}
+                            className={`px-2 py-0.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                              zoomLevel === z ? "bg-[#0f4c81] text-white" : "text-white/70 hover:text-white"
+                            }`}
+                          >
+                            {z}x
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Lighting & Timer Controls */}
+                      <div className="flex items-center gap-2">
+                        {/* Exposure Mode */}
+                        <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md p-1 rounded-xl border border-white/20 text-white text-xs">
+                          <Sun className="w-3.5 h-3.5 ml-1 text-amber-400" />
+                          <button
+                            type="button"
+                            onClick={() => setExposureMode("normal")}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                              exposureMode === "normal" ? "bg-white text-slate-900" : "text-white/70 hover:text-white"
+                            }`}
+                          >
+                            Normal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setExposureMode("bright")}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                              exposureMode === "bright" ? "bg-amber-400 text-slate-900" : "text-white/70 hover:text-white"
+                            }`}
+                          >
+                            Bright
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setTimerEnabled(prev => !prev)}
+                          className={`p-2 rounded-xl backdrop-blur-md transition-colors cursor-pointer text-xs flex items-center gap-1 ${
+                            timerEnabled ? "bg-emerald-500 text-white font-bold" : "bg-black/60 border border-white/20 text-white"
+                          }`}
+                          title="Toggle 3s Timer"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={toggleCameraFacing}
+                          className="p-2 bg-black/60 border border-white/20 text-white rounded-xl backdrop-blur-md transition-colors cursor-pointer"
+                          title="Switch Camera"
+                        >
+                          <SwitchCamera className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -404,6 +497,42 @@ export default function OCRScanner() {
             ) : (
               /* Image Captured / Selected Preview */
               <div className="flex flex-col h-full">
+                {/* Real-time Preview Lighting Bar */}
+                <div className="flex items-center justify-between mb-3 bg-slate-100 p-2.5 rounded-xl border border-slate-200 text-xs">
+                  <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <Sun className="w-4 h-4 text-amber-500" /> Image Lighting:
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => adjustPreviewBrightness(1.0)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        previewBrightness === 1.0 ? "bg-[#0f4c81] text-white shadow-xs" : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      Natural (1x)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => adjustPreviewBrightness(1.25)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        previewBrightness === 1.25 ? "bg-[#0f4c81] text-white shadow-xs" : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      Bright (+25%)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => adjustPreviewBrightness(1.50)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        previewBrightness === 1.50 ? "bg-[#0f4c81] text-white shadow-xs" : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      Auto-Boost (+50%)
+                    </button>
+                  </div>
+                </div>
+
                 <div className="relative rounded-xl overflow-hidden border border-gray-200 flex-1 min-h-[340px] bg-slate-900 flex items-center justify-center">
                   <img 
                     src={imagePreview} 
@@ -470,7 +599,7 @@ export default function OCRScanner() {
                 <Loader2 className="w-12 h-12 text-[#0f4c81] animate-spin mb-4" />
                 <h3 className="font-extrabold text-[#0f2942] text-base">Reading Medical Handwriting...</h3>
                 <p className="text-xs max-w-xs mt-1 text-slate-600">
-                  Optical Vision engine is reading the prescription and resolving clinical entities.
+                  Optical Vision engine is transcribing handwriting and reasoning clinical entities with Medical RAG.
                 </p>
               </div>
             ) : results ? (
@@ -479,7 +608,7 @@ export default function OCRScanner() {
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between shadow-2xs">
                   <div>
                     <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Document Type</span>
-                    <span className="font-bold text-[#0f2942] text-sm">{results.document_type || "Prescription"}</span>
+                    <span className="font-bold text-[#0f2942] text-sm">{results.document_type || "Doctor Prescription (OPD)"}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
@@ -503,7 +632,7 @@ export default function OCRScanner() {
                         />
                       ) : (
                         <span className="font-extrabold text-[#0f4c81] text-xs uppercase tracking-wide">
-                          🏥 {results.clinic_name || <span className="text-gray-400 italic">Not detected (click edit to set)</span>}
+                          🏥 {results.clinic_name || <span className="text-gray-400 italic">Not detected</span>}
                         </span>
                       )}
                     </div>
@@ -515,8 +644,8 @@ export default function OCRScanner() {
                           type="text"
                           value={editDoctor}
                           onChange={e => setEditDoctor(e.target.value)}
-                          placeholder="e.g. Dr. Santhosh Patil"
-                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-slate-800"
+                          placeholder="e.g. Dr. Sachin Patil MBBS"
+                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 text-right"
                         />
                       ) : (
                         <span className="text-[11px] text-slate-700 font-bold">
@@ -563,7 +692,7 @@ export default function OCRScanner() {
                         </div>
                       ) : (
                         <strong className="text-slate-800">
-                          {results.patient_age ? `${results.patient_age} yrs` : "--"} / {results.patient_gender || "--"}
+                          {results.patient_age ? `${results.patient_age}` : "--"} / {results.patient_gender || "--"}
                         </strong>
                       )}
                     </div>
@@ -597,7 +726,7 @@ export default function OCRScanner() {
                           type="text"
                           value={editPulse}
                           onChange={e => setEditPulse(e.target.value)}
-                          placeholder="72"
+                          placeholder="72 bpm"
                           className="w-full bg-white border border-rose-300 rounded text-center text-xs font-bold text-rose-900 mt-1 py-0.5"
                         />
                       ) : (
@@ -611,7 +740,7 @@ export default function OCRScanner() {
                           type="text"
                           value={editTemp}
                           onChange={e => setEditTemp(e.target.value)}
-                          placeholder="98.6"
+                          placeholder="98.6 °F"
                           className="w-full bg-white border border-amber-300 rounded text-center text-xs font-bold text-amber-900 mt-1 py-0.5"
                         />
                       ) : (
@@ -647,7 +776,7 @@ export default function OCRScanner() {
                           type="text"
                           value={newDiagnosis}
                           onChange={e => setNewDiagnosis(e.target.value)}
-                          placeholder="Add diagnosis (e.g. Acute Viral Fever)"
+                          placeholder="Add diagnosis (e.g. Bronchial Asthma)"
                           className="flex-1 bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs"
                           onKeyDown={e => {
                             if (e.key === "Enter" && newDiagnosis.trim()) {
@@ -664,7 +793,7 @@ export default function OCRScanner() {
                               setNewDiagnosis("");
                             }
                           }}
-                          className="bg-purple-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-purple-700"
+                          className="bg-purple-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-purple-700 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
@@ -726,7 +855,7 @@ export default function OCRScanner() {
                               setNewMedication("");
                             }
                           }}
-                          className="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-blue-700"
+                          className="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-blue-700 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
@@ -761,6 +890,51 @@ export default function OCRScanner() {
                     <p className="text-xs text-gray-400 italic">No medications found in document</p>
                   )}
                 </div>
+
+                {/* Medical RAG Clinical Decision Support Card */}
+                {results.rag_decision_support && (
+                  <div className="p-3.5 bg-gradient-to-br from-indigo-50/80 via-blue-50/60 to-white border border-indigo-200 rounded-xl text-xs space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-bold text-indigo-950">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        Clinical Decision Support & Protocols
+                      </span>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+                        {results.rag_decision_support.urgency} Urgency
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-800">
+                      <strong>Matched Protocol:</strong> {results.rag_decision_support.condition}
+                    </div>
+
+                    {results.rag_decision_support.contraindications?.length > 0 && (
+                      <div className="text-[11px] text-amber-950 bg-amber-50/90 p-2.5 rounded-lg border border-amber-200">
+                        <strong className="flex items-center gap-1 text-amber-800 mb-1">
+                          <ShieldAlert className="w-3.5 h-3.5" /> Clinical Safety Alert & Contraindications:
+                        </strong>
+                        <ul className="list-disc ml-4 space-y-0.5 text-amber-900">
+                          {results.rag_decision_support.contraindications.slice(0, 2).map((c: string, idx: number) => (
+                            <li key={idx}>{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {results.rag_decision_support.recommendedWorkup?.length > 0 && (
+                      <div className="text-[11px] text-blue-950 bg-blue-50/80 p-2 rounded-lg border border-blue-200">
+                        <strong className="block text-[#0f4c81] mb-1">Recommended Diagnostic Workup:</strong>
+                        <div className="flex flex-wrap gap-1.5">
+                          {results.rag_decision_support.recommendedWorkup.slice(0, 3).map((w: string, idx: number) => (
+                            <span key={idx} className="bg-white border border-blue-200 px-2 py-0.5 rounded text-[10px] font-semibold text-slate-700">
+                              {w}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Raw Optical OCR Detections Inspector */}
                 {results.raw_ocr_lines && results.raw_ocr_lines.length > 0 && (
