@@ -121,7 +121,11 @@ export default function FloatingAssistant({ currentStep = 1, onNavigate, onActio
       reply = "Language switched to English.";
     }
     // 2. Navigation Commands
-    else if (text.includes("ayush") || text.includes("prakriti") || text.includes("ayurveda") || text.includes("dosha")) {
+    else if (text.includes("rag") || text.includes("decision support") || text.includes("clinical ai")) {
+      router.push("/his/rag");
+      if (onAction) onAction("open_rag");
+      reply = "Opening Clinical RAG Co-Pilot & Decision Support Console.";
+    } else if (text.includes("ayush") || text.includes("prakriti") || text.includes("ayurveda") || text.includes("dosha")) {
       router.push("/his/ayush");
       if (onAction) onAction("open_ayush");
       reply = "Opening AYUSH Pariksha & Prakriti Profiler.";

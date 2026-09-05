@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { 
-  ClipboardList, Stethoscope, ArrowLeft, Camera, Leaf, Shield, Users, Building2 
+  ClipboardList, Stethoscope, ArrowLeft, Camera, Leaf, Shield, Users, Building2, Sparkles 
 } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -66,6 +66,14 @@ export default function HisSelectionPage() {
       icon: <Users className="w-8 h-8" />,
       color: "amber",
       badge: "Queue Ops"
+    },
+    {
+      href: "/his/rag",
+      title: "Clinical RAG Co-Pilot",
+      desc: "Multi-architectured medical knowledge retrieval, telemetry inspector, and dynamic chip synthesizer.",
+      icon: <Sparkles className="w-8 h-8" />,
+      color: "indigo",
+      badge: "Clinical AI"
     }
   ];
 

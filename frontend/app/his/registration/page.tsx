@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, UserPlus, FileHeart, QrCode, ClipboardCheck, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, UserPlus, FileHeart, QrCode, ClipboardCheck, Sparkles, Loader2, KeyRound, Smartphone, ShieldCheck, RefreshCw } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ChipParameterModal, ParamConfig } from "@/components/ChipParameterModal";
-
+import { AbhaSmartCard, AbhaPatientProfile } from "@/components/AbhaSmartCard";
+import { AbhaCreationModal } from "@/components/AbhaCreationModal";
 
 export default function RegistrationDashboard() {
   const { t, setLanguage } = useLanguage();
@@ -15,6 +16,8 @@ export default function RegistrationDashboard() {
     phone: "",
     abhaId: "",
   });
+  const [fullPatientProfile, setFullPatientProfile] = useState<AbhaPatientProfile | null>(null);
+  const [isAbhaModalOpen, setIsAbhaModalOpen] = useState(false);
   const [vitals, setVitals] = useState({
     weight: "",
     bp: "",
@@ -32,18 +35,44 @@ export default function RegistrationDashboard() {
   const [chipAnswers, setChipAnswers] = useState<Record<string, any>>({});
   const [isLoadingChips, setIsLoadingChips] = useState(false);
 
+  const handleAbhaVerified = (profile: AbhaPatientProfile) => {
+    setFullPatientProfile(profile);
+    setPatientData({
+      name: profile.name,
+      phone: profile.phone,
+      abhaId: profile.abhaId
+    });
+    localStorage.setItem("mockAbhaId", profile.abhaId);
+  };
+
   const generateMockAbha = async () => {
     setIsGeneratingAbha(true);
-    // Simulate ABDM Delay
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 800));
     const p1 = Math.floor(1000 + Math.random() * 9000);
     const p2 = Math.floor(1000 + Math.random() * 9000);
     const p3 = Math.floor(1000 + Math.random() * 9000);
-    const newAbha = `91-${p1}-${p2}-${p3}`;
+    const newAbha = `14-${p1}-${p2}-${p3}`;
     
-    setPatientData({ ...patientData, abhaId: newAbha });
-    
-    // BUG 1 FIX: Store locally for easy access in the demo Patient Portal
+    const mockProfile: AbhaPatientProfile = {
+      name: patientData.name || "Suresh Kumar",
+      abhaId: newAbha,
+      abhaAddress: `${(patientData.name || "suresh").toLowerCase().replace(/\s+/g, ".")}@abdm`,
+      gender: "Male",
+      dob: "10 Oct 1980",
+      yearOfBirth: "1980",
+      bloodGroup: "B+",
+      phone: patientData.phone || "9876543210",
+      district: "Hyderabad",
+      state: "Telangana",
+      organDonorPledge: true
+    };
+
+    setFullPatientProfile(mockProfile);
+    setPatientData({
+      name: mockProfile.name,
+      phone: mockProfile.phone,
+      abhaId: newAbha
+    });
     localStorage.setItem("mockAbhaId", newAbha);
     setIsGeneratingAbha(false);
   };
@@ -215,26 +244,71 @@ export default function RegistrationDashboard() {
                 </div>
 
                 <div className="mt-8 border-t border-gray-100 pt-6">
-                  <h3 className="text-lg font-bold text-[#0f2942] mb-4">ABHA ID (Sandbox Mock)</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-[#0f2942]">ABDM Ayushman Identity & ABHA ID</h3>
+                      <p className="text-xs text-gray-500">Fast digital verification via Aadhaar e-KYC or Counter Scan & Share.</p>
+                    </div>
+                    {patientData.abhaId && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAbhaModalOpen(true)}
+                        className="text-xs font-bold text-[#0f4c81] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Re-Verify ABHA
+                      </button>
+                    )}
+                  </div>
                   
                   {patientData.abhaId ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-green-700 font-semibold mb-1">Generated ABHA Address</p>
-                        <p className="text-xl font-bold text-green-900 tracking-wider">{patientData.abhaId}</p>
-                      </div>
-                      <ClipboardCheck className="w-8 h-8 text-green-600" />
+                    <div className="space-y-4">
+                      {/* Photorealistic Smart Card Preview */}
+                      <AbhaSmartCard 
+                        patient={fullPatientProfile || {
+                          name: patientData.name || "Suresh Kumar",
+                          abhaId: patientData.abhaId,
+                          abhaAddress: `${(patientData.name || "suresh").toLowerCase().replace(/\s+/g, ".")}@abdm`,
+                          gender: "Male",
+                          dob: "10 Oct 1980",
+                          yearOfBirth: "1980",
+                          bloodGroup: "B+",
+                          phone: patientData.phone || "9876543210",
+                          state: "Telangana",
+                          organDonorPledge: true
+                        }} 
+                        compact={true}
+                      />
                     </div>
                   ) : (
-                    <button 
-                      onClick={generateMockAbha}
-                      disabled={isGeneratingAbha}
-                      className="w-full py-4 border-2 border-dashed border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                    >
-                      {isGeneratingAbha ? "Simulating ABDM Sandbox..." : (
-                        <><QrCode className="w-5 h-5" /> Generate Mock ABHA ID</>
-                      )}
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <button 
+                        type="button"
+                        onClick={() => setIsAbhaModalOpen(true)}
+                        className="p-4 border-2 border-dashed border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-2xl flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer text-center"
+                      >
+                        <KeyRound className="w-6 h-6 text-emerald-600" />
+                        <span className="text-xs">Aadhaar e-KYC (Instant OTP)</span>
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={() => setIsAbhaModalOpen(true)}
+                        className="p-4 border-2 border-dashed border-blue-300 bg-blue-50 hover:bg-blue-100 text-[#0f4c81] font-bold rounded-2xl flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer text-center"
+                      >
+                        <QrCode className="w-6 h-6 text-[#0f4c81]" />
+                        <span className="text-xs">Scan & Share QR at Counter</span>
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={generateMockAbha}
+                        disabled={isGeneratingAbha}
+                        className="p-4 border-2 border-dashed border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-2xl flex flex-col items-center justify-center gap-2 transition-colors cursor-pointer text-center disabled:opacity-50"
+                      >
+                        {isGeneratingAbha ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6 text-purple-600" />}
+                        <span className="text-xs">{isGeneratingAbha ? "Connecting..." : "⚡ Fast Quick Generate"}</span>
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -395,6 +469,14 @@ export default function RegistrationDashboard() {
         }}
         onComplete={handleChipComplete}
         currentAnswers={chipAnswers}
+      />
+
+      {/* ABDM Ayushman Identity Creation Modal */}
+      <AbhaCreationModal
+        isOpen={isAbhaModalOpen}
+        onClose={() => setIsAbhaModalOpen(false)}
+        onSuccess={handleAbhaVerified}
+        initialMobile={patientData.phone}
       />
     </main>
   );

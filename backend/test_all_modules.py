@@ -94,6 +94,12 @@ def test_medical_rag_engine():
     assert any(opt.get("isRedFlag") for q in res_fever["guideline"]["diagnosticQuestions"] for opt in q["options"])
     print("[PASS] Test 3 Passed: Dengue / Febrile illness matched with dynamic diagnostic chip parameters.")
 
+    # Test 4: Dynamic on-the-fly clinical question synthesizer for uncataloged complaint
+    res_dyn = retrieve_medical_guideline("Excruciating right flank pain radiating to groin with bloody urine")
+    assert "guideline" in res_dyn and len(res_dyn["guideline"]["diagnosticQuestions"]) >= 2
+    assert res_dyn["retrieval_architecture"]["dense_score"] > 0
+    print("[PASS] Test 4 Passed: Dynamic On-The-Fly Clinical Synthesizer generated bespoke diagnostic questions.")
+
 def test_chip_parameter_generation():
     print("\n--- 3. Testing Dynamic Chip Parameter Model Schema ---")
     
