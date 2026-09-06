@@ -28,86 +28,97 @@ export default function QueueTrackerPage() {
   const [announcementAudio, setAnnouncementAudio] = useState(true);
   const [smsNotificationStatus, setSmsNotificationStatus] = useState<string | null>(null);
 
-  const [tokens, setTokens] = useState<QueueToken[]>([
-    {
-      tokenNumber: 101,
-      patientName: "Suresh Kumar",
-      abhaId: "91-4920-1928-3847",
-      phone: "9876501234",
-      department: "Cardiology",
-      roomNumber: "Room 102",
-      doctorName: "Dr. Arvind Rao",
-      urgency: "High",
-      status: "IN_CONSULT",
-      registrationTime: "09:30 AM",
-      estimatedWaitMinutes: 0
-    },
-    {
-      tokenNumber: 102,
-      patientName: "Ananya Sen",
-      abhaId: "91-3829-5729-1920",
-      phone: "9845012345",
-      department: "General Medicine",
-      roomNumber: "Room 101",
-      doctorName: "Dr. Anita Sengupta",
-      urgency: "Normal",
-      status: "CALLED",
-      registrationTime: "09:42 AM",
-      estimatedWaitMinutes: 0
-    },
-    {
-      tokenNumber: 103,
-      patientName: "Mohd. Ibrahim",
-      abhaId: "91-8492-0192-4829",
-      phone: "9912345678",
-      department: "General Medicine",
-      roomNumber: "Room 101",
-      doctorName: "Dr. Anita Sengupta",
-      urgency: "Normal",
-      status: "WAITING",
-      registrationTime: "09:55 AM",
-      estimatedWaitMinutes: 8
-    },
-    {
-      tokenNumber: 104,
-      patientName: "Kamala Devi",
-      abhaId: "91-5839-2910-3847",
-      phone: "9876543210",
-      department: "Cardiology",
-      roomNumber: "Room 102",
-      doctorName: "Dr. Arvind Rao",
-      urgency: "High",
-      status: "WAITING",
-      registrationTime: "10:05 AM",
-      estimatedWaitMinutes: 14
-    },
-    {
-      tokenNumber: 105,
-      patientName: "Rajeshwar Varma",
-      abhaId: "91-2849-1029-4820",
-      phone: "9123456789",
-      department: "AYUSH / Integrative",
-      roomNumber: "Room 105",
-      doctorName: "Vaidya Shastry",
-      urgency: "Normal",
-      status: "WAITING",
-      registrationTime: "10:12 AM",
-      estimatedWaitMinutes: 20
-    },
-    {
-      tokenNumber: 106,
-      patientName: "Basheer Ahmed",
-      abhaId: "91-7483-9201-3849",
-      phone: "9786543210",
-      department: "Pulmonology",
-      roomNumber: "Room 103",
-      doctorName: "Dr. Meenakshi",
-      urgency: "High",
-      status: "WAITING",
-      registrationTime: "10:18 AM",
-      estimatedWaitMinutes: 26
+  const [tokens, setTokens] = useState<QueueToken[]>([]);
+  const [showAddWalkIn, setShowAddWalkIn] = useState(false);
+  const [newPatientName, setNewPatientName] = useState("");
+  const [newPatientDept, setNewPatientDept] = useState("General Medicine");
+
+  // Dynamic queue loading from backend and browser local storage
+  const loadQueue = async () => {
+    let loaded: QueueToken[] = [];
+    try {
+      const stored = typeof window !== "undefined" ? localStorage.getItem("samanvaya_queue") : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          loaded = parsed;
+        }
+      }
+    } catch {}
+
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${baseUrl}/api/db/queue`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.queue && Array.isArray(data.queue) && data.queue.length > 0) {
+          const dbTokens: QueueToken[] = data.queue.map((q: any, i: number) => ({
+            tokenNumber: parseInt(String(q.token_number || "").replace(/\D/g, "") || String(101 + i)),
+            patientName: q.patients?.name || "OPD Patient",
+            abhaId: q.patients?.abha_id || `14-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
+            phone: q.patients?.phone || `98${Math.floor(10000000 + Math.random() * 90000000)}`,
+            department: q.department || "General Medicine",
+            roomNumber: q.department === "Cardiology" ? "Room 102" : "Room 101",
+            doctorName: "Dr. On-Duty Specialist",
+            urgency: q.urgency === "High" || q.urgency === "Emergency" ? q.urgency : "Normal",
+            status: "WAITING",
+            registrationTime: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+            estimatedWaitMinutes: (i + 1) * 8
+          }));
+          loaded = [...loaded, ...dbTokens.filter(d => !loaded.some(l => l.tokenNumber === d.tokenNumber))];
+        }
+      }
+    } catch (err) {
+      console.warn("Notice: Live DB queue query notice:", err);
     }
-  ]);
+
+    setTokens(loaded);
+  };
+
+  useEffect(() => {
+    loadQueue();
+    const interval = setInterval(loadQueue, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const issueLiveToken = (name?: string, dept?: string) => {
+    const nextNum = (tokens.length > 0 ? Math.max(...tokens.map(t => t.tokenNumber)) : 100) + 1;
+    const resolvedName = name?.trim() || `Walk-in Patient #${nextNum}`;
+    const resolvedDept = dept || "General Medicine";
+    const roomMap: Record<string, { room: string; doc: string }> = {
+      "General Medicine": { room: "Room 101", doc: "Dr. On-Duty Physician" },
+      "Cardiology": { room: "Room 102", doc: "Dr. Arvind Rao" },
+      "Pulmonology": { room: "Room 103", doc: "Dr. Meenakshi" },
+      "AYUSH / Integrative": { room: "Room 105", doc: "Vaidya Shastry" }
+    };
+    const info = roomMap[resolvedDept] || { room: "Room 101", doc: "Dr. On-Duty Physician" };
+
+    const p1 = Math.floor(1000 + Math.random() * 9000);
+    const p2 = Math.floor(1000 + Math.random() * 9000);
+    const p3 = Math.floor(1000 + Math.random() * 9000);
+
+    const newToken: QueueToken = {
+      tokenNumber: nextNum,
+      patientName: resolvedName,
+      abhaId: `14-${p1}-${p2}-${p3}`,
+      phone: `98${Math.floor(10000000 + Math.random() * 90000000)}`,
+      department: resolvedDept,
+      roomNumber: info.room,
+      doctorName: info.doc,
+      urgency: "Normal",
+      status: "WAITING",
+      registrationTime: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      estimatedWaitMinutes: (tokens.filter(t => t.status === "WAITING").length + 1) * 8
+    };
+
+    const updated = [...tokens, newToken];
+    setTokens(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("samanvaya_queue", JSON.stringify(updated));
+    }
+    setShowAddWalkIn(false);
+    setNewPatientName("");
+  };
 
   const departments = ["All", "General Medicine", "Cardiology", "Pulmonology", "AYUSH / Integrative"];
 
@@ -336,10 +347,64 @@ export default function QueueTrackerPage() {
             ))}
           </div>
 
-          <div className="text-xs text-gray-500 font-medium">
-            Waiting in Queue: <span className="font-bold text-gray-900">{waitingTokens.length} patients</span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAddWalkIn(!showAddWalkIn)}
+              className="bg-[#0f4c81] hover:bg-blue-900 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+            >
+              + Issue Walk-in Token
+            </button>
+            <div className="text-xs text-gray-500 font-medium">
+              Waiting in Queue: <span className="font-bold text-gray-900">{waitingTokens.length} patients</span>
+            </div>
           </div>
         </div>
+
+        {/* Walk-in Add Modal */}
+        {showAddWalkIn && (
+          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 mb-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex-1 w-full sm:w-auto">
+              <label className="text-[11px] font-bold text-[#0f2942] block mb-1">Patient Full Name</label>
+              <input
+                type="text"
+                value={newPatientName}
+                onChange={e => setNewPatientName(e.target.value)}
+                placeholder="Enter patient name"
+                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-[#0f4c81]"
+              />
+            </div>
+            <div className="w-full sm:w-60">
+              <label className="text-[11px] font-bold text-[#0f2942] block mb-1">Assigned Department</label>
+              <select
+                value={newPatientDept}
+                onChange={e => setNewPatientDept(e.target.value)}
+                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-[#0f4c81]"
+              >
+                <option value="General Medicine">General Medicine</option>
+                <option value="Cardiology">Cardiology</option>
+                <option value="Pulmonology">Pulmonology</option>
+                <option value="AYUSH / Integrative">AYUSH / Integrative</option>
+              </select>
+            </div>
+            <div className="pt-4 sm:pt-0 flex gap-2">
+              <button
+                type="button"
+                onClick={() => issueLiveToken(newPatientName, newPatientDept)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors cursor-pointer"
+              >
+                Generate Token
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddWalkIn(false)}
+                className="bg-white border border-gray-300 text-gray-600 text-xs px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Queue Table / Grid */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
@@ -357,81 +422,99 @@ export default function QueueTrackerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredTokens.map((t) => (
-                  <tr key={t.tokenNumber} className={`hover:bg-slate-50/80 transition-colors ${t.status === "CALLED" ? "bg-amber-50/50" : ""}`}>
-                    <td className="p-4">
-                      <span className="font-mono font-extrabold text-base text-[#0f4c81]">#{t.tokenNumber}</span>
-                      <div className="text-[10px] text-gray-400 mt-0.5">{t.registrationTime}</div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="font-bold text-gray-900 text-sm">{t.patientName}</div>
-                      <div className="text-[11px] font-mono text-gray-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3" /> +91-{t.phone}
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="font-semibold text-gray-800">{t.department}</div>
-                      <div className="text-[11px] text-emerald-700 font-bold">{t.roomNumber} ({t.doctorName})</div>
-                    </td>
-
-                    <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        t.urgency === "Emergency" 
-                          ? "bg-red-100 text-red-800" 
-                          : (t.urgency === "High" ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700")
-                      }`}>
-                        {t.urgency}
-                      </span>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="flex items-center gap-1 text-gray-700 font-semibold">
-                        <Clock className="w-3.5 h-3.5 text-gray-400" />
-                        <span>~{t.estimatedWaitMinutes} mins</span>
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        t.status === "CALLED" 
-                          ? "bg-amber-100 text-amber-800 animate-pulse" 
-                          : (t.status === "IN_CONSULT" 
-                              ? "bg-purple-100 text-purple-800" 
-                              : (t.status === "COMPLETED" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-600"))
-                      }`}>
-                        {t.status}
-                      </span>
-                    </td>
-
-                    <td className="p-4 text-right">
-                      {t.status === "WAITING" && (
-                        <button
-                          type="button"
-                          onClick={() => handleCallNext(t)}
-                          className="bg-[#0f4c81] hover:bg-blue-900 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
-                        >
-                          Call Token
-                        </button>
-                      )}
-                      {t.status === "CALLED" && (
-                        <button
-                          type="button"
-                          onClick={() => handleMarkComplete(t.tokenNumber)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
-                        >
-                          Finish
-                        </button>
-                      )}
-                      {t.status === "COMPLETED" && (
-                        <span className="text-emerald-600 font-semibold flex items-center justify-end gap-1 text-xs">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Completed
-                        </span>
-                      )}
+                {filteredTokens.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-gray-500">
+                      <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="font-bold text-gray-700 text-sm">No Patients Currently Waiting in This Department</p>
+                      <p className="text-xs text-gray-400 mt-1">New tokens registered via Kiosk or walk-in desk will appear here automatically.</p>
+                      <button
+                        type="button"
+                        onClick={() => issueLiveToken()}
+                        className="mt-3 bg-[#0f4c81] text-white text-xs font-semibold px-4 py-1.5 rounded-lg hover:bg-blue-900 cursor-pointer"
+                      >
+                        + Issue Instant Token
+                      </button>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredTokens.map((t) => (
+                    <tr key={t.tokenNumber} className={`hover:bg-slate-50/80 transition-colors ${t.status === "CALLED" ? "bg-amber-50/50" : ""}`}>
+                      <td className="p-4">
+                        <span className="font-mono font-extrabold text-base text-[#0f4c81]">#{t.tokenNumber}</span>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{t.registrationTime}</div>
+                      </td>
+
+                      <td className="p-4">
+                        <div className="font-bold text-gray-900 text-sm">{t.patientName}</div>
+                        <div className="text-[11px] font-mono text-gray-500 flex items-center gap-1 mt-0.5">
+                          <Phone className="w-3 h-3" /> +91-{t.phone}
+                        </div>
+                      </td>
+
+                      <td className="p-4">
+                        <div className="font-semibold text-gray-800">{t.department}</div>
+                        <div className="text-[11px] text-emerald-700 font-bold">{t.roomNumber} ({t.doctorName})</div>
+                      </td>
+
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          t.urgency === "Emergency" 
+                            ? "bg-red-100 text-red-800" 
+                            : (t.urgency === "High" ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700")
+                        }`}>
+                          {t.urgency}
+                        </span>
+                      </td>
+
+                      <td className="p-4">
+                        <div className="flex items-center gap-1 text-gray-700 font-semibold">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          <span>~{t.estimatedWaitMinutes} mins</span>
+                        </div>
+                      </td>
+
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          t.status === "CALLED" 
+                            ? "bg-amber-100 text-amber-800 animate-pulse" 
+                            : (t.status === "IN_CONSULT" 
+                                ? "bg-purple-100 text-purple-800" 
+                                : (t.status === "COMPLETED" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-600"))
+                        }`}>
+                          {t.status}
+                        </span>
+                      </td>
+
+                      <td className="p-4 text-right">
+                        {t.status === "WAITING" && (
+                          <button
+                            type="button"
+                            onClick={() => handleCallNext(t)}
+                            className="bg-[#0f4c81] hover:bg-blue-900 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
+                          >
+                            Call Token
+                          </button>
+                        )}
+                        {t.status === "CALLED" && (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkComplete(t.tokenNumber)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
+                          >
+                            Done
+                          </button>
+                        )}
+                        {t.status === "IN_CONSULT" && (
+                          <span className="text-purple-700 font-bold text-xs">With Doctor</span>
+                        )}
+                        {t.status === "COMPLETED" && (
+                          <span className="text-emerald-700 font-bold text-xs">Closed</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

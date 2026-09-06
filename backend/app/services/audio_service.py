@@ -1,9 +1,10 @@
+import os
 import requests
 import io
+from app.core.key_rotator import key_rotator
 
-# API Keys provided by user
-WHISPER_KEY = "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"
-MAGPIE_KEY = "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"
+WHISPER_KEY = os.getenv("NVIDIA_WHISPER_KEY") or key_rotator.get_llama_3_3_70b_key() or ""
+MAGPIE_KEY = os.getenv("NVIDIA_MAGPIE_KEY") or key_rotator.get_llama_3_3_70b_key() or ""
 
 def transcribe_audio(audio_bytes: bytes) -> str:
     """

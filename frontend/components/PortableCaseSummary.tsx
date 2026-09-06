@@ -2,7 +2,25 @@
 import React from 'react';
 import { Printer, QrCode, FileText, User, ClipboardList, Stethoscope, Pill } from 'lucide-react';
 
-export default function PortableCaseSummary() {
+interface PortableCaseSummaryProps {
+    patientName?: string;
+    abhaId?: string;
+    chiefComplaint?: string;
+    vitalsSummary?: string;
+    allergies?: string;
+    currentMedications?: string;
+    knownConditions?: string;
+}
+
+export default function PortableCaseSummary({
+    patientName = "Patient Record",
+    abhaId = "14-XXXX-XXXX-XXXX",
+    chiefComplaint = "Acute health condition under physician evaluation.",
+    vitalsSummary = "Vitals recorded at triage screening.",
+    allergies = "None reported",
+    currentMedications = "As per active prescription record",
+    knownConditions = "Under clinical evaluation"
+}: PortableCaseSummaryProps) {
     return (
         <div className="bg-white border border-gray-200 shadow-sm p-8 max-w-3xl mx-auto font-sans text-gray-800">
             {/* Header */}
@@ -27,14 +45,14 @@ export default function PortableCaseSummary() {
                     <User className="text-gray-400" />
                     <div>
                         <p className="text-xs text-gray-500 uppercase">Patient Name</p>
-                        <p className="font-semibold text-gray-900">Ramesh Kumar (42/M)</p>
+                        <p className="font-semibold text-gray-900">{patientName}</p>
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
                     <FileText className="text-gray-400" />
                     <div>
                         <p className="text-xs text-gray-500 uppercase">ABHA ID (Linked)</p>
-                        <p className="font-semibold text-gray-900">14-2234-9981-0021</p>
+                        <p className="font-semibold text-gray-900">{abhaId}</p>
                     </div>
                 </div>
             </div>
@@ -49,7 +67,7 @@ export default function PortableCaseSummary() {
                         <h2 className="text-lg font-bold uppercase tracking-wide">Chief Complaint</h2>
                     </div>
                     <p className="text-gray-700 pl-6 border-l-2 border-gray-200 ml-2">
-                        Severe chest heaviness and generalized body ache for the past 3 days. Occasional dizziness when standing up.
+                        {chiefComplaint}
                     </p>
                 </section>
 
@@ -60,10 +78,9 @@ export default function PortableCaseSummary() {
                         <h2 className="text-lg font-bold uppercase tracking-wide">Reported History & Vitals</h2>
                     </div>
                     <ul className="list-disc pl-10 space-y-1 text-gray-700">
-                        <li><strong>Known Diabetic:</strong> Yes, currently on Metformin 500mg.</li>
-                        <li><strong>Recent Travel:</strong> None.</li>
-                        <li><strong>Allergies:</strong> Penicillin.</li>
-                        <li><strong>Vitals (ASHA screened):</strong> BP 140/90, Random Sugar 160 mg/dL.</li>
+                        <li><strong>Known Conditions:</strong> {knownConditions}</li>
+                        <li><strong>Allergies:</strong> {allergies}</li>
+                        <li><strong>Vitals / Triage Screening:</strong> {vitalsSummary}</li>
                     </ul>
                 </section>
 
@@ -74,7 +91,7 @@ export default function PortableCaseSummary() {
                         <h2 className="text-lg font-bold uppercase tracking-wide">Current Medications</h2>
                     </div>
                     <p className="text-gray-700 pl-6 border-l-2 border-gray-200 ml-2">
-                        Glycomet 500 (Metformin) - 1-0-1.
+                        {currentMedications}
                     </p>
                 </section>
 

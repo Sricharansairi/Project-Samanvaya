@@ -21,8 +21,7 @@ interface Step10Props {
 export default function Step10_ConfirmSubmit({ summaryData, confidence, onConfirm, onRetry, onBack }: Step10Props) {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   
-  // Simulate fetching a real confidence score if one isn't passed for the demo
-  const isLowConfidence = confidence !== undefined ? confidence < 0.7 : true; // Set to true for the demo to show it off
+  const isLowConfidence = confidence !== undefined ? confidence < 0.7 : false;
 
   const playFullSummaryAudio = () => {
     setIsPlayingAudio(true);

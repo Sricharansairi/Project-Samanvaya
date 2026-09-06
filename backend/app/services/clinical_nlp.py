@@ -10,8 +10,10 @@ import json
 import requests
 from typing import Dict, Any, List
 
+from app.core.key_rotator import key_rotator
+
 KIMI_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-KIMI_KEY = "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"
+KIMI_KEY = os.getenv("KIMI_API_KEY") or key_rotator.get_llama_3_3_70b_key() or ""
 
 VERNACULAR_PATTERNS = [
     {

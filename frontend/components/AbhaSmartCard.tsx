@@ -145,15 +145,15 @@ export function AbhaSmartCard({ patient, showActions = true, compact = false, on
                 <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 text-[11px]">
                   <div>
                     <span className="text-gray-500 font-medium block text-[9px] uppercase">DOB / YOB</span>
-                    <span className="font-bold text-gray-800">{patient.dob || patient.yearOfBirth || "1988"}</span>
+                    <span className="font-bold text-gray-800">{patient.dob || patient.yearOfBirth || "—"}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 font-medium block text-[9px] uppercase">Gender</span>
-                    <span className="font-bold text-gray-800">{patient.gender}</span>
+                    <span className="font-bold text-gray-800">{patient.gender || "—"}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 font-medium block text-[9px] uppercase">Blood Group</span>
-                    <span className="font-bold text-rose-600">{patient.bloodGroup || "O+"}</span>
+                    <span className="font-bold text-rose-600">{patient.bloodGroup || "—"}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 font-medium block text-[9px] uppercase">State</span>

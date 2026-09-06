@@ -771,7 +771,7 @@ export default function Home() {
                       required
                       value={grievanceData.name}
                       onChange={(e) => setGrievanceData({ ...grievanceData, name: e.target.value })}
-                      placeholder="e.g. Rajesh Kumar"
+                      placeholder="Enter your full name"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-[#0f4c81] outline-none"
                     />
                   </div>

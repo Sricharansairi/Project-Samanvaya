@@ -33,33 +33,75 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
   const handleMicToggle = () => {
     if (!isRecording) {
       setIsRecording(true);
-      setTimeout(() => {
-        const spoken = "Mujhe do din se bukhar aur tez khansi hai";
-        setComplaintText(spoken);
-        setIsRecording(false);
-        generateFollowupChips(spoken);
-      }, 2000);
+      if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SpeechRec();
+        recognition.lang = "hi-IN";
+        recognition.continuous = false;
+        recognition.onresult = (event: any) => {
+          const spoken = event.results[0][0].transcript;
+          setComplaintText(spoken);
+          setIsRecording(false);
+          generateFollowupChips(spoken);
+        };
+        recognition.onerror = () => {
+          setIsRecording(false);
+        };
+        recognition.start();
+      } else {
+        setTimeout(() => {
+          setIsRecording(false);
+        }, 1500);
+      }
     } else {
       setIsRecording(false);
     }
   };
 
   const generateFollowupChips = async (complaint: string) => {
+    if (!complaint.trim()) return;
     setIsGeneratingChips(true);
-    if (complaint.toLowerCase().includes("chest pain") || complaint.toLowerCase().includes("chhati")) {
+    const lower = complaint.toLowerCase();
+    if (lower.includes("chest pain") || lower.includes("chhati") || lower.includes("gunde noppi") || lower.includes("heart attack")) {
       onTriggerRedFlag();
+      setIsGeneratingChips(false);
       return;
     }
     
-    setTimeout(() => {
-      setDynamicChips([
-        "Severe body ache & chills",
-        "Loss of taste / smell",
-        "Worse at night",
-        "No chest pain"
-      ]);
-      setIsGeneratingChips(false);
-    }, 1000);
+    try {
+      const res = await fetch("/api/rag/interrogate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ complaint })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.parameterConfigs && data.parameterConfigs.length > 0) {
+          const generated = data.parameterConfigs.flatMap((cfg: any) => 
+            (cfg.options || []).map((o: any) => o.label)
+          ).slice(0, 6);
+          if (generated.length > 0) {
+            setDynamicChips(generated);
+            setIsGeneratingChips(false);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to generate dynamic chips from RAG:", e);
+    }
+
+    // Dynamic contextual chips based on clinical categories
+    if (lower.includes("fever") || lower.includes("bukhar") || lower.includes("jwaram")) {
+      setDynamicChips(["Severe body chills & rigors", "Continuous high grade fever", "Associated headache or eye pain", "No rash / bleeding"]);
+    } else if (lower.includes("cough") || lower.includes("khansi") || lower.includes("breath")) {
+      setDynamicChips(["Productive yellow/green sputum", "Worse in cold weather or night", "Wheezing or breathlessness", "Dry irritating cough"]);
+    } else if (lower.includes("pain") || lower.includes("dard") || lower.includes("noppi")) {
+      setDynamicChips(["Continuous throbbing pain", "Aggravated by movement", "Mild dull ache", "Sharp stabbing sensation"]);
+    } else {
+      setDynamicChips(["Started today", "Gradual worsening over 3-5 days", "Associated with weakness", "No severe red flag"]);
+    }
+    setIsGeneratingChips(false);
   };
 
   const toggleChip = (chip: string) => {
@@ -72,7 +114,7 @@ export default function Step5_ConversationalHistory({ onHistorySubmit, onNext, o
 
   const handleProceed = () => {
     onHistorySubmit({
-      chiefComplaint: complaintText || "Fever & Persistent Cough",
+      chiefComplaint: complaintText.trim() || (selectedChips.length > 0 ? selectedChips.join(", ") : "General clinical assessment requested"),
       timeline,
       selectedChips,
       isRedFlag: false

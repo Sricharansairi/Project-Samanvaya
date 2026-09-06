@@ -44,5 +44,15 @@ class SmartKeyRotator:
             raise ValueError("No SARVAM API keys found in .env!")
         return random.choice(self.sarvam_keys)
 
+    def get_groq_key(self) -> str:
+        groq_key = os.getenv("GROQ_API_KEY")
+        if groq_key and groq_key.strip():
+            return groq_key.strip()
+        # Scan any GROQ_API_KEY_ prefix
+        groq_keys = self._get_keys_by_prefix("GROQ_API_KEY")
+        if groq_keys:
+            return random.choice(groq_keys)
+        return ""
+
 # Instantiate a singleton to be used across the application
 key_rotator = SmartKeyRotator()

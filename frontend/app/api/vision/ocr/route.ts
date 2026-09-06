@@ -197,16 +197,11 @@ async function normalizePrescription(parsed: any, detectedWords: string[]): Prom
       }
     }
 
-    // Medications recovery
-    if (/^(t\.|tab|cap|syp|syr|inj|rx)/i.test(line) || lower.includes("epan") || lower.includes("althro") || lower.includes("breezy") || lower.includes("clavam") || lower.includes("clopirad")) {
-      let resolved = line;
-      if (lower.includes("albeeeep") || lower.includes("althro")) resolved = "T. Althro-SP (1-0-1)";
-      else if (lower.includes("brmmy") || lower.includes("breezy")) resolved = "Syp. Breezy (10ml TDS)";
-      else if (lower.includes("opan") || lower.includes("epan")) resolved = "T. Opan / Epan 400mg (1-0-1)";
-      else if (lower.includes("clavam") || lower.includes("clopirad")) resolved = "T. Clavam-D / Clopirad 40mg (1-0-0)";
-      
-      if (!medications.some(m => m.toLowerCase().includes(resolved.toLowerCase().split(" ")[1] || ""))) {
-        medications.push(resolved);
+    // Medications recovery - Dynamically captures any clinical prescription item
+    if (/^(t\.|tab|cap|syp|syr|inj|rx|oint|gel|drops|susp)/i.test(line) || /\b\d+\s*(mg|ml|mcg|gm)\b/i.test(line) || /\b(1-0-1|1-1-1|1-0-0|0-0-1|bd|tds|od|sos|hs|po)\b/i.test(line)) {
+      const trimmed = line.trim();
+      if (trimmed.length > 2 && !medications.some(m => m.toLowerCase() === trimmed.toLowerCase())) {
+        medications.push(trimmed);
       }
     }
   }
@@ -266,10 +261,11 @@ export async function POST(request: Request) {
     // 1. Nemotron OCR v2 for raw text detection
     const nemotronUrl = "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2";
     const nemotronKeys = [
-      "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",
-      "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",
-      "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"
-    ];
+      process.env.NVIDIA_NEMOTRON_OCR_KEY,
+      process.env.NVIDIA_API_KEY,
+      process.env.NVIDIA_LLAMA_3_3_70B_KEY_1,
+      process.env.NVIDIA_LLAMA_3_3_70B_KEY_2,
+    ].filter(Boolean) as string[];
 
     for (const key of nemotronKeys) {
       try {
@@ -407,7 +403,7 @@ OUTPUT SCHEMA (JSON ONLY):
     // Secondary: Moonshot Kimi-K3 via NVIDIA NIM if Groq is unavailable
     if (!parsed) {
       const kimiUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
-      const kimiKey = "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";
+      const kimiKey = process.env.NVIDIA_KIMI_KEY || process.env.NVIDIA_API_KEY || process.env.NVIDIA_LLAMA_3_3_70B_KEY_1 || "";
       try {
         const kimiRes = await fetch(kimiUrl, {
           method: "POST",

@@ -9,14 +9,23 @@ interface Step11Props {
   onOpenDoctorView: () => void;
   tokenNumber?: string;
   department?: string;
+  patientName?: string;
+  patientPhone?: string;
+  abhaId?: string;
+  chiefComplaint?: string;
 }
 
 export default function Step11_TokenWait({
   onOpenDoctorView,
-  tokenNumber = "A-142",
-  department = "General Medicine & AYUSH (Room 4, Floor 1)"
+  tokenNumber,
+  department = "General Medicine OPD",
+  patientName = "Patient",
+  patientPhone = "",
+  abhaId = "14-XXXX-XXXX-XXXX",
+  chiefComplaint = "Triage intake completed."
 }: Step11Props) {
-  const [phoneNumber, setPhoneNumber] = useState("+91 98765 43210");
+  const displayToken = tokenNumber || "OPD-101";
+  const [phoneNumber, setPhoneNumber] = useState(patientPhone || "");
   const [smsRegistered, setSmsRegistered] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
 
@@ -47,7 +56,7 @@ export default function Step11_TokenWait({
         {/* Next Action Card replaces old token display */}
         <NextActionCard 
           type="pre-consultation" 
-          token={tokenNumber} 
+          token={displayToken} 
           department={department} 
           doctorType="Specialist" 
         />
@@ -96,7 +105,11 @@ export default function Step11_TokenWait({
 
         {showSummary && (
           <div className="mt-4 border border-gray-200 rounded p-4 bg-gray-50">
-             <PortableCaseSummary />
+             <PortableCaseSummary 
+               patientName={patientName}
+               abhaId={abhaId}
+               chiefComplaint={chiefComplaint}
+             />
           </div>
         )}
 

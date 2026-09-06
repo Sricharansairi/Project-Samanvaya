@@ -17,8 +17,9 @@ interface AbhaCreationModalProps {
 
 export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = "" }: AbhaCreationModalProps) {
   const [activeMode, setActiveMode] = useState<"aadhaar" | "scan_share" | "mobile">("aadhaar");
-  const [aadhaarNumber, setAadhaarNumber] = useState("5839-2910-3847");
-  const [mobileNumber, setMobileNumber] = useState(initialMobile || "9876543210");
+  const [patientNameInput, setPatientNameInput] = useState("");
+  const [aadhaarNumber, setAadhaarNumber] = useState("");
+  const [mobileNumber, setMobileNumber] = useState(initialMobile || "");
   const [otpStep, setOtpStep] = useState(false);
   const [otpValue, setOtpValue] = useState("");
   const [countdown, setCountdown] = useState(60);
@@ -51,25 +52,27 @@ export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = 
       const p2 = Math.floor(1000 + Math.random() * 9000);
       const p3 = Math.floor(1000 + Math.random() * 9000);
       const generatedAbha = `14-${p1}-${p2}-${p3}`;
+      const resolvedName = patientNameInput.trim() || "Verified ABDM Citizen";
+      const usernameSlug = resolvedName.toLowerCase().replace(/[^a-z0-9]/g, ".");
 
       const profile: AbhaPatientProfile = {
-        name: "Lakshmi Narayana Rao",
+        name: resolvedName,
         abhaId: generatedAbha,
-        abhaAddress: "lakshmi.narayana@abdm",
+        abhaAddress: `${usernameSlug}@abdm`,
         gender: "Male",
-        dob: "12 August 1984",
-        yearOfBirth: "1984",
+        dob: "12 August 1988",
+        yearOfBirth: "1988",
         bloodGroup: "B+",
-        phone: mobileNumber || "9876543210",
-        address: "H.No 4-21/A, Gandhi Road",
-        district: "Hyderabad",
-        state: "Telangana",
+        phone: mobileNumber || `98${Math.floor(10000000 + Math.random() * 90000000)}`,
+        address: "Ward 4, Civil Lines",
+        district: "Central District",
+        state: "Delhi",
         organDonorPledge: true,
-        allergies: ["Penicillin"],
-        chronicConditions: ["Hypertension"],
-        emergencyContactName: "Saraswathi Rao (Wife)",
-        emergencyContactPhone: "9876500000",
-        phcCenter: "Osmania General Hospital & CHC"
+        allergies: [],
+        chronicConditions: [],
+        emergencyContactName: "Family Relative",
+        emergencyContactPhone: mobileNumber || "9876500000",
+        phcCenter: "Community Health Centre & Sub-District Hospital"
       };
 
       setVerifiedProfile(profile);
@@ -80,24 +83,31 @@ export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = 
   const handleScanShareSimulate = () => {
     setIsVerifying(true);
     setTimeout(() => {
+      const p1 = Math.floor(1000 + Math.random() * 9000);
+      const p2 = Math.floor(1000 + Math.random() * 9000);
+      const p3 = Math.floor(1000 + Math.random() * 9000);
+      const generatedAbha = `91-${p1}-${p2}-${p3}`;
+      const scanName = patientNameInput.trim() || "ABDM App Citizen";
+      const usernameSlug = scanName.toLowerCase().replace(/[^a-z0-9]/g, ".");
+
       const profile: AbhaPatientProfile = {
-        name: "Ananya Deshmukh",
-        abhaId: "91-3829-5729-1920",
-        abhaAddress: "ananya.d@abdm",
+        name: scanName,
+        abhaId: generatedAbha,
+        abhaAddress: `${usernameSlug}@abdm`,
         gender: "Female",
-        dob: "24 April 1992",
-        yearOfBirth: "1992",
+        dob: "24 April 1994",
+        yearOfBirth: "1994",
         bloodGroup: "O+",
-        phone: "9845012345",
+        phone: mobileNumber || `98${Math.floor(10000000 + Math.random() * 90000000)}`,
         address: "Flat 302, Green Acres",
-        district: "Pune",
+        district: "Urban District",
         state: "Maharashtra",
         organDonorPledge: true,
         allergies: [],
         chronicConditions: [],
-        emergencyContactName: "Rohit Deshmukh (Husband)",
+        emergencyContactName: "Relative",
         emergencyContactPhone: "9845099999",
-        phcCenter: "District Hospital Aundh"
+        phcCenter: "District Civil Hospital"
       };
 
       setVerifiedProfile(profile);
@@ -109,6 +119,7 @@ export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = 
     if (verifiedProfile) {
       // Store in localStorage for persistence
       localStorage.setItem("mockAbhaId", verifiedProfile.abhaId);
+      localStorage.setItem("samanvaya_patient_profile", JSON.stringify(verifiedProfile));
       onSuccess(verifiedProfile);
       onClose();
     }
@@ -191,6 +202,19 @@ export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = 
                 <div className="space-y-4">
                   {!otpStep ? (
                     <div>
+                      <div className="mb-3">
+                        <label className="text-xs font-bold text-gray-700 block mb-1">
+                          Patient Full Name (Optional — auto-derived from e-KYC if empty)
+                        </label>
+                        <input
+                          type="text"
+                          value={patientNameInput}
+                          onChange={(e) => setPatientNameInput(e.target.value)}
+                          placeholder="Enter patient full name"
+                          className="w-full text-xs px-3.5 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0f4c81]"
+                        />
+                      </div>
+
                       <label className="text-xs font-bold text-gray-700 block mb-1">
                         12-Digit Aadhaar Number
                       </label>
@@ -207,10 +231,15 @@ export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = 
                         </span>
                         <button
                           type="button"
-                          onClick={() => setAadhaarNumber("5839-2910-3847")}
+                          onClick={() => {
+                            const r1 = Math.floor(1000 + Math.random() * 9000);
+                            const r2 = Math.floor(1000 + Math.random() * 9000);
+                            const r3 = Math.floor(1000 + Math.random() * 9000);
+                            setAadhaarNumber(`${r1}-${r2}-${r3}`);
+                          }}
                           className="text-[11px] font-bold text-[#0f4c81] hover:underline cursor-pointer"
                         >
-                          Auto-fill Demo Aadhaar
+                          Generate Random 12-Digit Aadhaar
                         </button>
                       </div>
 
@@ -227,7 +256,7 @@ export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = 
                   ) : (
                     <div>
                       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-xs text-blue-900">
-                        OTP sent to Aadhaar-linked mobile: <strong>******3210</strong>. Valid for {countdown}s.
+                        OTP sent to Aadhaar-linked mobile: <strong>******{mobileNumber ? mobileNumber.slice(-4) : "8941"}</strong>. Valid for {countdown}s.
                       </div>
 
                       <label className="text-xs font-bold text-gray-700 block mb-1">
@@ -303,7 +332,7 @@ export function AbhaCreationModal({ isOpen, onClose, onSuccess, initialMobile = 
                     type="tel"
                     value={mobileNumber}
                     onChange={(e) => setMobileNumber(e.target.value)}
-                    placeholder="9876543210"
+                    placeholder="Enter 10-digit mobile number"
                     maxLength={10}
                     className="w-full text-base font-mono px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0f4c81]"
                   />

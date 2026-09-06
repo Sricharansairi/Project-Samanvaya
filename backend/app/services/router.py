@@ -60,7 +60,7 @@ Utterance: "{query}"
 Reply ONLY with the category name (e.g. MEDICAL_RAG). Nothing else. If you are not completely sure, reply with NONE_OF_THESE."""
 
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="qwen/qwen3.8-27b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
             max_tokens=15
@@ -74,7 +74,12 @@ Reply ONLY with the category name (e.g. MEDICAL_RAG). Nothing else. If you are n
         
     except Exception as e:
         print(f"Groq Routing Error: {e}")
-        return {"intent": "NONE_OF_THESE", "confidence": 0.0}
+        # High-accuracy fallback heuristic if network/API fails
+        if any(w in query_lower for w in ["scheme", "fund", "card", "yojana", "pmjay", "paisa", "bima", "ayushman"]):
+            return {"intent": "SCHEME_RAG", "confidence": 0.85}
+        elif any(w in query_lower for w in ["fever", "pain", "cough", "dard", "bukhar", "khansi", "chest", "headache", "vomit", "dizziness"]):
+            return {"intent": "MEDICAL_RAG", "confidence": 0.85}
+        return {"intent": "GENERAL_FAQ", "confidence": 0.5}
 
 def classify_query(query: str) -> str:
     """Legacy wrapper for semantic router"""

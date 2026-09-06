@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No audio file provided" }, { status: 400 });
     }
 
-    const whisperKey = "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";
+    const whisperKey = process.env.NVIDIA_WHISPER_KEY || process.env.NVIDIA_API_KEY || process.env.NVIDIA_LLAMA_3_3_70B_KEY_1 || "";
     const whisperUrl = "https://integrate.api.nvidia.com/v1/audio/transcriptions";
 
     const whisperData = new FormData();

@@ -44,7 +44,7 @@ export default function NextActionCard({
                             <div className="bg-gray-50 border border-gray-200 rounded p-3 mt-3 flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-gray-500 uppercase tracking-wide">Your Token Number</p>
-                                    <p className="text-3xl font-black text-blue-900">{token || 'A-142'}</p>
+                                    <p className="text-3xl font-black text-blue-900">{token || 'OPD-READY'}</p>
                                 </div>
                                 <ArrowRight className="text-gray-400" size={24} />
                             </div>

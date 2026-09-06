@@ -5,7 +5,7 @@ from app.services.pii_service import strip_pii
 from app.services.fhir_service import convert_to_fhir_r4
 from app.services.epidemic_radar import detect_epidemic_outbreak
 from app.services.abha_service import generate_abha_from_aadhaar, verify_audio_consent
-from app.services.bhashini_service import check_acoustic_biomarkers
+from app.services.sarvam_service import check_acoustic_biomarkers
 from app.services.scheme_agent import evaluate_schemes
 from fastapi.testclient import TestClient
 from app.main import app

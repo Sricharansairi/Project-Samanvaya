@@ -2,6 +2,7 @@ import json
 import requests
 import base64
 import os
+import re
 
 def process_medical_image(base64_image: str) -> dict:
     """
@@ -11,10 +12,11 @@ def process_medical_image(base64_image: str) -> dict:
     # 1. Nemotron OCR v2 for raw text extraction
     nemotron_url = "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2"
     nemotron_keys = [
-        "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",
-        "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",
-        "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"
+        os.getenv("NVIDIA_LLAMA_3_3_70B_KEY_1"),
+        os.getenv("NVIDIA_LLAMA_3_3_70B_KEY_2"),
+        key_rotator.get_llama_3_3_70b_key()
     ]
+    nemotron_keys = [k for k in nemotron_keys if k and k.startswith("nvapi-")]
     
     img_url = base64_image if base64_image.startswith("data:") else f"data:image/jpeg;base64,{base64_image}"
     nemotron_payload = {
@@ -80,7 +82,7 @@ Extract structured clinical JSON from the raw OCR text transcribed by Nemotron O
   "medications": ["string"],
   "abnormal_labs": []
 }
-ONLY extract data present or implied by the OCR text. Standardize abbreviations (e.g. 'Eppr cw' -> 'T. Epan 400mg', 'Breway' -> 'Syp. Breezy', 'Clipein' -> 'T. Clopirad 40mg', 'BARO' -> 'Bronchial Asthma'). Return ONLY valid JSON."""
+ONLY extract data present or implied by the OCR text. Intelligently decipher physician handwriting and Indian clinical abbreviations (e.g. standardizing dosage frequencies '1-0-1', 'OD', 'BD', 'TDS', 'SOS', drug formulations 'T.', 'Tab.', 'Cap.', 'Syp.', and clinical conditions). Return ONLY valid JSON."""
 
     ocr_input = ocr_result.strip() if ocr_result.strip() else "Doctor Prescription. Text indistinct."
 
@@ -118,9 +120,9 @@ ONLY extract data present or implied by the OCR text. Standardize abbreviations 
     medications = []
     for line in detected_words:
         line_clean = line.strip()
-        if any(w in line_clean.lower() for w in ["fever", "asthma", "cough", "infection", "cold", "diagnosis", "ba @"]):
+        if any(w in line_clean.lower() for w in ["fever", "asthma", "cough", "infection", "cold", "diagnosis", "pain", "hypertension", "diabetes"]):
             diagnoses.append(line_clean)
-        elif any(line_clean.upper().startswith(p) for p in ["T.", "TAB", "CAP", "SYP", "INJ", "RX"]) or any(k in line_clean.lower() for k in ["epan", "althro", "breezy", "clopirad"]):
+        elif any(line_clean.upper().startswith(p) for p in ["T.", "TAB", "CAP", "SYP", "INJ", "RX", "OINT", "GEL", "DROPS", "SUSP"]) or re.search(r'\b\d+\s*(mg|ml|mcg|gm)\b', line_clean, re.I):
             medications.append(line_clean)
 
     return {

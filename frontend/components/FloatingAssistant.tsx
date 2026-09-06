@@ -521,34 +521,74 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
         let filledFields: string[] = [];
         if (extractedName) {
-          autoFillDOMInput('input[placeholder*="Suresh" i], input[placeholder*="Name" i], input[name="name"]', extractedName);
+          autoFillDOMInput('input[placeholder*="Patient" i], input[placeholder*="Name" i], input[name="name"], input[id*="name" i]', extractedName);
           filledFields.push(`Name: ${extractedName}`);
         }
+        if (extractedAge) {
+          autoFillDOMInput('input[placeholder*="Age" i], input[name="age"], input[id*="age" i]', extractedAge);
+          filledFields.push(`Age: ${extractedAge} Yrs`);
+        }
         if (extractedPhone) {
-          autoFillDOMInput('input[placeholder*="9876" i], input[placeholder*="Phone" i], input[name="phone"]', extractedPhone);
+          autoFillDOMInput('input[placeholder*="Mobile" i], input[placeholder*="Phone" i], input[name="phone"], input[type="tel"]', extractedPhone);
           filledFields.push(`Phone: ${extractedPhone}`);
         }
         if (extractedBp) {
-          autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i]', extractedBp);
+          autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i], input[name*="bp" i]', extractedBp);
           filledFields.push(`BP: ${extractedBp}`);
         }
         if (extractedTemp) {
-          autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i]', extractedTemp);
+          autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i], input[name*="temp" i]', extractedTemp);
           filledFields.push(`Temp: ${extractedTemp}°F`);
         }
 
-        autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i]', rawCmd);
+        autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i], input[placeholder*="complaint" i]', rawCmd);
 
         dispatchInAppAction("fill_form", {
           name: extractedName,
+          age: extractedAge,
           phone: extractedPhone,
           bp: extractedBp,
           temp: extractedTemp,
           concern: rawCmd
         });
 
-        reply = `Autonomously filled registration form with: ${filledFields.join(", ")}.`;
+        reply = `Autonomously filled form fields with: ${filledFields.join(", ")}.`;
         setLastActionExecuted(`Auto-filled: ${filledFields.join(", ")}`);
+        setAssistantResponse(reply);
+        speakResponse(reply);
+        setIsProcessing(false);
+        return;
+      }
+    }
+
+    // C2. UNIVERSAL SEARCH / FILTER AUTO-FILLER
+    if (text.startsWith("search") || text.startsWith("find") || text.startsWith("filter")) {
+      const queryTerm = rawCmd.replace(/^(search|find|filter|look for)\s*(for|about)?\s*/i, "").trim();
+      if (queryTerm) {
+        const didFill = autoFillDOMInput('input[type="search"], input[placeholder*="search" i], input[placeholder*="filter" i]', queryTerm);
+        if (didFill) {
+          reply = `Autonomously populated search bar with '${queryTerm}'.`;
+          setLastActionExecuted(`Searched: ${queryTerm}`);
+          setAssistantResponse(reply);
+          speakResponse(reply);
+          setIsProcessing(false);
+          return;
+        }
+      }
+    }
+
+    // C3. DOCTOR DESK PRESCRIPTION AUTO-FILLER
+    if (text.startsWith("prescribe") || text.startsWith("give medicine") || text.startsWith("add rx")) {
+      const rxTerm = rawCmd.replace(/^(prescribe|give medicine|add rx)\s*/i, "").trim();
+      if (rxTerm) {
+        if (pathname !== "/his/doctor") {
+          router.push("/his/doctor");
+        }
+        setTimeout(() => {
+          autoFillDOMInput('input[placeholder*="medicine" i], input[placeholder*="drug" i], textarea[placeholder*="rx" i], textarea', rxTerm);
+        }, 500);
+        reply = `Opening Doctor Desk and autonomously queuing prescription: ${rxTerm}.`;
+        setLastActionExecuted(`Prescribed: ${rxTerm}`);
         setAssistantResponse(reply);
         speakResponse(reply);
         setIsProcessing(false);

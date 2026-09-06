@@ -1103,3 +1103,5 @@ export const STATES_AND_UTS = [
   { code: "LD", name: "Lakshadweep" },
   { code: "PY", name: "Puducherry" }
 ];
+
+export const SCHEME_DATABASE: SchemeDefinition[] = ALL_INDIA_SCHEMES;

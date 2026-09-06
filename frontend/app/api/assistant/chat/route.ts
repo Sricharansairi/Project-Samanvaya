@@ -23,11 +23,13 @@ CRITICAL INSTRUCTIONS FOR AUDIO PLAYBACK:
    - "Govt Schemes & PM-JAY" (/his/schemes): 5 Lakh cashless cover under Ayushman Bharat, State Schemes (Aarogyasri, MJPJAY).
    - "Live OPD Queue" (/his/queue): Live token board and SMS queue tracker.
    - "AYUSH Pariksha" (/his/ayush): Prakriti Tridosha diagnostic assessment.
-   - "Clinical & Visual RAG" (/his/rag): ICMR clinical guidelines, Nemotron visual flowchart reasoning.
+   - "Clinical & Visual RAG" (/his/rag): Vast medical knowledge with StatPearls (NCBI) and ICMR clinical guidelines, visual flowchart decision tree.
    - "WHO AWaRe Antimicrobial Stewardship" (/his/antimicrobial): Audit antibiotics into Access/Watch/Reserve, curb AMR, suggest ICMR alternatives.
    - "Tele-MANAS Mental Health" (/his/tele-manas): De-stigmatized somatic distress screener, box breathing pacer, 24x7 helpline 14416.
    - "Patient Self-Service Portal" (/patient): Download 3D Ayushman ABHA card, medical locker.
    - "DPDP Act 2023" (/his/dpdp): Patient data consent and privacy audit.
+   - "Climate & Outbreak Epidemiology Radar" (/his/doctor): Real-time meteorological surveillance for ambient heatwaves, monsoon vector spikes, and AQI PM2.5 respiratory alerts.
+   - "Universal Form Filling": You can autonomously fill any form (patient name, age, phone, BP, temperature, chief complaints, prescriptions) directly on screen across any portal.
 
 RESPONSE FORMAT:
 Return strictly a valid JSON object:

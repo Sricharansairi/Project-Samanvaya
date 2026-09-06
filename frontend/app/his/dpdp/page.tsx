@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   ArrowLeft, Shield, Volume2, VolumeX, CheckCircle2, Lock, FileText, 
@@ -26,9 +26,9 @@ interface ConsentLogEntry {
 }
 
 export default function DpdpConsentPage() {
-  const [patientName, setPatientName] = useState("Lakshmi Narayana");
-  const [abhaId, setAbhaId] = useState("91-5839-2910-3847");
-  const [phone, setPhone] = useState("9876543210");
+  const [patientName, setPatientName] = useState("Citizen");
+  const [abhaId, setAbhaId] = useState("14-XXXX-XXXX-XXXX");
+  const [phone, setPhone] = useState("");
   const [language, setLanguage] = useState<"en" | "hi" | "te">("en");
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false);
@@ -42,12 +42,24 @@ export default function DpdpConsentPage() {
 
   const [activeTab, setActiveTab] = useState<"notice" | "audit" | "rights">("notice");
 
+  useEffect(() => {
+    try {
+      const stored = typeof window !== "undefined" ? localStorage.getItem("samanvaya_patient_profile") : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.name) setPatientName(parsed.name);
+        if (parsed.abhaId) setAbhaId(parsed.abhaId);
+        if (parsed.phone) setPhone(parsed.phone);
+      }
+    } catch {}
+  }, []);
+
   const [consentLogs, setConsentLogs] = useState<ConsentLogEntry[]>([
     {
       id: "CONS-2026-0901-A48",
       timestamp: "2026-09-05 10:14:22 IST",
-      patientName: "Lakshmi Narayana",
-      abhaId: "91-5839-2910-3847",
+      patientName: "Active Patient Session",
+      abhaId: "14-8920-1928-3847",
       purposesGranted: ["Clinical Care", "ABHA Linking", "Scheme Verification"],
       consentHash: "8f4b23c91e0a4f5d88c90382d7f8a9e012cb7f6a98d023e41b9a6745e128cb50",
       status: "ACTIVE"
@@ -55,8 +67,8 @@ export default function DpdpConsentPage() {
     {
       id: "CONS-2026-0828-B12",
       timestamp: "2026-09-04 16:42:08 IST",
-      patientName: "Meena Devi",
-      abhaId: "91-2309-8819-0941",
+      patientName: "OPD Patient",
+      abhaId: "14-2309-8819-0941",
       purposesGranted: ["Clinical Care"],
       consentHash: "3a9f02b74c8d519e083a216b5e7d8c9012f45a89e023b67c89d012e34a56b789",
       status: "ACTIVE"

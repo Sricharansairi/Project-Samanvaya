@@ -407,28 +407,104 @@ const VERNACULAR_ONTOLOGY: VernacularMedicalMapping[] = [
 ];
 
 /**
- * Fallback General Internal Medicine Translation Synthesizer
+ * Dynamic Multi-Domain Clinical Entity Synthesizer
+ * Grounded in WHO ICD-10, SNOMED-CT, and ICMR Treatment Workflows.
  */
 function synthesizeFallbackClinicalEntity(rawPrompt: string): ClinicalTranslationResult {
   const clean = rawPrompt.trim();
+  const lower = clean.toLowerCase();
+
+  const isHindi = /[अ-ह]/.test(clean) || /\b(hai|mujhe|mera|dard|bukhar|khansi|chhati|pet|sir|chakkar)\b/i.test(lower);
+  const isTelugu = /[అ-హ]/.test(clean) || /\b(naku|undi|noppi|jwaram|daggu|gunde|kadupu)\b/i.test(lower);
+  const lang = isHindi ? "Hindi" : isTelugu ? "Telugu" : "English";
+
+  // Check clinical domain indicators
+  let system = "General Internal Medicine";
+  let standardTerm = `Clinical Symptom: ${clean}`;
+  let icd10 = "R69";
+  let snomed = "404684003";
+  let snomedDisplay = "Clinical finding (finding)";
+  let severity: "Critical" | "High" | "Medium" | "Low" = "Medium";
+  let isLifeThreat = false;
+  let targetRoute = "/his/registration";
+  let explanation = `I have documented your reported symptoms (${clean}). Our clinical system has routed your case for comprehensive physician evaluation and vital signs screening.`;
+
+  if (lower.includes("chest") || lower.includes("chhati") || lower.includes("seene") || lower.includes("gunde") || lower.includes("heart") || lower.includes("dil")) {
+    system = "Cardiovascular System";
+    standardTerm = "Acute Thoracic Pain / Cardiac Evaluation";
+    icd10 = "R07.9";
+    snomed = "29857009";
+    snomedDisplay = "Chest pain (finding)";
+    severity = lower.includes("severe") || lower.includes("bahut") || lower.includes("tez") ? "Critical" : "High";
+    isLifeThreat = severity === "Critical";
+    targetRoute = isLifeThreat ? "/his/doctor" : "/his/registration";
+    explanation = "Chest discomfort warrants immediate cardiac evaluation including baseline 12-lead ECG and vital signs monitoring.";
+  } else if (lower.includes("fever") || lower.includes("bukhar") || lower.includes("jwaram") || lower.includes("tap") || lower.includes("chills")) {
+    system = "Infectious Diseases / General Medicine";
+    standardTerm = "Acute Febrile Illness (AFI)";
+    icd10 = "R50.9";
+    snomed = "386661006";
+    snomedDisplay = "Fever (finding)";
+    severity = lower.includes("rash") || lower.includes("vomit") || lower.includes("shivering") ? "High" : "Medium";
+    targetRoute = "/his/registration";
+    explanation = "Acute fever requires clinical screening for endemic seasonal infections (Malaria, Dengue, Typhoid, Viral AFI).";
+  } else if (lower.includes("cough") || lower.includes("khansi") || lower.includes("daggu") || lower.includes("sputum") || lower.includes("balgam") || lower.includes("breath") || lower.includes("saans")) {
+    system = "Respiratory System";
+    standardTerm = "Acute Respiratory Tract Condition / Dyspnea";
+    icd10 = "J06.9";
+    snomed = "49727002";
+    snomedDisplay = "Cough (finding)";
+    severity = lower.includes("breath") || lower.includes("saans") || lower.includes("blood") || lower.includes("khoon") ? "High" : "Medium";
+    isLifeThreat = lower.includes("cannot breathe") || lower.includes("stridor");
+    targetRoute = isLifeThreat ? "/his/doctor" : "/his/registration";
+    explanation = "Respiratory symptoms need lung auscultation, pulse oximetry (SpO2), and sputum/chest radiograph evaluation.";
+  } else if (lower.includes("stomach") || lower.includes("pet") || lower.includes("abdomen") || lower.includes("kadupu") || lower.includes("vomit") || lower.includes("dast") || lower.includes("loose")) {
+    system = "Gastroenterology";
+    standardTerm = "Acute Gastrointestinal Syndrome / Dyspepsia";
+    icd10 = "K52.9";
+    snomed = "21522001";
+    snomedDisplay = "Abdominal pain (finding)";
+    severity = lower.includes("blood") || lower.includes("unbearable") ? "High" : "Medium";
+    targetRoute = "/his/registration";
+    explanation = "Gastrointestinal complaints require hydration assessment, abdominal palpation, and electrolyte balance review.";
+  } else if (lower.includes("headache") || lower.includes("sir dard") || lower.includes("tala noppi") || lower.includes("dizzy") || lower.includes("chakkar")) {
+    system = "Neurology";
+    standardTerm = "Acute Cephalea / Neuro-Vestibular Syndrome";
+    icd10 = "R51";
+    snomed = "25064002";
+    snomedDisplay = "Headache (finding)";
+    severity = lower.includes("worst") || lower.includes("vomiting") ? "High" : "Medium";
+    targetRoute = "/his/registration";
+    explanation = "Headache and vestibular disturbances require blood pressure measurement, neurological screening, and red-flag assessment.";
+  } else if (lower.includes("sugar") || lower.includes("diabetes") || lower.includes("hba1c") || lower.includes("bp") || lower.includes("pressure")) {
+    system = "Endocrinology & Cardiology";
+    standardTerm = "Chronic Cardio-Metabolic Syndrome";
+    icd10 = "E11.9";
+    snomed = "44054006";
+    snomedDisplay = "Type 2 diabetes mellitus (disorder)";
+    severity = "Medium";
+    targetRoute = "/his/rag";
+    explanation = "Cardio-metabolic profiles require blood sugar (FPG/PPBS/HbA1c) review and organ protection evaluation.";
+  }
+
   return {
     patientRawPrompt: clean,
-    detectedLanguage: /[अ-ह]/.test(clean) ? "Hindi" : /[అ-హ]/.test(clean) ? "Telugu" : "English",
-    standardizedMedicalTerm: `General Clinical Syndrome: ${clean.slice(0, 50)}`,
-    icd10Code: "R69",
-    snomedCode: "404684003",
-    snomedDisplay: "Clinical finding (finding)",
-    anatomicalSystem: "General Internal Medicine",
-    clinicalSeverity: "Medium",
-    isLifeThreat: false,
+    detectedLanguage: lang,
+    standardizedMedicalTerm: standardTerm,
+    icd10Code: icd10,
+    snomedCode: snomed,
+    snomedDisplay: snomedDisplay,
+    anatomicalSystem: system,
+    clinicalSeverity: severity,
+    isLifeThreat: isLifeThreat,
     clinicalRedFlags: [
-      "Sudden alteration in consciousness or speech",
-      "Severe respiratory distress or cyanosis",
-      "Uncontrolled acute hemorrhage",
-      "Hemodynamic collapse or unmeasurable blood pressure"
+      "Sudden alteration in consciousness, speech, or motor power",
+      "Severe resting respiratory distress (SpO2 < 92%)",
+      "Uncontrolled acute hemorrhage or hematemesis",
+      "Persistent hemodynamic collapse (Systolic BP < 90 mmHg)"
     ],
     differentialDiagnoses: [
-      "Primary Pathological Syndrome (Pending Clinical Exam)",
+      `${standardTerm} - Primary Pathology`,
       "Secondary Metabolic or Infectious Etiology",
       "Atypical presentation of Acute Systemic Disorder"
     ],
@@ -439,25 +515,27 @@ function synthesizeFallbackClinicalEntity(rawPrompt: string): ClinicalTranslatio
       "Baseline 12-Lead Electrocardiogram (ECG)"
     ],
     standardMedicationClasses: [
-      "Symptomatic relief as indicated by physician",
-      "Oral hydration and resting position"
+      "Symptomatic relief as indicated by treating physician",
+      "Oral rehydration and resting semi-Fowler position"
     ],
     contraindications: [
       "Do not administer potent sedatives or narcotics prior to physical examination",
       "Avoid unmonitored empirical antibiotic administration"
     ],
     autonomousAction: {
-      targetRoute: "/his/registration",
-      actionName: "prefill_registration",
-      reason: "Standard clinical evaluation and vitals capture required at triage desk.",
+      targetRoute: targetRoute,
+      actionName: isLifeThreat ? "emergency_triage" : "prefill_registration",
+      reason: isLifeThreat 
+        ? "Potential acute clinical life-threat detected. Immediate emergency room triage activated."
+        : "Standard clinical evaluation and vitals capture required at triage desk.",
       prefillData: {
         chiefConcern: clean,
-        icd10: "R69",
-        snomed: "404684003",
-        severity: "Medium"
+        icd10: icd10,
+        snomed: snomed,
+        severity: severity
       }
     },
-    patientFriendlyExplanation: "I have recorded your symptoms. Our clinical system has routed your case for routine physician evaluation and vitals screening."
+    patientFriendlyExplanation: explanation
   };
 }
 
@@ -511,4 +589,39 @@ export function translatePatientToClinical(rawPrompt: string): ClinicalTranslati
 
   // 2. If no direct pattern matches, synthesize clinical finding
   return synthesizeFallbackClinicalEntity(text);
+}
+
+/**
+ * Dynamic Asynchronous Clinical NLP Translation
+ * Uses server-side AI model or API route when online, falling back to local ontology
+ */
+export async function translatePatientToClinicalAsync(rawPrompt: string): Promise<ClinicalTranslationResult> {
+  const localResult = translatePatientToClinical(rawPrompt);
+  
+  // If local matcher matched a known ontology rule with high confidence, return immediately
+  if (localResult.icd10Code !== "R69") {
+    return localResult;
+  }
+
+  // Attempt dynamic online zero-shot extraction via Next.js API or Groq
+  try {
+    const res = await fetch("/api/nlp/translate-clinical", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: rawPrompt })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.translation) {
+        return {
+          ...localResult,
+          ...data.translation
+        };
+      }
+    }
+  } catch {
+    // Graceful fallback to local synthesized entity
+  }
+
+  return localResult;
 }

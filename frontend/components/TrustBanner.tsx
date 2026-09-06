@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import { Search, ShieldCheck, Phone, Globe, Eye, Volume2, Accessibility } from "lucide-react";
 import { useState } from "react";

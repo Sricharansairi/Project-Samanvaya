@@ -120,17 +120,19 @@ export default function RegistrationDashboard() {
     const p3 = Math.floor(1000 + Math.random() * 9000);
     const newAbha = `14-${p1}-${p2}-${p3}`;
     
+    const resolvedName = patientData.name?.trim() || "Walk-in Patient";
+    const slug = resolvedName.toLowerCase().replace(/[^a-z0-9]/g, ".");
     const mockProfile: AbhaPatientProfile = {
-      name: patientData.name || "Suresh Kumar",
+      name: resolvedName,
       abhaId: newAbha,
-      abhaAddress: `${(patientData.name || "suresh").toLowerCase().replace(/\s+/g, ".")}@abdm`,
+      abhaAddress: `${slug}@abdm`,
       gender: "Male",
-      dob: "10 Oct 1980",
-      yearOfBirth: "1980",
+      dob: "10 Oct 1985",
+      yearOfBirth: "1985",
       bloodGroup: "B+",
-      phone: patientData.phone || "9876543210",
-      district: "Hyderabad",
-      state: "Telangana",
+      phone: patientData.phone || `98${Math.floor(10000000 + Math.random() * 90000000)}`,
+      district: "Civil District",
+      state: "National Health Authority",
       organDonorPledge: true
     };
 
@@ -161,9 +163,45 @@ export default function RegistrationDashboard() {
         })
       });
 
-      // 2. Generate Visit & Triage in DB (BUG 5 FIX: Token generation handled by backend)
-      const dept = chiefConcern.toLowerCase().includes("heart") ? "Cardiology" : "General Medicine & AYUSH";
-      const urgency = chiefConcern.toLowerCase().includes("pain") ? "High" : "Medium";
+      // 2. Comprehensive Multi-Specialty Clinical Triage Routing
+      const lower = (chiefConcern || "").toLowerCase();
+      let dept = "General Medicine OPD";
+      let room = "Room 101, Floor 1";
+      let urgency: "Normal" | "Medium" | "High" | "Emergency" = "Normal";
+
+      if (lower.includes("chest") || lower.includes("heart") || lower.includes("angina") || lower.includes("palpitation")) {
+        dept = "Cardiology OPD";
+        room = "Room 102, Floor 1";
+        urgency = "High";
+      } else if (lower.includes("cough") || lower.includes("breath") || lower.includes("asthma") || lower.includes("wheeze") || lower.includes("tb") || lower.includes("sputum")) {
+        dept = "Pulmonology OPD";
+        room = "Room 103, Floor 1";
+        urgency = lower.includes("breath") ? "High" : "Medium";
+      } else if (lower.includes("stomach") || lower.includes("abdomen") || lower.includes("vomit") || lower.includes("diarrhea") || lower.includes("loose") || lower.includes("jaundice")) {
+        dept = "Gastroenterology OPD";
+        room = "Room 104, Floor 1";
+        urgency = "Medium";
+      } else if (lower.includes("child") || lower.includes("baby") || lower.includes("pediatric") || lower.includes("infant")) {
+        dept = "Pediatrics OPD";
+        room = "Room 105, Floor 1";
+        urgency = "Medium";
+      } else if (lower.includes("headache") || lower.includes("seizure") || lower.includes("stroke") || lower.includes("dizzy") || lower.includes("paralysis")) {
+        dept = "Neurology OPD";
+        room = "Room 106, Floor 1";
+        urgency = "High";
+      } else if (lower.includes("joint") || lower.includes("bone") || lower.includes("fracture") || lower.includes("knee") || lower.includes("back pain")) {
+        dept = "Orthopedics OPD";
+        room = "Room 108, Floor 1";
+        urgency = "Medium";
+      } else if (lower.includes("ayush") || lower.includes("ayurveda") || lower.includes("prakriti") || lower.includes("dosha")) {
+        dept = "AYUSH & Integrative Medicine";
+        room = "Room 111, Floor 2";
+        urgency = "Normal";
+      }
+
+      if (lower.includes("severe") || lower.includes("unconscious") || lower.includes("bleed") || lower.includes("choking")) {
+        urgency = "Emergency";
+      }
 
       const res = await fetch(`${baseUrl}/api/db/visits`, {
         method: "POST",
@@ -183,7 +221,7 @@ export default function RegistrationDashboard() {
         setTokenData({
           tokenNumber: data.visit.token_number,
           department: data.visit.department,
-          room: "Room 4, Floor 1"
+          room: room
         });
       } else {
         throw new Error(data.message);
@@ -194,7 +232,7 @@ export default function RegistrationDashboard() {
       setTokenData({
         tokenNumber: `A-${Math.floor(100 + Math.random() * 900)}`,
         department: "General Medicine",
-        room: "Room 4, Floor 1"
+        room: "Room 101, Floor 1"
       });
     }
   };
@@ -295,7 +333,7 @@ export default function RegistrationDashboard() {
                       value={patientData.name}
                       onChange={(e) => setPatientData({...patientData, name: e.target.value})}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-[#0f4c81]" 
-                      placeholder="e.g. Ramesh Kumar"
+                      placeholder="Enter patient full name"
                     />
                   </div>
                   <div>
@@ -332,15 +370,15 @@ export default function RegistrationDashboard() {
                       {/* Photorealistic Smart Card Preview */}
                       <AbhaSmartCard 
                         patient={fullPatientProfile || {
-                          name: patientData.name || "Suresh Kumar",
+                          name: patientData.name || "Walk-in Patient",
                           abhaId: patientData.abhaId,
-                          abhaAddress: `${(patientData.name || "suresh").toLowerCase().replace(/\s+/g, ".")}@abdm`,
+                          abhaAddress: `${(patientData.name || "citizen").toLowerCase().replace(/[^a-z0-9]/g, ".")}@abdm`,
                           gender: "Male",
-                          dob: "10 Oct 1980",
-                          yearOfBirth: "1980",
+                          dob: "10 Oct 1985",
+                          yearOfBirth: "1985",
                           bloodGroup: "B+",
-                          phone: patientData.phone || "9876543210",
-                          state: "Telangana",
+                          phone: patientData.phone || "9800000000",
+                          state: "National Health Authority",
                           organDonorPledge: true
                         }} 
                         compact={true}

@@ -80,9 +80,9 @@ def evaluate_schemes(patient_state: str, patient_income: int = None, ration_card
     eligible_schemes = []
     
     # Always check national PM-JAY first
-    national_scheme = next(s for s in SCHEMES_DB if s["state"] == "National")
-    if secc_listed:
-        eligible_schemes.append(national_scheme)
+    pmjay_scheme = next((s for s in SCHEMES_DB if s["state"] == "National" and "PM-JAY" in s["scheme_name"]), None)
+    if secc_listed and pmjay_scheme:
+        eligible_schemes.append(pmjay_scheme)
         
     # Check state-specific schemes
     state_schemes = [s for s in SCHEMES_DB if s["state"].lower() == patient_state.lower()]

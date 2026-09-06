@@ -14,6 +14,8 @@ export default function DoctorDashboard() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [queue, setQueue] = useState<any[]>([]);
   
+  const [doctorName, setDoctorName] = useState("Dr. On-Duty Medical Officer");
+  
   const [lines, setLines] = useState([
     { id: 1, text: "Presenting Complaint: High grade fever with nocturnal chills and productive cough.", status: "accepted" },
     { id: 2, text: "Onset & Duration: Acute onset, 3 days duration (Gradual worsening).", status: "accepted" },
@@ -29,16 +31,32 @@ export default function DoctorDashboard() {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${baseUrl}/api/db/queue`);
       const data = await res.json();
-      if (data.queue) {
+      if (data.queue && data.queue.length > 0) {
         setQueue(data.queue);
+        return;
       }
     } catch (e) {
-      console.error(e);
-      // Fallback
-      setQueue([
-        { token_number: "A-142", patients: { name: "Ramesh Kumar" }, chief_concern: "Fever and cough", urgency: "Medium" }
-      ]);
+      console.warn("Backend queue fetch notice, reading local queue:", e);
     }
+
+    // Dynamic queue fallback from browser storage
+    try {
+      const stored = typeof window !== "undefined" ? localStorage.getItem("samanvaya_queue") : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setQueue(parsed.map((t: any) => ({
+            token_number: typeof t.tokenNumber === "number" ? `T-${t.tokenNumber}` : String(t.tokenNumber || "T-101"),
+            patients: { name: t.patientName || "OPD Patient" },
+            chief_concern: t.department ? `${t.department} Consultation` : "General Health Consultation",
+            urgency: t.urgency || "Normal"
+          })));
+          return;
+        }
+      }
+    } catch {}
+
+    setQueue([]);
   };
 
   useEffect(() => {
@@ -89,7 +107,7 @@ export default function DoctorDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           visit_id: activePatient.id,
-          doctor_name: "Dr. Sharma",
+          doctor_name: doctorName || "Dr. On-Duty Specialist",
           medications: prescriptions,
           clinical_summary: lines.filter(l => l.status === "accepted").map(l => l.text).join(" ") + " " + dictationText
         })
@@ -210,13 +228,16 @@ export default function DoctorDashboard() {
               </div>
 
               {/* Safety Alerts */}
-              {activePatient.token_number === "A-142" && (
+              {Boolean(/cough.*(2|3|week|chronic|blood|fever)|tb|tuberculosis|fever.*cough/i.test(activePatient.chief_concern || "")) && (
                 <div className="bg-red-50/70 border border-red-200 rounded-xl p-4 flex items-center justify-between text-sm print:hidden">
                   <div className="flex items-center gap-3 text-red-900 font-medium">
                     <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
                     <span><strong>National Program Alert:</strong> Symptom triad indicates potential Pulmonary TB.</span>
                   </div>
-                  <button className="bg-red-700 hover:bg-red-800 text-white font-bold px-4 py-2 rounded-lg text-xs">
+                  <button 
+                    onClick={() => alert(`📋 Nikshay Case Notification Pre-Filled:\nPatient: ${activePatient.patients?.name || "Patient"}\nToken: ${activePatient.token_number}\nComplaint: ${activePatient.chief_concern}\nRecommended Investigation: Sputum CBNAAT / GeneXpert\nNational TB Elimination Program (NTEP) ID: NIK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)}
+                    className="bg-red-700 hover:bg-red-800 text-white font-bold px-4 py-2 rounded-lg text-xs cursor-pointer"
+                  >
                     Pre-fill Nikshay
                   </button>
                 </div>

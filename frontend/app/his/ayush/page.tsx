@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, Sparkles, HeartPulse, Leaf, Flame, Wind, Droplets, 
@@ -11,20 +11,23 @@ import { PRAKRITI_QUESTIONNAIRE, evaluatePrakriti, PrakritiResult } from "@/serv
 
 export default function AyushAssessmentPage() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, "Vata" | "Pitta" | "Kapha">>({
-    q1_frame: "Vata",
-    q2_skin: "Pitta",
-    q3_digestion: "Pitta",
-    q4_bowel: "Kapha",
-    q5_thermal: "Vata",
-    q6_sleep: "Pitta",
-    q7_mind: "Vata"
-  });
-  const [patientName, setPatientName] = useState("Rameshwar Rao");
-  const [patientAbha, setPatientAbha] = useState("91-4829-1039-4820");
+  const [answers, setAnswers] = useState<Record<string, "Vata" | "Pitta" | "Kapha">>({});
+  const [patientName, setPatientName] = useState("OPD Patient");
+  const [patientAbha, setPatientAbha] = useState("14-XXXX-XXXX-XXXX");
   const [isCompleted, setIsCompleted] = useState(false);
   const [result, setResult] = useState<PrakritiResult | null>(null);
   const [activeTab, setActiveTab] = useState<"diet" | "lifestyle" | "yoga" | "formulations" | "dashavidha">("diet");
+
+  useEffect(() => {
+    try {
+      const stored = typeof window !== "undefined" ? localStorage.getItem("samanvaya_patient_profile") : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.name) setPatientName(parsed.name);
+        if (parsed.abhaId) setPatientAbha(parsed.abhaId);
+      }
+    } catch {}
+  }, []);
 
   const totalQuestions = PRAKRITI_QUESTIONNAIRE.length;
   const currentQ = PRAKRITI_QUESTIONNAIRE[currentStep];

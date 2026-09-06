@@ -6,7 +6,7 @@ export async function POST(request: Request) {
     const { transcript = "" } = body;
 
     const kimiUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
-    const kimiKey = "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";
+    const kimiKey = process.env.NVIDIA_KIMI_KEY || process.env.NVIDIA_API_KEY || process.env.NVIDIA_LLAMA_3_3_70B_KEY_1 || "";
 
     const systemPrompt = `You are a clinical NLP extractor for Project Samanvaya.
 Extract patient entities from this speech transcript.

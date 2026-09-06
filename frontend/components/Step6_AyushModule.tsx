@@ -15,9 +15,9 @@ interface Step6Props {
 }
 
 export default function Step6_AyushModule({ onAyushSubmit, onNext, selectedLanguage = "hi" }: Step6Props) {
-  const [agni, setAgni] = useState("Sama (Normal & Balanced)");
-  const [nidra, setNidra] = useState("Disturbed / Insomnia");
-  const [dietHabits, setDietHabits] = useState("Wheat Roti & Dal");
+  const [agni, setAgni] = useState("");
+  const [nidra, setNidra] = useState("");
+  const [dietHabits, setDietHabits] = useState("");
   const [fastingObserved, setFastingObserved] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
@@ -47,9 +47,9 @@ export default function Step6_AyushModule({ onAyushSubmit, onNext, selectedLangu
 
   const handleProceed = () => {
     onAyushSubmit({
-      agni,
-      nidra,
-      dietHabits,
+      agni: agni || "Sama (Normal & Balanced)",
+      nidra: nidra || "Sound Sleep (6-8 hrs)",
+      dietHabits: dietHabits || (isSouthRegion ? "Rice, Sambar & Rasam" : "Wheat Roti & Dal"),
       fastingObserved
     });
     onNext();

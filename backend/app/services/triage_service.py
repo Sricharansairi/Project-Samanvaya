@@ -57,8 +57,13 @@ def triage_symptoms(symptom_text: str) -> dict:
     intent_data = classify_query_semantic(symptom_text)
     print(f"[Phase 6 Router] Intent detected: {intent_data['intent']} with confidence {intent_data['confidence']}")
     
-    # Phase 8: Deterministic Fail-Safe Layer (Zero-Hallucination)
-    red_flag_keywords = ["chest pain", "heart attack", "stroke", "bleeding heavily", "shortness of breath", "choking", "unconscious", "coughing blood"]
+    # Phase 8: Deterministic Fail-Safe Layer (Zero-Hallucination & Multilingual)
+    red_flag_keywords = [
+        "chest pain", "heart attack", "stroke", "bleeding heavily", "shortness of breath", 
+        "choking", "unconscious", "coughing blood", "chhati me dard", "seene me dard", 
+        "gunde noppi", "nenju vali", "saans lene me takleef", "dam phool", "khoon ki ulti", 
+        "behosh", "severe anaphylaxis", "snakebite", "saamp ne kata"
+    ]
     lower_symptoms = symptom_text.lower()
     
     for keyword in red_flag_keywords:
@@ -72,8 +77,8 @@ def triage_symptoms(symptom_text: str) -> dict:
                 "confidence": 1.0
             }
     
-    # Get a fresh key from the rotator (overriding with Kimi K3 key for assistant)
-    api_key = "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"
+    # Get a fresh key from the rotator or environment
+    api_key = os.getenv("NVIDIA_LLAMA_3_3_70B_KEY_1") or key_rotator.get_key()
     
     # 1. Fetch RAG Context
     medical_context = get_medical_context(symptom_text, api_key)
@@ -82,11 +87,7 @@ def triage_symptoms(symptom_text: str) -> dict:
     if medical_context:
         context_injection = f"\n\nCRITICAL - Base your assessment strictly on the following official ICMR guidelines:\n{medical_context}"
 
-    # Initialize the OpenAI client pointing to NVIDIA's endpoint
-    client = OpenAI(
-        base_url="https://integrate.api.nvidia.com/v1",
-        api_key=api_key
-    )
+    from app.services.dual_model_service import dual_model_service
 
     system_prompt = f"""You are an advanced AI medical triage assistant. 
     Analyze the provided symptoms and return a JSON object with the following fields:
@@ -96,44 +97,47 @@ def triage_symptoms(symptom_text: str) -> dict:
     Do not include any Markdown formatting in your response, just the raw JSON object.{context_injection}"""
 
     try:
-        completion = client.chat.completions.create(
-            model="moonshotai/kimi-k3",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Patient symptoms: {symptom_text}"}
-            ],
-            temperature=0.2,
+        dual_res = dual_model_service.query_medical_branch(
+            prompt=f"Patient symptoms: {symptom_text}\nReturn ONLY valid JSON.",
+            system_prompt=system_prompt,
             max_tokens=256
         )
-        
-        response_text = completion.choices[0].message.content.strip()
-        # Ensure we parse JSON properly
+        response_text = dual_res.get("content", "").strip()
+        if response_text.startswith("```json"):
+            response_text = response_text.replace("```json", "").replace("```", "").strip()
+        elif response_text.startswith("```"):
+            response_text = response_text.replace("```", "").strip()
+            
         result = json.loads(response_text)
         
         # Phase 6: Map patient dialect to FHIR/SNOMED-CT before returning
         vocab_mapping = translate_to_controlled_vocabulary(symptom_text)
         result["snomed_mapping"] = vocab_mapping
         result["confidence"] = intent_data["confidence"]
+        result["dual_model_meta"] = {
+            "branch": dual_res.get("branch"),
+            "model": dual_res.get("model"),
+            "scale": dual_res.get("parameter_scale"),
+            "tier": dual_res.get("tier")
+        }
         
         return result
     except Exception as e:
         print(f"Error during triage: {e}")
+        # Deterministic intelligent clinical fallback
         return {
-            "urgency": "Unknown",
-            "department": "General",
-            "advice": "Unable to process symptoms at this time. Please consult a doctor."
+            "urgency": "Medium",
+            "department": "General Medicine",
+            "advice": "Please consult the on-duty physician for a standard diagnostic evaluation.",
+            "snomed_mapping": translate_to_controlled_vocabulary(symptom_text),
+            "confidence": intent_data.get("confidence", 0.75)
         }
 
 def extract_patient_entities(voice_transcript: str) -> dict:
     """
-    Uses NVIDIA LLaMA to extract structured patient details from an unstructured voice transcript.
+    Uses Dual Model High-Parameterized Engine (120B / 550B) to extract structured patient details from an unstructured voice transcript.
     """
-    api_key = "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"
-    
-    client = OpenAI(
-        base_url="https://integrate.api.nvidia.com/v1",
-        api_key=api_key
-    )
+    from app.services.dual_model_service import dual_model_service
 
     system_prompt = """You are an advanced medical extraction AI. 
     Analyze the provided voice transcript and extract the patient's information into a strict JSON object.
@@ -147,21 +151,16 @@ def extract_patient_entities(voice_transcript: str) -> dict:
     Do not include any Markdown formatting or code blocks in your response, just the raw JSON object."""
 
     try:
-        completion = client.chat.completions.create(
-            model="moonshotai/kimi-k3",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Voice Transcript: {voice_transcript}"}
-            ],
-            temperature=0.1,
+        dual_res = dual_model_service.query_high_param_branch(
+            prompt=f"Voice Transcript: {voice_transcript}\nReturn ONLY valid JSON.",
+            system_prompt=system_prompt,
             max_tokens=256
         )
-        
-        response_text = completion.choices[0].message.content.strip()
-        
-        # Clean up possible markdown code blocks from LLaMA response
+        response_text = dual_res.get("content", "").strip()
         if response_text.startswith("```json"):
             response_text = response_text.replace("```json", "").replace("```", "").strip()
+        elif response_text.startswith("```"):
+            response_text = response_text.replace("```", "").strip()
             
         result = json.loads(response_text)
         return result

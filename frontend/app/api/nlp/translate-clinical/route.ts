@@ -4,18 +4,19 @@ import { translatePatientToClinical, ClinicalTranslationResult } from "@/service
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { prompt = "", language = "auto" } = body;
+    const inputPrompt = (body.prompt || body.text || "").trim();
+    const language = body.language || "auto";
 
-    if (!prompt.trim()) {
+    if (!inputPrompt) {
       return NextResponse.json({ error: "No patient speech or prompt provided" }, { status: 400 });
     }
 
     // Immediate rule-based and local ontology evaluation for guaranteed high-speed baseline
-    const localResult = translatePatientToClinical(prompt);
+    const localResult = translatePatientToClinical(inputPrompt);
 
-    // Kimi-K3 Deep Reasoning Configuration (NVIDIA NIM Moonshot Kimi-K3)
+    // Kimi-K3 / NVIDIA NIM Deep Reasoning Configuration
     const kimiUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
-    const kimiKey = "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";
+    const kimiKey = process.env.NVIDIA_LLAMA_3_3_70B_KEY_1 || process.env.NVIDIA_API_KEY || "";
 
     const systemPrompt = `You are the Chief AI Medical Informaticist & Clinical Lexicographer for Project Samanvaya, India's national healthcare platform.
 The patient has expressed their symptoms in colloquial, layperson, or regional vernacular (Hindi, Telugu, Hinglish, or casual English).
@@ -86,7 +87,7 @@ DO NOT wrap in markdown fences. Return ONLY valid JSON.`;
 
         // Merge Kimi AI reasoning with local ground truth
         const mergedResult: ClinicalTranslationResult = {
-          patientRawPrompt: prompt,
+          patientRawPrompt: inputPrompt,
           detectedLanguage: parsedKimi.detectedLanguage || localResult.detectedLanguage,
           standardizedMedicalTerm: parsedKimi.standardizedMedicalTerm || localResult.standardizedMedicalTerm,
           icd10Code: parsedKimi.icd10Code || localResult.icd10Code,
@@ -117,7 +118,8 @@ DO NOT wrap in markdown fences. Return ONLY valid JSON.`;
         return NextResponse.json({
           success: true,
           engine: "Samanvaya Clinical NLP + SNOMED-CT Ontology",
-          result: mergedResult
+          result: mergedResult,
+          translation: mergedResult
         });
       }
     } catch (e: any) {
@@ -128,7 +130,8 @@ DO NOT wrap in markdown fences. Return ONLY valid JSON.`;
     return NextResponse.json({
       success: true,
       engine: "Samanvaya 2000+ Verified Clinical Ontology",
-      result: localResult
+      result: localResult,
+      translation: localResult
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

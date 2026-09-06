@@ -20,7 +20,12 @@ def verify_audio_consent(audio_text_transcript: str) -> bool:
     Checks if the patient's ASR transcript contains a clear affirmative consent.
     This fulfills the DPDP Act 2023 requirement for explicit audio-verifiable consent.
     """
-    affirmative_words = ["yes", "haan", "agree", "manzoor", "theek", "okay"]
+    # Multilingual affirmative consent dictionary covering Hindi, Telugu, Tamil, Kannada, Marathi, Bengali, Odia, English
+    affirmative_words = [
+        "yes", "haan", "agree", "manzoor", "theek", "okay", "avunu", "sare", 
+        "oppukuntunna", "aam", "seri", "haudu", "sari", "ho", "hyan", "sammati", 
+        "kabool", "paravillai", "agreed", "consent given", "theek hai"
+    ]
     transcript_lower = audio_text_transcript.lower()
     
     for word in affirmative_words:

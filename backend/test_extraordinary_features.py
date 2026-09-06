@@ -37,10 +37,16 @@ def run_tests():
     assert_test(dictation in res["text"]["div"], "Doctor Dictation Appended to FHIR Text")
     assert_test(res["extension"][0]["valueString"] == dictation, "Doctor Dictation Appended to FHIR Extension")
 
-    # Test 3: Festival Analytics
-    res = get_festival_analytics("110001")
-    assert_test(res["current_season"] == "Monsoon", "Festival Analytics Season Check")
-    assert_test("Diwali" in res["upcoming_festival"], "Festival Analytics Festival Check")
+    # Test 3: Climate Outbreak Radar Analytics
+    from app.services.extraordinary_features import get_climate_epidemiology_analytics, calculate_generic_savings
+    res = get_climate_epidemiology_analytics("110001")
+    assert_test("Monsoon" in res["current_season"] or "Season" in res["current_season"], "Climate Radar Season Check")
+    assert_test(len(res["predicted_surges"]) > 0, "Climate Radar Surges Check")
+    assert_test("surveillance_engine" in res, "Climate Radar Surveillance Engine Check")
+
+    # Test 3B: Dynamic Medicine Savings
+    med_res = calculate_generic_savings("Augmentin 625")
+    assert_test(med_res["savings_amount"] > 0, "Dynamic Jan Aushadhi Savings Check")
 
     # Test 4: Cost Estimator (No Scheme)
     res = estimate_rough_cost("Cardiology", scheme_eligible=False)

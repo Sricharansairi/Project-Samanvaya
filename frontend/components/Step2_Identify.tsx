@@ -7,22 +7,35 @@ import { QrCode, UserCheck, Users, Shield, ArrowRight, UserPlus, CheckCircle2, I
 interface Step2Props {
   onIdentify: (patientData: { abhaId: string; name: string; isCaregiver: boolean; caregiverName?: string; familyMembers?: string[] }) => void;
   onNext: () => void;
+  initialAbha?: string;
+  initialName?: string;
 }
 
-export default function Step2_Identify({ onIdentify, onNext }: Step2Props) {
-  const [authMode, setAuthMode] = useState<"abha_qr" | "aadhaar_otp" | "family_batch" | "new_patient">("aadhaar_otp");
-  const [abhaInput, setAbhaInput] = useState("91-4820-1934-8291");
+export default function Step2_Identify({ onIdentify, onNext, initialAbha = "", initialName = "" }: Step2Props) {
+  const [authMode, setAuthMode] = useState<"aadhaar_otp" | "abha_qr" | "family_batch" | "new_patient">("aadhaar_otp");
+  const [abhaInput, setAbhaInput] = useState(initialAbha || "");
+  const [newPatientName, setNewPatientName] = useState(initialName || "");
+  const [newPatientAge, setNewPatientAge] = useState("");
+  const [newPatientGender, setNewPatientGender] = useState("Male");
   const [isCaregiver, setIsCaregiver] = useState(false);
   const [caregiverName, setCaregiverName] = useState("");
   const [caregiverRelation, setCaregiverRelation] = useState("Son");
-  const [familyMembers, setFamilyMembers] = useState<string[]>(["Ramesh Kumar (Self)", "Sita Devi (Mother)"]);
-  const [selectedFamilyMember, setSelectedFamilyMember] = useState("Ramesh Kumar (Self)");
+  const [familyMembers, setFamilyMembers] = useState<string[]>(["Self", "Spouse / Relative"]);
+  const [selectedFamilyMember, setSelectedFamilyMember] = useState("Self");
   const [memberConsentGiven, setMemberConsentGiven] = useState(true);
 
   const handleProceed = () => {
+    const resolvedName = authMode === "new_patient" 
+      ? (newPatientName.trim() || "Walk-in Patient") 
+      : authMode === "family_batch"
+      ? selectedFamilyMember
+      : (initialName || "Patient");
+
+    const resolvedAbha = abhaInput.trim() || (authMode === "new_patient" ? `WALK-${Math.floor(100000 + Math.random() * 900000)}` : "14-XXXX-XXXX-XXXX");
+
     onIdentify({
-      abhaId: abhaInput,
-      name: isCaregiver ? `${selectedFamilyMember} (via ${caregiverName || "Caregiver"})` : selectedFamilyMember,
+      abhaId: resolvedAbha,
+      name: isCaregiver ? `${resolvedName} (via ${caregiverName || "Caregiver"})` : resolvedName,
       isCaregiver,
       caregiverName: isCaregiver ? caregiverName : undefined,
       familyMembers: authMode === "family_batch" ? familyMembers : undefined
@@ -140,7 +153,9 @@ export default function Step2_Identify({ onIdentify, onNext }: Step2Props) {
               <label className="text-xs font-semibold text-[#0f2942] block mb-1">Patient Full Name *</label>
               <input
                 type="text"
-                defaultValue="Suresh Patil"
+                value={newPatientName}
+                onChange={(e) => setNewPatientName(e.target.value)}
+                placeholder="Enter patient full name"
                 className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none"
               />
             </div>
@@ -149,16 +164,22 @@ export default function Step2_Identify({ onIdentify, onNext }: Step2Props) {
                 <label className="text-xs font-semibold text-[#0f2942] block mb-1">Age</label>
                 <input
                   type="number"
-                  defaultValue={48}
+                  value={newPatientAge}
+                  onChange={(e) => setNewPatientAge(e.target.value)}
+                  placeholder="e.g. 35"
                   className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none"
                 />
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#0f2942] block mb-1">Gender</label>
-                <select className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none">
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
+                <select 
+                  value={newPatientGender}
+                  onChange={(e) => setNewPatientGender(e.target.value)}
+                  className="w-full bg-slate-50 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-[#0f2942] font-semibold focus:bg-white focus:ring-2 focus:ring-[#0f4c81] outline-none"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
             </div>
