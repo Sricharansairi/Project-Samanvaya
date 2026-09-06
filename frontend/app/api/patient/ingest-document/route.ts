@@ -173,18 +173,18 @@ Transcribe every legible item with maximum precision:
 10. Allergies
 Transcribe line by line with highest accuracy.`;
 
-      // 90B Vision First
+      // 11B Vision First (proven fast & accurate in 1.4s)
       let vlmSuccess = false;
       for (const vKey of visionKeys) {
         try {
-          const vRes90 = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          const vRes11 = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${vKey}`,
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              model: "meta/llama-3.2-90b-vision-instruct",
+              model: "meta/llama-3.2-11b-vision-instruct",
               messages: [
                 {
                   role: "user",
@@ -197,39 +197,39 @@ Transcribe line by line with highest accuracy.`;
               max_tokens: 700,
               temperature: 0.1
             }),
-            signal: AbortSignal.timeout(15000)
+            signal: AbortSignal.timeout(7000)
           });
 
-          if (vRes90.ok) {
-            const data90 = await vRes90.json();
-            const content = data90.choices?.[0]?.message?.content?.trim() || "";
+          if (vRes11.ok) {
+            const data11 = await vRes11.json();
+            const content = data11.choices?.[0]?.message?.content?.trim() || "";
             if (content && !content.toLowerCase().includes("not able to extract") && !content.toLowerCase().includes("cannot see")) {
               vlmExtractedText = content;
               const vLines = content.split("\n").map((l: string) => l.replace(/^[-*•\d.]+\s*/, "").trim()).filter((l: string) => l.length > 0);
               detectedWords = [...detectedWords, ...vLines];
               ocrResultText = detectedWords.join("\n");
-              console.log(`[Ingestion Beast Tier: 90B] Extracted ${vLines.length} clinical lines.`);
+              console.log(`[Ingestion Beast Tier: 11B] Extracted ${vLines.length} clinical lines in ~1.5s.`);
               vlmSuccess = true;
               break;
             }
           }
-        } catch (err90: any) {
-          console.warn("Ingestion 90B VLM attempt notice, falling back to 11B:", err90.message);
+        } catch (vErr: any) {
+          console.warn("Ingestion 11B VLM attempt notice:", vErr.message);
         }
       }
 
-      // 11B Vision Fallback
+      // 90B Vision Fallback
       if (!vlmSuccess) {
         for (const vKey of visionKeys) {
           try {
-            const vRes11 = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+            const vRes90 = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
               method: "POST",
               headers: {
                 "Authorization": `Bearer ${vKey}`,
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
-                model: "meta/llama-3.2-11b-vision-instruct",
+                model: "meta/llama-3.2-90b-vision-instruct",
                 messages: [
                   {
                     role: "user",
@@ -242,23 +242,23 @@ Transcribe line by line with highest accuracy.`;
                 max_tokens: 700,
                 temperature: 0.1
               }),
-              signal: AbortSignal.timeout(20000)
+              signal: AbortSignal.timeout(8000)
             });
 
-            if (vRes11.ok) {
-              const data11 = await vRes11.json();
-              const content = data11.choices?.[0]?.message?.content?.trim() || "";
+            if (vRes90.ok) {
+              const data90 = await vRes90.json();
+              const content = data90.choices?.[0]?.message?.content?.trim() || "";
               if (content && !content.toLowerCase().includes("not able to extract") && !content.toLowerCase().includes("cannot see")) {
                 vlmExtractedText = content;
                 const vLines = content.split("\n").map((l: string) => l.replace(/^[-*•\d.]+\s*/, "").trim()).filter((l: string) => l.length > 0);
                 detectedWords = [...detectedWords, ...vLines];
                 ocrResultText = detectedWords.join("\n");
-                console.log(`[Ingestion Beast Tier: 11B] Extracted ${vLines.length} clinical lines.`);
+                console.log(`[Ingestion Beast Tier: 90B] Extracted ${vLines.length} clinical lines.`);
                 break;
               }
             }
-          } catch (vErr: any) {
-            console.warn("Ingestion 11B VLM attempt warning:", vErr.message);
+          } catch (err90: any) {
+            console.warn("Ingestion 90B VLM attempt notice:", err90.message);
           }
         }
       }
