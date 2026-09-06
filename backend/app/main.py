@@ -627,7 +627,9 @@ from app.services.longitudinal_clinical_engine import (
     build_longitudinal_patient_timeline,
     audit_pharmacovigilance_conflicts,
     generate_abdm_fhir_milestone3_bundle,
-    generate_vernacular_health_coach_briefing
+    generate_vernacular_health_coach_briefing,
+    save_or_amend_patient_consultation,
+    perform_patient_medication_rag
 )
 
 class PharmacovigilanceRequest(BaseModel):
@@ -637,6 +639,25 @@ class PharmacovigilanceRequest(BaseModel):
 class HealthCoachRequest(BaseModel):
     abha_id: str
     preferred_language: str = "hi"
+
+class ConsultationUploadRequest(BaseModel):
+    abha_id: str
+    doctor_name: Optional[str] = "Dr. On-Duty Specialist"
+    opd_department: Optional[str] = "General Medicine"
+    encounter_id: Optional[str] = None
+    is_amendment: bool = False
+    amendment_reason: Optional[str] = None
+    patient_name: Optional[str] = "Citizen Patient"
+    vitals: Optional[Dict[str, Any]] = None
+    diagnoses: Optional[List[Dict[str, Any]]] = None
+    medications: Optional[List[Dict[str, Any]]] = None
+    clinical_summary: Optional[str] = None
+    patient_advice: Optional[Dict[str, Any]] = None
+
+class MedicationRAGRequest(BaseModel):
+    abha_id: str
+    query: str
+    in_memory_records: Optional[List[Dict[str, Any]]] = None
 
 @app.get("/api/patient/longitudinal-timeline/{abha_id}")
 async def handle_get_longitudinal_timeline(abha_id: str):
@@ -658,6 +679,23 @@ async def handle_health_coach_advice(request: HealthCoachRequest):
     return generate_vernacular_health_coach_briefing(
         abha_id=request.abha_id,
         preferred_language=request.preferred_language
+    )
+
+@app.post("/api/patient/upload-consultation")
+async def handle_upload_consultation(request: ConsultationUploadRequest):
+    return save_or_amend_patient_consultation(
+        abha_id=request.abha_id,
+        consultation=request.dict(),
+        is_amendment=request.is_amendment,
+        amendment_reason=request.amendment_reason
+    )
+
+@app.post("/api/patient/medication-rag")
+async def handle_medication_rag(request: MedicationRAGRequest):
+    return perform_patient_medication_rag(
+        abha_id=request.abha_id,
+        query=request.query,
+        in_memory_records=request.in_memory_records
     )
 
 if __name__ == "__main__":

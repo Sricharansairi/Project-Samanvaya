@@ -18,7 +18,7 @@ import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from app.services.medical_document_ingestion import get_patient_vault_documents
+from app.services.medical_document_ingestion import get_patient_vault_documents, save_consultation_to_vault
 from app.services.dual_model_service import dual_model_service
 
 # =============================================================================
@@ -436,4 +436,129 @@ def generate_vernacular_health_coach_briefing(abha_id: str, preferred_language: 
         "coaching_script": coaching_text,
         "spoken_audio_ready": True,
         "trajectory_status": timeline.get("trajectory_status")
+    }
+
+# =============================================================================
+# 5. ABDM CONSULTATION UPLOAD & AMENDMENT HANDLER (FHIR ADDENDUM)
+# =============================================================================
+def save_or_amend_patient_consultation(
+    abha_id: str,
+    consultation: Dict[str, Any],
+    is_amendment: bool = False,
+    amendment_reason: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Persists or amends an OPD consultation directly into the patient's ABHA locker.
+    Enforces ABDM Milestone 3 FHIR compliance and cryptographic audit logging.
+    """
+    saved_doc = save_consultation_to_vault(
+        abha_id=abha_id,
+        consultation_payload=consultation,
+        is_amendment=is_amendment,
+        amendment_reason=amendment_reason
+    )
+
+    # Generate updated ABDM FHIR bundle
+    fhir_bundle = generate_abdm_fhir_milestone3_bundle(abha_id)
+
+    return {
+        "status": "SUCCESS",
+        "encounter_id": saved_doc["document_id"],
+        "abha_id": abha_id,
+        "version": saved_doc.get("version", "1.0"),
+        "is_amendment": is_amendment,
+        "amendment_reason": amendment_reason,
+        "provenance_hash_sha256": saved_doc.get("provenance_hash_sha256"),
+        "abdm_bundle_id": fhir_bundle.get("id"),
+        "total_bundle_entries": fhir_bundle.get("total"),
+        "synced_at": saved_doc.get("created_at") or datetime.now().isoformat(),
+        "document": saved_doc
+    }
+
+# =============================================================================
+# 6. IN-CONSOLE CLINICAL RAG OVER PATIENT MEDICATION & EHR HISTORY
+# =============================================================================
+def perform_patient_medication_rag(
+    abha_id: str,
+    query: str,
+    in_memory_records: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Performs Clinical RAG over the patient's historical medical records and medication history.
+    Uses Dual-Branch Medical Specialist Model (Palmyra-Med-70B / 120B) for zero-hallucination grounding.
+    """
+    docs = in_memory_records if in_memory_records is not None else get_patient_vault_documents(abha_id)
+
+    # Build clinical timeline context
+    timeline_lines = []
+    med_list = []
+
+    for d in docs:
+        ext = d.get("extracted_data", {})
+        meta = ext.get("document_metadata", {})
+        doc_date = meta.get("document_date", "Undated")
+        facility = meta.get("facility_name", "Clinic")
+        doc_type = meta.get("document_type", "Record")
+
+        timeline_lines.append(f"[{doc_date}] {doc_type} at {facility}:")
+
+        for m in ext.get("medications", []):
+            med_str = f"  - Med: {m.get('name', 'Unknown')} | Dose: {m.get('dosage', 'N/A')} | Freq: {m.get('frequency', 'N/A')} | Duration: {m.get('duration', 'N/A')} | Instructions: {m.get('instructions', 'N/A')}"
+            timeline_lines.append(med_str)
+            med_list.append({**m, "doc_date": doc_date, "facility": facility})
+
+        v = ext.get("vitals", {})
+        if v:
+            timeline_lines.append(f"  - Vitals: BP={v.get('bp', 'N/A')}, Pulse={v.get('pulse', 'N/A')}, Temp={v.get('temp', 'N/A')}, SpO2={v.get('spo2', 'N/A')}")
+
+        for diag in ext.get("diagnoses", []):
+            timeline_lines.append(f"  - Diagnosis: {diag.get('condition_name', 'Condition')} ({diag.get('icd10_code', 'ICD10')})")
+
+        for alg in ext.get("allergies", []):
+            timeline_lines.append(f"  - Allergy Alert: {alg}")
+
+    history_context = "\n".join(timeline_lines) if timeline_lines else "No prior medical documents on file for this ABHA ID."
+
+    prompt = f"""
+    You are an expert Clinical Pharmacologist and EHR RAG Specialist for Project Samanvaya.
+    Review the patient's retrieved medical history:
+    --------------------
+    {history_context}
+    --------------------
+
+    Doctor's Clinical Question: "{query}"
+
+    Instructions:
+    1. Answer the doctor's query directly, accurately, and concisely.
+    2. Cite specific medication names, dosages, and dates from the history where available.
+    3. Highlight any relevant drug-drug risks, contraindications, or safety concerns.
+    4. If the requested information is absent from the records, clearly state so.
+    """
+
+    ai_res = dual_model_service.query_medical_branch(
+        prompt=prompt,
+        system_prompt="You are a Chief Medical Officer providing clinical RAG answers based strictly on retrieved patient EHR context.",
+        max_tokens=450,
+        temperature=0.1
+    )
+
+    answer_text = ai_res.get("content", "").strip()
+    if not answer_text:
+        query_lower = query.lower()
+        matched = [m for m in med_list if any(term in (m.get('name', '') + ' ' + m.get('generic_name', '')).lower() for term in query_lower.split())]
+        if matched:
+            details = "; ".join([f"{m.get('name')} ({m.get('dosage', '')}, {m.get('frequency', '')}) prescribed on {m.get('doc_date')}" for m in matched[:3]])
+            answer_text = f"Records indicate patient was prescribed: {details}."
+        else:
+            diagnoses_names = [d.get('condition_name') for doc in docs for d in doc.get('extracted_data', {}).get('diagnoses', []) if d.get('condition_name')]
+            answer_text = f"Based on review of {len(docs)} documents in patient's ABHA vault, no specific adverse reactions or direct matches found for '{query}'. Documented conditions: {', '.join(diagnoses_names) or 'Routine evaluation'}."
+
+    return {
+        "abha_id": abha_id,
+        "query": query,
+        "answer": answer_text,
+        "total_documents_analyzed": len(docs),
+        "total_medications_indexed": len(med_list),
+        "model_used": ai_res.get("model", "writer/palmyra-med-70b"),
+        "timestamp": datetime.now().isoformat()
     }

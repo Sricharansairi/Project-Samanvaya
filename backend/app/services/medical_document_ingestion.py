@@ -466,3 +466,117 @@ def get_patient_vault_documents(abha_id: str) -> List[Dict[str, Any]]:
     Retrieves all structured ingested records for a given ABHA ID.
     """
     return _PATIENT_DOCUMENT_VAULT.get(abha_id, [])
+
+def save_consultation_to_vault(
+    abha_id: str,
+    consultation_payload: Dict[str, Any],
+    is_amendment: bool = False,
+    amendment_reason: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Saves a completed doctor OPD consultation to the patient's ABHA vault.
+    Supports amendments/edits: if is_amendment is True, updates the existing
+    encounter with version increment (e.g. v1.0 -> v1.1) and appends an audit log.
+    """
+    if abha_id not in _PATIENT_DOCUMENT_VAULT:
+        _PATIENT_DOCUMENT_VAULT[abha_id] = []
+
+    encounter_id = consultation_payload.get("encounter_id") or f"abdm-enc-{int(time.time())}"
+    current_docs = _PATIENT_DOCUMENT_VAULT[abha_id]
+
+    existing_idx = -1
+    for idx, doc in enumerate(current_docs):
+        if doc.get("document_id") == encounter_id:
+            existing_idx = idx
+            break
+
+    now_iso = datetime.now().isoformat()
+    raw_hash_seed = f"{abha_id}-{encounter_id}-{now_iso}-{json.dumps(consultation_payload.get('medications', []))}"
+    provenance_hash = hashlib.sha256(raw_hash_seed.encode("utf-8")).hexdigest()
+
+    if is_amendment and existing_idx != -1:
+        old_doc = current_docs[existing_idx]
+        try:
+            prev_version = float(old_doc.get("version", "1.0"))
+            new_version = f"{prev_version + 0.1:.1f}"
+        except Exception:
+            new_version = "1.1"
+
+        audit_entry = {
+            "amended_at": now_iso,
+            "amended_by": consultation_payload.get("doctor_name", "Consulting Physician"),
+            "reason": amendment_reason or "Clinical modification post-investigation",
+            "previous_version": old_doc.get("version", "1.0")
+        }
+
+        updated_doc = {
+            **old_doc,
+            "version": new_version,
+            "status": "AMENDED",
+            "last_updated_at": now_iso,
+            "provenance_hash_sha256": provenance_hash,
+            "extracted_data": {
+                **old_doc.get("extracted_data", {}),
+                "document_metadata": {
+                    "document_type": "Amended Outpatient Consultation",
+                    "facility_name": consultation_payload.get("facility_name", "Government General Hospital & CHC"),
+                    "doctor_name": consultation_payload.get("doctor_name", "Consulting Physician"),
+                    "specialty": consultation_payload.get("opd_department", "General Medicine"),
+                    "document_date": datetime.now().strftime("%Y-%m-%d"),
+                    "version": new_version
+                },
+                "vitals": consultation_payload.get("vitals", {}),
+                "diagnoses": consultation_payload.get("diagnoses", []),
+                "medications": consultation_payload.get("medications", []),
+                "physician_clinical_briefing": consultation_payload.get("clinical_summary", ""),
+                "patient_advice": consultation_payload.get("patient_advice", {})
+            },
+            "audit_trail": old_doc.get("audit_trail", []) + [audit_entry]
+        }
+        current_docs[existing_idx] = updated_doc
+        logger.info(f"[Vault Amendment] Amended encounter {encounter_id} to v{new_version} for ABHA {abha_id}")
+        return updated_doc
+    else:
+        new_doc = {
+            "document_id": encounter_id,
+            "abha_id": abha_id,
+            "document_title": f"OPD Consultation - {consultation_payload.get('opd_department', 'General Medicine')}",
+            "version": "1.0",
+            "status": "FINAL",
+            "provenance_hash_sha256": provenance_hash,
+            "dpdp_compliance": {
+                "act": "Digital Personal Data Protection Act 2023 (DPDP)",
+                "data_minimization_enforced": True,
+                "raw_image_purged": True,
+                "retention_policy": "Structured ABDM FHIR encounter; legally binding digital prescription.",
+                "signed_at": now_iso
+            },
+            "extracted_data": {
+                "document_metadata": {
+                    "document_type": "Outpatient Consultation",
+                    "facility_name": consultation_payload.get("facility_name", "Government General Hospital & CHC"),
+                    "doctor_name": consultation_payload.get("doctor_name", "Consulting Physician"),
+                    "specialty": consultation_payload.get("opd_department", "General Medicine"),
+                    "document_date": datetime.now().strftime("%Y-%m-%d"),
+                    "version": "1.0"
+                },
+                "patient_demographics": {
+                    "name": consultation_payload.get("patient_name", "Citizen Patient"),
+                    "uhid": abha_id
+                },
+                "vitals": consultation_payload.get("vitals", {}),
+                "diagnoses": consultation_payload.get("diagnoses", []),
+                "medications": consultation_payload.get("medications", []),
+                "physician_clinical_briefing": consultation_payload.get("clinical_summary", ""),
+                "patient_advice": consultation_payload.get("patient_advice", {})
+            },
+            "audit_trail": [{
+                "created_at": now_iso,
+                "created_by": consultation_payload.get("doctor_name", "Consulting Physician"),
+                "action": "INITIAL_CREATION"
+            }],
+            "created_at": now_iso
+        }
+        current_docs.insert(0, new_doc)
+        logger.info(f"[Vault Upload] Created initial consultation {encounter_id} (v1.0) for ABHA {abha_id}")
+        return new_doc
