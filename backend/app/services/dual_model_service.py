@@ -20,7 +20,7 @@ class DualModelService:
     # =========================================================================
     # LOW-LEVEL HTTP CALLERS WITH STRICT TIMEOUTS
     # =========================================================================
-    def _call_groq(self, model: str, messages: List[Dict[str, str]], max_tokens: int = 500, timeout: float = 3.5, temperature: float = 0.2) -> Optional[str]:
+    def _call_groq(self, model: str, messages: List[Dict[str, str]], max_tokens: int = 500, timeout: float = 12.0, temperature: float = 0.2) -> Optional[str]:
         api_key = key_rotator.get_groq_key()
         if not api_key:
             return None
@@ -46,7 +46,7 @@ class DualModelService:
         except Exception as e:
             return None
 
-    def _call_nvidia(self, model: str, messages: List[Dict[str, str]], max_tokens: int = 500, timeout: float = 4.0, temperature: float = 0.2) -> Optional[str]:
+    def _call_nvidia(self, model: str, messages: List[Dict[str, str]], max_tokens: int = 500, timeout: float = 12.0, temperature: float = 0.2) -> Optional[str]:
         api_key = key_rotator.get_llama_3_3_70b_key()
         if not api_key:
             return None
@@ -72,7 +72,7 @@ class DualModelService:
             return None
 
     # =========================================================================
-    # BRANCH 1: HIGH-PARAMETERIZED GENERAL FOUNDATION MODELS (550B / 120B / 90B)
+    # BRANCH 1: HIGH-PARAMETERIZED GENERAL FOUNDATION MODELS (120B / 70B / 27B)
     # Deep multi-hop clinical reasoning, triage arbitration, and system orchestration
     # =========================================================================
     def query_high_param_branch(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 600, temperature: float = 0.2) -> Dict[str, Any]:
@@ -83,20 +83,8 @@ class DualModelService:
         ]
         start_time = time.time()
 
-        # Tier 0: Experimental 550B Scale Probe (NVIDIA Nemotron 550B MoE with 3.5s timeout)
-        t0_ans = self._call_nvidia("nvidia/nemotron-3-ultra-550b-a55b", messages, max_tokens=max_tokens, timeout=3.5, temperature=temperature)
-        if t0_ans:
-            return {
-                "branch": "Branch 1: High-Parameterized General",
-                "model": "nvidia/nemotron-3-ultra-550b-a55b (550B MoE)",
-                "parameter_scale": "550 Billion Parameters",
-                "latency_seconds": round(time.time() - start_time, 2),
-                "content": t0_ans,
-                "tier": "Tier 0 (550B Mega-Scale)"
-            }
-
-        # Tier 1 (Primary High-Param Workhorse): Groq LPU 120B (openai/gpt-oss-120b)
-        t1_ans = self._call_groq("openai/gpt-oss-120b", messages, max_tokens=max_tokens, timeout=3.0, temperature=temperature)
+        # Tier 1 (Primary High-Param Beast Workhorse): Groq LPU 120B (openai/gpt-oss-120b)
+        t1_ans = self._call_groq("openai/gpt-oss-120b", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
         if t1_ans:
             return {
                 "branch": "Branch 1: High-Parameterized General",
@@ -107,40 +95,28 @@ class DualModelService:
                 "tier": "Tier 1 (120B LPU Ultra-Fast)"
             }
 
-        # Tier 1 Fallback (NVIDIA NIM 120B MoE): nvidia/nemotron-3-super-120b-a12b
-        t1_nim = self._call_nvidia("nvidia/nemotron-3-super-120b-a12b", messages, max_tokens=max_tokens, timeout=4.0, temperature=temperature)
-        if t1_nim:
+        # Tier 2 (NVIDIA NIM 70B Beast): meta/llama-3.3-70b-instruct
+        t2_nim = self._call_nvidia("meta/llama-3.3-70b-instruct", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
+        if t2_nim:
             return {
                 "branch": "Branch 1: High-Parameterized General",
-                "model": "nvidia/nemotron-3-super-120b-a12b (120B MoE NIM)",
-                "parameter_scale": "120 Billion Parameters (MoE)",
+                "model": "meta/llama-3.3-70b-instruct (70B NIM)",
+                "parameter_scale": "70 Billion Parameters",
                 "latency_seconds": round(time.time() - start_time, 2),
-                "content": t1_nim,
-                "tier": "Tier 1 (120B NIM MoE)"
+                "content": t2_nim,
+                "tier": "Tier 2 (70B NIM Instruct)"
             }
 
-        # Tier 2: Groq LPU Fast Multilingual Workhorse (qwen/qwen3.8-27b)
-        t2_ans = self._call_groq("qwen/qwen3.8-27b", messages, max_tokens=max_tokens, timeout=2.5, temperature=temperature)
-        if t2_ans:
+        # Tier 3: Groq LPU Fast Multilingual Workhorse (qwen/qwen3.8-27b)
+        t3_ans = self._call_groq("qwen/qwen3.8-27b", messages, max_tokens=max_tokens, timeout=8.0, temperature=temperature)
+        if t3_ans:
             return {
                 "branch": "Branch 1: High-Parameterized General",
                 "model": "qwen/qwen3.8-27b (Groq LPU)",
                 "parameter_scale": "27 Billion Parameters",
                 "latency_seconds": round(time.time() - start_time, 2),
-                "content": t2_ans,
-                "tier": "Tier 2 (27B Fast Reasoning)"
-            }
-
-        # Tier 3 (Ultra-Low-Latency Guard): NVIDIA Nemotron 3.5 Lightning 30B
-        t3_ans = self._call_nvidia("nvidia/nemotron-3.5-lightning-30b-a3b", messages, max_tokens=max_tokens, timeout=2.0, temperature=temperature)
-        if t3_ans:
-            return {
-                "branch": "Branch 1: High-Parameterized General",
-                "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
-                "parameter_scale": "30 Billion Parameters",
-                "latency_seconds": round(time.time() - start_time, 2),
                 "content": t3_ans,
-                "tier": "Tier 3 (30B Lightning)"
+                "tier": "Tier 3 (27B Fast Reasoning)"
             }
 
         # Final Fallback to Branch 2

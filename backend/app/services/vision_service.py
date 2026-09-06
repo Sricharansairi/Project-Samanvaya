@@ -3,6 +3,7 @@ import requests
 import base64
 import os
 import re
+from app.core.key_rotator import key_rotator
 
 def process_medical_image(base64_image: str) -> dict:
     """
@@ -14,7 +15,8 @@ def process_medical_image(base64_image: str) -> dict:
     nemotron_keys = [
         os.getenv("NVIDIA_LLAMA_3_3_70B_KEY_1"),
         os.getenv("NVIDIA_LLAMA_3_3_70B_KEY_2"),
-        key_rotator.get_llama_3_3_70b_key()
+        os.getenv("NVIDIA_LLAMA_3_2_90B_KEY_1"),
+        os.getenv("NVIDIA_PHI_4_KEY_1")
     ]
     nemotron_keys = [k for k in nemotron_keys if k and k.startswith("nvapi-")]
     
@@ -60,6 +62,40 @@ def process_medical_image(base64_image: str) -> dict:
                     break
         except Exception as e:
             print(f"Error during Nemotron OCR attempt with key {key[:15]}: {e}")
+
+    # 1b. Multimodal Vision Model Fallback if OCR is sparse (< 5 lines)
+    if len(detected_words) < 5 and nemotron_keys:
+        print("[Vision Service] Sparse OCR, calling NVIDIA Multimodal Vision Model...")
+        for key in nemotron_keys:
+            try:
+                v_res = requests.post(
+                    "https://integrate.api.nvidia.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "meta/llama-3.2-11b-vision-instruct",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": "Transcribe all text on this prescription slip line by line: clinic name, doctor, patient details, vitals, diagnoses, and medications with strength and frequency."},
+                                    {"type": "image_url", "image_url": {"url": img_url}}
+                                ]
+                            }
+                        ],
+                        "max_tokens": 400,
+                        "temperature": 0.1
+                    },
+                    timeout=18
+                )
+                if v_res.ok:
+                    v_txt = v_res.json()["choices"][0]["message"]["content"].strip()
+                    lines = [l.strip() for l in v_txt.splitlines() if l.strip()]
+                    detected_words.extend(lines)
+                    ocr_result = "\n".join(detected_words)
+                    print(f"[Vision Service] Multimodal VLM extracted {len(lines)} lines from prescription image.")
+                    break
+            except Exception as v_err:
+                print(f"[Vision Service] VLM fallback attempt error: {v_err}")
 
     # 2. Structured parsing via Groq (Primary, ~1s)
     groq_key = os.environ.get("GROQ_API_KEY") or base64.b64decode("Z3NrXzYxdFprRDlUWWJlTU1RdDhYR09XR2R5YnJRWTYyQjNpN29sNVNJcGxkWFZRandQZEpmSg==").decode("utf-8")

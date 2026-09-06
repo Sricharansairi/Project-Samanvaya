@@ -59,6 +59,8 @@ def extract_raw_ocr_tokens(image_bytes: bytes) -> Dict[str, Any]:
     nemotron_keys = [
         os.getenv("NVIDIA_LLAMA_3_3_70B_KEY_1"),
         os.getenv("NVIDIA_LLAMA_3_3_70B_KEY_2"),
+        os.getenv("NVIDIA_LLAMA_3_2_90B_KEY_1"),
+        os.getenv("NVIDIA_PHI_4_KEY_1"),
         key_rotator.get_llama_3_3_70b_key()
     ]
     nemotron_keys = [k for k in nemotron_keys if k and k.startswith("nvapi-")]
@@ -87,7 +89,7 @@ def extract_raw_ocr_tokens(image_bytes: bytes) -> Dict[str, Any]:
                     "Content-Type": "application/json"
                 },
                 json=payload,
-                timeout=10
+                timeout=12
             )
             if res.ok:
                 data = res.json()
@@ -109,9 +111,86 @@ def extract_raw_ocr_tokens(image_bytes: bytes) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Nemotron OCR attempt with key {key[:15]} failed: {e}")
 
+    # Multimodal Vision Model Fallback if OCR is sparse (< 6 lines) or missing clinical terms
+    has_med_words = any(w in " ".join(detected_lines).lower() for w in ["tab", "cap", "syp", "dr.", "rx", "mg", "clinic", "hospital", "patient", "diag", "report", "test"])
+    if (len(detected_lines) < 6 or not has_med_words) and nemotron_keys:
+        logger.info("[Ingestion Vision Beast Tier] Sparse OCR, calling Multimodal VLM for deep transcription...")
+        vlm_prompt = (
+            "You are an expert Clinical Pharmacist and Medical Scribe. Read this prescription or clinical document photo carefully. "
+            "Transcribe all medical writing: Clinic name, Doctor name, Patient details, Vitals, Diagnoses, and every prescribed medicine "
+            "with dosage form, strength (mg), frequency (1-0-1, OD, BD, TDS), and instructions. Transcribe line by line."
+        )
+
+        vlm_success = False
+        # Try 90B Vision First
+        for key in nemotron_keys:
+            try:
+                v_res = requests.post(
+                    "https://integrate.api.nvidia.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "meta/llama-3.2-90b-vision-instruct",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": vlm_prompt},
+                                    {"type": "image_url", "image_url": {"url": img_data_url}}
+                                ]
+                            }
+                        ],
+                        "max_tokens": 600,
+                        "temperature": 0.1
+                    },
+                    timeout=15
+                )
+                if v_res.ok:
+                    v_txt = v_res.json()["choices"][0]["message"]["content"].strip()
+                    if v_txt and "not able to extract" not in v_txt.lower() and "cannot see" not in v_txt.lower():
+                        v_lines = [l.strip() for l in v_txt.splitlines() if l.strip()]
+                        detected_lines.extend(v_lines)
+                        logger.info(f"[Ingestion Vision Beast Tier: 90B] Extracted {len(v_lines)} clinical lines.")
+                        vlm_success = True
+                        break
+            except Exception as err90:
+                logger.warning(f"90B VLM attempt notice: {err90}")
+
+        # Fallback to 11B Vision
+        if not vlm_success:
+            for key in nemotron_keys:
+                try:
+                    v_res = requests.post(
+                        "https://integrate.api.nvidia.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                        json={
+                            "model": "meta/llama-3.2-11b-vision-instruct",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": vlm_prompt},
+                                        {"type": "image_url", "image_url": {"url": img_data_url}}
+                                    ]
+                                }
+                            ],
+                            "max_tokens": 600,
+                            "temperature": 0.1
+                        },
+                        timeout=20
+                    )
+                    if v_res.ok:
+                        v_txt = v_res.json()["choices"][0]["message"]["content"].strip()
+                        if v_txt and "not able to extract" not in v_txt.lower() and "cannot see" not in v_txt.lower():
+                            v_lines = [l.strip() for l in v_txt.splitlines() if l.strip()]
+                            detected_lines.extend(v_lines)
+                            logger.info(f"[Ingestion Vision Beast Tier: 11B] Extracted {len(v_lines)} clinical lines.")
+                            break
+                except Exception as err11:
+                    logger.warning(f"11B VLM attempt notice: {err11}")
+
     raw_text = "\n".join(detected_lines).strip()
     return {
-        "engine": "NVIDIA Nemotron OCR v2 (Spatial Coordinate Sorting)",
+        "engine": "NVIDIA Nemotron OCR v2 + Llama 3.2 Vision (Spatial Coordinate Sorting)",
         "lines": detected_lines,
         "raw_text": raw_text if raw_text else "Indistinct clinical record text."
     }
@@ -220,10 +299,9 @@ JSON OUTPUT SCHEMA (RESPOND STRICTLY WITH VALID JSON ONLY):
             raw_json_str = raw_json_str[7:]
         elif raw_json_str.startswith("```"):
             raw_json_str = raw_json_str[3:]
-        if raw_json_str.endswith("```"):
-            raw_json_str = raw_json_str[:-3]
-
-        parsed_record = json.loads(raw_json_str.strip())
+        # Sanitize trailing commas before json.loads
+        sanitized_json = re.sub(r',\s*([\]\}])', r'\1', raw_json_str.strip())
+        parsed_record = json.loads(sanitized_json)
         if not parsed_record.get("document_metadata") or not isinstance(parsed_record["document_metadata"], dict):
             parsed_record["document_metadata"] = {}
         if not parsed_record["document_metadata"].get("document_type"):
