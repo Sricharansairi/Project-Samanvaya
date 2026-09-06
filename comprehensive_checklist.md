@@ -59,9 +59,21 @@
 
 ---
 
-### Phase 2: Clinical Safety & Antimicrobial Stewardship (Planned)
-- [ ] ICMR & WHO AWaRe Antimicrobial Stewardship Audit.
-- [ ] De-Stigmatized Tele-MANAS (14416) Mental Health Screener.
+### Phase 2: Clinical Safety & Antimicrobial Stewardship (Completed & Deployed)
+- [x] **ICMR & WHO AWaRe Antimicrobial Stewardship Audit**:
+  - [x] Dynamic real-time Groq LLM API (`/api/antimicrobial/audit`) with zero hardcoding.
+  - [x] Categorizes prescriptions into WHO **Access**, **Watch**, and **Reserve** tiers.
+  - [x] Audits indication appropriateness against ICMR National Treatment Guidelines.
+  - [x] Recommends narrower first-line Access alternatives (e.g. Amoxicillin over Azithromycin for viral URTI).
+  - [x] Interactive stewardship console (`/his/antimicrobial`) with tricolor hospital surveillance gauge (WHO >60% Access target).
+  - [x] Real-time AWaRe pill badges integrated into Doctor OPD Desk (`/his/doctor`).
+- [x] **De-Stigmatized Tele-MANAS (14416) Mental Health Screener**:
+  - [x] Dynamic real-time Groq LLM API (`/api/tele-manas/evaluate`) for somatic distress triage.
+  - [x] Evaluates bodily tension, fatigue, and sleep disruption to normalize mind-body connection without psychiatric stigma.
+  - [x] Formulates personalized 3-step coping action plan and evidence-based lifestyle guidance.
+  - [x] Interactive Sama Vritti (4-4-4-4 Box Breathing) visual animated pacer.
+  - [x] 1-Click confidential dialer to 24x7 National Helpline `14416` (`/his/tele-manas`).
+  - [x] Multi-lingual support across all 11 Indian languages.
 
 ### Phase 3: Civic Operations & Emergency Logistics (Planned)
 - [ ] ABDM "Scan-to-Queue" Smart OPD Pass with Live Wait-Time Forecast.

@@ -389,221 +389,159 @@ Nemotron Rerank-VL Match Probability: ${(d.rerankScore * 100).toFixed(1)}%`;
                 {/* PRIMARY TWO-COLUMN WORKSPACE: LEFT IS VISUAL DOCUMENT VIEWER WITH ZOOM, RIGHT IS DUAL CARDS */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   
-                  {/* LEFT COLUMN: INTERACTIVE HIGH-RESOLUTION DOCUMENT SHEET & ZOOM VIEWER (7 SPAN) */}
+                  {/* LEFT COLUMN: CRISP NATIVE CLINICAL DATA & DECISION CARD (7 SPAN) */}
                   <div className="lg:col-span-7 flex flex-col gap-4">
-                    
-                    {/* Viewport Controls Bar */}
-                    <div className="bg-slate-900 text-white px-4 py-2.5 rounded-2xl flex items-center justify-between shadow-md">
-                      <div className="flex items-center gap-2 text-xs font-bold">
-                        <FileText className="w-4 h-4 text-emerald-400" />
-                        <span>Visual Page Canvas</span>
-                        <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                          Box: [{visualDoc.targetBoundingBox.ymin}, {visualDoc.targetBoundingBox.xmin}, {visualDoc.targetBoundingBox.ymax}, {visualDoc.targetBoundingBox.xmax}]
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-xs p-5 sm:p-6">
+                      
+                      {/* Document Meta Header */}
+                      <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0f4c81] flex items-center justify-center font-bold text-base">
+                            {visualDoc.documentType === "lab_report" ? "🧪" : "🩺"}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm sm:text-base text-[#0f2942]">
+                              {visualDoc.documentType === "lab_report" ? "NABL Accredited Pathology Panel" : "ICMR Standard Treatment Workflow"}
+                            </h3>
+                            <p className="text-xs text-gray-500 font-medium">
+                              {visualDoc.authority} • {visualDoc.citation}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 hidden sm:inline">
+                          ISO 15189:2022
                         </span>
                       </div>
 
-                      {/* Zoom Toggle Buttons */}
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsZoomedIn(true);
-                            setZoomLevel(visualDoc.zoomFocus.zoomLevel || 2.6);
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                            isZoomedIn 
-                              ? "bg-emerald-500 text-slate-950 shadow-sm" 
-                              : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          }`}
-                          title="Instantly zoom directly into target table"
-                        >
-                          <ZoomIn className="w-3.5 h-3.5" /> Zoom to Table
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsZoomedIn(false);
-                            setZoomLevel(1.0);
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                            !isZoomedIn 
-                              ? "bg-emerald-500 text-slate-950 shadow-sm" 
-                              : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          }`}
-                          title="View full document overview"
-                        >
-                          <Minimize2 className="w-3.5 h-3.5" /> Full Sheet
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Interactive Zoomable Viewport Container */}
-                    <div className="relative w-full h-[520px] bg-slate-200/90 rounded-3xl border-2 border-slate-300 shadow-inner overflow-hidden flex items-center justify-center select-none">
-                      
-                      {/* Document Sheet with Smooth Transform Transition */}
-                      <div 
-                        className="w-[600px] min-h-[780px] bg-white rounded-xl shadow-2xl p-6 text-slate-800 font-sans relative origin-top-left transition-transform duration-700 ease-out"
-                        style={{
-                          transform: isZoomedIn 
-                            ? `scale(${zoomLevel}) translate(-${visualDoc.zoomFocus.xPercent * 0.45}%, -${visualDoc.zoomFocus.yPercent * 0.55}%)`
-                            : `scale(0.62) translate(0%, 0%)`,
-                          transformOrigin: `${visualDoc.zoomFocus.xPercent}% ${visualDoc.zoomFocus.yPercent}%`
-                        }}
-                      >
-                        {/* Document Header (Authentic Hospital / NABL Pathology Format) */}
-                        <div className="border-b-2 border-slate-900 pb-3 mb-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-[#0f4c81] text-white flex items-center justify-center font-bold text-sm">
-                                🏥
-                              </div>
-                              <div>
-                                <h3 className="font-extrabold text-sm text-[#0f2942] uppercase tracking-wider">
-                                  {visualDoc.documentType === "lab_report" ? "National NABL Certified Clinical Pathology" : "ICMR Standard Treatment Workflow Flowchart"}
-                                </h3>
-                                <p className="text-[10px] text-slate-500">Government Empanelled Diagnostic & Treatment Network</p>
-                              </div>
-                            </div>
-                            <div className="text-right text-[9px] text-slate-500 font-mono">
-                              <div>BARCODE: *92840192*</div>
-                              <div>ISO 15189:2022 ACCREDITED</div>
-                            </div>
-                          </div>
-
-                          {/* Patient Bar if lab report */}
-                          {visualDoc.patientDemographics && (
-                            <div className="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-4 gap-2 text-[9px]">
-                              <div><strong className="text-slate-500">NAME:</strong> {visualDoc.patientDemographics.name}</div>
-                              <div><strong className="text-slate-500">AGE/GENDER:</strong> {visualDoc.patientDemographics.ageGender}</div>
-                              <div><strong className="text-slate-500">UHID:</strong> {visualDoc.patientDemographics.uhid}</div>
-                              <div><strong className="text-slate-500">DATE:</strong> {visualDoc.patientDemographics.sampleDate}</div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* SECTION A: LAB REPORT TABLE WITH SPECIFIC TARGET ROW HIGHLIGHT */}
-                        {visualDoc.tableRows && visualDoc.tableRows.length > 0 && (
-                          <div className="relative mb-6">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-bold text-xs text-[#0f2942] uppercase tracking-wide">
-                                {visualDoc.targetSectionTitle}
-                              </span>
-                              <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                                NABL Accredited Parameters
-                              </span>
-                            </div>
-
-                            {/* TARGET TABLE SPOTLIGHT BOUNDING BOX OVERLAY */}
-                            <div className="relative border border-slate-300 rounded-lg overflow-hidden shadow-xs">
-                              <table className="w-full text-left border-collapse text-[10px]">
-                                <thead>
-                                  <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700">
-                                    <th className="p-1.5 pl-2">Investigation</th>
-                                    <th className="p-1.5">Observed</th>
-                                    <th className="p-1.5">Unit</th>
-                                    <th className="p-1.5">Reference Interval</th>
-                                    <th className="p-1.5 text-right pr-2">Flag</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {visualDoc.tableRows.map((row, rIdx) => (
-                                    <tr 
-                                      key={rIdx} 
-                                      className={`border-b border-slate-100 transition-colors ${
-                                        row.isTargetRow 
-                                          ? "bg-amber-100/90 font-extrabold text-slate-950 border-l-4 border-l-amber-600" 
-                                          : "hover:bg-slate-50 text-slate-700"
-                                      }`}
-                                    >
-                                      <td className="p-1.5 pl-2 flex items-center gap-1">
-                                        {row.isTargetRow && <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping shrink-0" />}
-                                        <span>{row.testName}</span>
-                                      </td>
-                                      <td className="p-1.5 font-bold text-sm">{row.observedValue}</td>
-                                      <td className="p-1.5 text-slate-500">{row.unit}</td>
-                                      <td className="p-1.5 text-[9px] text-slate-500">{row.referenceRange}</td>
-                                      <td className="p-1.5 text-right pr-2">
-                                        <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
-                                          row.flag === "HIGH" || row.flag === "CRITICAL"
-                                            ? "bg-red-600 text-white"
-                                            : "bg-emerald-100 text-emerald-800"
-                                        }`}>
-                                          {row.flag}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-
-                              {/* PULSATING SPOTLIGHT BOUNDING BOX GLOW */}
-                              <div className="absolute inset-0 border-2 border-emerald-500 rounded-lg pointer-events-none shadow-[0_0_20px_rgba(16,185,129,0.35)]" />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* SECTION B: CLINICAL FLOWCHART DECISION TREE */}
-                        {visualDoc.flowchartNodes && visualDoc.flowchartNodes.length > 0 && (
-                          <div className="mb-6">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-bold text-xs text-[#0f2942] uppercase tracking-wide">
-                                {visualDoc.targetSectionTitle}
-                              </span>
-                              <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                                ICMR STW Flowchart
-                              </span>
-                            </div>
-
-                            <div className="space-y-2 relative">
-                              {visualDoc.flowchartNodes.map((node, nIdx) => (
-                                <div 
-                                  key={nIdx}
-                                  className={`p-2.5 rounded-xl border transition-all ${
-                                    node.isTargetNode
-                                      ? "bg-amber-50 border-2 border-amber-500 shadow-md"
-                                      : "bg-slate-50 border-slate-200"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[11px] font-bold text-[#0f2942]">
-                                      {nIdx + 1}. {node.title}
-                                    </span>
-                                    {node.isTargetNode && (
-                                      <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full uppercase">
-                                        Target Node
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] text-slate-600 mb-1">
-                                    <strong>Condition:</strong> {node.condition}
-                                  </div>
-                                  <div className="text-[10px] font-bold text-emerald-800">
-                                    <strong>Action:</strong> {node.action}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Document Footer */}
-                        <div className="mt-8 pt-3 border-t border-slate-200 flex justify-between items-center text-[8px] text-slate-400">
-                          <div>Standard Guideline Reference: {visualDoc.citation}</div>
-                          <div>Verified by Chief Medical Officer</div>
-                        </div>
-
-                      </div>
-
-                      {/* Viewport Overlay Targeting Reticle */}
-                      {isZoomedIn && (
-                        <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md text-emerald-400 px-3 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 shadow-lg pointer-events-none">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                          <span>Direct Camera Zoom Active ({zoomLevel}x)</span>
+                      {/* Patient Demographics Bar */}
+                      {visualDoc.patientDemographics && (
+                        <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div><span className="text-gray-400 block text-[10px] font-bold">PATIENT</span><span className="font-bold text-slate-800">{visualDoc.patientDemographics.name}</span></div>
+                          <div><span className="text-gray-400 block text-[10px] font-bold">AGE / GENDER</span><span className="font-bold text-slate-800">{visualDoc.patientDemographics.ageGender}</span></div>
+                          <div><span className="text-gray-400 block text-[10px] font-bold">UHID</span><span className="font-bold text-slate-800 font-mono">{visualDoc.patientDemographics.uhid}</span></div>
+                          <div><span className="text-gray-400 block text-[10px] font-bold">SAMPLE DATE</span><span className="font-bold text-slate-800">{visualDoc.patientDemographics.sampleDate}</span></div>
                         </div>
                       )}
-                    </div>
 
+                      {/* SECTION 1: NABL LAB REPORT TABLE */}
+                      {visualDoc.tableRows && visualDoc.tableRows.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-[#0f2942] uppercase tracking-wider">
+                              {visualDoc.targetSectionTitle}
+                            </span>
+                            <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md font-bold border border-emerald-200">
+                              Diagnostic Biomarkers
+                            </span>
+                          </div>
+
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-2xs">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-gray-200 font-bold text-slate-600 text-[11px] uppercase tracking-wider">
+                                  <th className="py-2.5 px-3">Investigation</th>
+                                  <th className="py-2.5 px-3">Observed Value</th>
+                                  <th className="py-2.5 px-3">Unit</th>
+                                  <th className="py-2.5 px-3">Biological Reference</th>
+                                  <th className="py-2.5 px-3 text-right">Status Flag</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {visualDoc.tableRows.map((row, rIdx) => (
+                                  <tr 
+                                    key={rIdx} 
+                                    className={`transition-colors ${
+                                      row.isTargetRow 
+                                        ? "bg-amber-50/90 font-bold text-slate-900 border-l-4 border-l-amber-500" 
+                                        : "hover:bg-slate-50 text-slate-700"
+                                    }`}
+                                  >
+                                    <td className="py-2.5 px-3 flex items-center gap-2">
+                                      {row.isTargetRow && (
+                                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+                                      )}
+                                      <span className={row.isTargetRow ? "text-[#0f2942] font-extrabold" : ""}>{row.testName}</span>
+                                    </td>
+                                    <td className="py-2.5 px-3 font-extrabold text-sm text-slate-900">{row.observedValue}</td>
+                                    <td className="py-2.5 px-3 text-gray-500">{row.unit}</td>
+                                    <td className="py-2.5 px-3 text-gray-500">{row.referenceRange}</td>
+                                    <td className="py-2.5 px-3 text-right">
+                                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                        row.flag === "HIGH" || row.flag === "CRITICAL"
+                                          ? "bg-red-100 text-red-800 border border-red-200"
+                                          : row.flag === "LOW"
+                                          ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                          : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                      }`}>
+                                        {row.flag}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SECTION 2: CLINICAL FLOWCHART PATHWAY */}
+                      {visualDoc.flowchartNodes && visualDoc.flowchartNodes.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-[#0f2942] uppercase tracking-wider">
+                              {visualDoc.targetSectionTitle}
+                            </span>
+                            <span className="text-[11px] text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md font-bold border border-blue-200">
+                              Clinical Algorithm
+                            </span>
+                          </div>
+
+                          <div className="space-y-2.5">
+                            {visualDoc.flowchartNodes.map((node, nIdx) => (
+                              <div 
+                                key={nIdx}
+                                className={`p-3.5 rounded-xl border transition-all ${
+                                  node.isTargetNode
+                                    ? "bg-amber-50/70 border-2 border-amber-400 shadow-xs"
+                                    : "bg-slate-50 border-slate-200"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-[#0f4c81] text-white text-[10px] font-bold flex items-center justify-center">
+                                      {nIdx + 1}
+                                    </span>
+                                    <span className="text-xs font-bold text-[#0f2942]">
+                                      {node.title}
+                                    </span>
+                                  </div>
+                                  {node.isTargetNode && (
+                                    <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase">
+                                      Recommended Action
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-slate-600 mb-1">
+                                  <span className="font-semibold text-gray-500">Condition:</span> {node.condition}
+                                </div>
+                                <div className="text-xs font-bold text-emerald-900 bg-emerald-50/80 p-2 rounded-lg border border-emerald-200">
+                                  <span className="text-emerald-700">Directive:</span> {node.action}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Card Footer */}
+                      <div className="mt-5 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+                        <span>Standard Reference: <strong className="text-gray-700">{visualDoc.citation}</strong></span>
+                        <span className="text-emerald-700 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Authenticated by Ministry Guidelines
+                        </span>
+                      </div>
+
+                    </div>
                   </div>
 
                   {/* RIGHT COLUMN: DUAL-TIER CIVIC & CLINICAL EXPLANATION CARDS (5 SPAN) */}

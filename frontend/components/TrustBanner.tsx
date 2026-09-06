@@ -50,6 +50,10 @@ export default function TrustBanner({ currentTab = "home", onTabChange, onLangua
         router.push("/his/registration");
       } else if (q.includes("rag") || q.includes("ai") || q.includes("decision") || q.includes("guidelines")) {
         router.push("/his/rag");
+      } else if (q.includes("amr") || q.includes("antibiotic") || q.includes("aware") || q.includes("stewardship")) {
+        router.push("/his/antimicrobial");
+      } else if (q.includes("tele") || q.includes("manas") || q.includes("mental") || q.includes("stress") || q.includes("14416") || q.includes("counsel")) {
+        router.push("/his/tele-manas");
       } else if (q.includes("dpdp") || q.includes("consent") || q.includes("privacy")) {
         router.push("/his/dpdp");
       } else if (q.includes("patient") || q.includes("card") || q.includes("abha") || q.includes("portal")) {
@@ -278,6 +282,36 @@ export default function TrustBanner({ currentTab = "home", onTabChange, onLangua
           }`}
         >
           🪪 My ABHA
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabClick("antimicrobial", "/his/antimicrobial")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            currentTab === "antimicrobial"
+              ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          💊 AWaRe AMR
+          <span className="text-[9px] bg-red-100 text-red-800 font-extrabold px-1.5 py-0.5 rounded-full border border-red-300">
+            Phase 2
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabClick("telemanas", "/his/tele-manas")}
+          className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            currentTab === "telemanas"
+              ? "bg-[#0f4c81] text-white font-semibold shadow-sm"
+              : "hover:bg-gray-100 text-gray-700"
+          }`}
+        >
+          🧠 Tele-MANAS
+          <span className="text-[9px] bg-teal-100 text-teal-800 font-extrabold px-1.5 py-0.5 rounded-full border border-teal-300">
+            14416
+          </span>
         </button>
 
         <button

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, Stethoscope, Check, X, AlertTriangle, Mic, MicOff, Save, FileText, Pill, Printer, ArrowRight } from "lucide-react";
+import { ArrowLeft, Users, Stethoscope, Check, X, AlertTriangle, Mic, MicOff, Save, FileText, Pill, Printer, ArrowRight, ShieldAlert, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -49,6 +50,21 @@ export default function DoctorDashboard() {
 
   const toggleLineStatus = (id: number, newStatus: "accepted" | "rejected") => {
     setLines(lines.map(l => l.id === id ? { ...l, status: newStatus } : l));
+  };
+
+  const getAwarePill = (medName: string) => {
+    const lower = (medName || "").toLowerCase();
+    if (!lower) return null;
+    if (/mero|colistin|linezolid|polymyxin|tigecycline/i.test(lower)) {
+      return { group: "Reserve", color: "bg-rose-100 text-rose-800 border-rose-300", label: "WHO Reserve (Restricted Last Resort)" };
+    }
+    if (/azithro|cefix|ceftriax|cipro|levo|oflox|piper|amox.*clav|augmentin/i.test(lower)) {
+      return { group: "Watch", color: "bg-amber-100 text-amber-800 border-amber-300", label: "WHO Watch (High Resistance Risk)" };
+    }
+    if (/amox|cefalex|doxy|metro|cotrimox|nitrofurantoin|gentamicin/i.test(lower)) {
+      return { group: "Access", color: "bg-emerald-100 text-emerald-800 border-emerald-300", label: "WHO Access (ICMR First-Line)" };
+    }
+    return null;
   };
 
   const handleVoiceDictation = () => {
@@ -293,39 +309,65 @@ export default function DoctorDashboard() {
 
                 <div className="space-y-3">
                   {prescriptions.map((rx, i) => (
-                    <div key={i} className="grid grid-cols-12 gap-3 items-end bg-gray-50 p-3 rounded-lg border border-gray-100">
-                      <div className="col-span-12 sm:col-span-4">
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">Medicine</label>
-                        <input type="text" value={rx.med} onChange={e => {
-                          const newRx = [...prescriptions];
-                          newRx[i].med = e.target.value;
-                          setPrescriptions(newRx);
-                        }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="e.g. Paracetamol" />
+                    <div key={i} className="bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-2">
+                      <div className="grid grid-cols-12 gap-3 items-end">
+                        <div className="col-span-12 sm:col-span-4">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Medicine</label>
+                          <input type="text" value={rx.med} onChange={e => {
+                            const newRx = [...prescriptions];
+                            newRx[i].med = e.target.value;
+                            setPrescriptions(newRx);
+                          }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="e.g. Paracetamol" />
+                        </div>
+                        <div className="col-span-6 sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Frequency</label>
+                          <input type="text" value={rx.freq} onChange={e => {
+                            const newRx = [...prescriptions];
+                            newRx[i].freq = e.target.value;
+                            setPrescriptions(newRx);
+                          }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="1-0-1" />
+                        </div>
+                        <div className="col-span-6 sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Duration</label>
+                          <input type="text" value={rx.days} onChange={e => {
+                            const newRx = [...prescriptions];
+                            newRx[i].days = e.target.value;
+                            setPrescriptions(newRx);
+                          }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="5 days" />
+                        </div>
+                        <div className="col-span-12 sm:col-span-4">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Notes</label>
+                          <input type="text" value={rx.notes} onChange={e => {
+                            const newRx = [...prescriptions];
+                            newRx[i].notes = e.target.value;
+                            setPrescriptions(newRx);
+                          }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="After food" />
+                        </div>
                       </div>
-                      <div className="col-span-6 sm:col-span-2">
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">Frequency</label>
-                        <input type="text" value={rx.freq} onChange={e => {
-                          const newRx = [...prescriptions];
-                          newRx[i].freq = e.target.value;
-                          setPrescriptions(newRx);
-                        }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="1-0-1" />
-                      </div>
-                      <div className="col-span-6 sm:col-span-2">
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">Duration</label>
-                        <input type="text" value={rx.days} onChange={e => {
-                          const newRx = [...prescriptions];
-                          newRx[i].days = e.target.value;
-                          setPrescriptions(newRx);
-                        }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="5 days" />
-                      </div>
-                      <div className="col-span-12 sm:col-span-4">
-                        <label className="block text-xs font-semibold text-gray-500 mb-1">Notes</label>
-                        <input type="text" value={rx.notes} onChange={e => {
-                          const newRx = [...prescriptions];
-                          newRx[i].notes = e.target.value;
-                          setPrescriptions(newRx);
-                        }} className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" placeholder="After food" />
-                      </div>
+
+                      {/* Real-Time WHO AWaRe Antimicrobial Stewardship Pill Badge */}
+                      {getAwarePill(rx.med) && (
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-200/60 text-xs">
+                          <span className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold flex items-center gap-1 ${getAwarePill(rx.med)?.color}`}>
+                            {getAwarePill(rx.med)?.group === "Reserve" ? (
+                              <ShieldAlert className="w-3 h-3 text-rose-600" />
+                            ) : getAwarePill(rx.med)?.group === "Watch" ? (
+                              <AlertTriangle className="w-3 h-3 text-amber-600" />
+                            ) : (
+                              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            )}
+                            <span>{getAwarePill(rx.med)?.label}</span>
+                          </span>
+
+                          <Link
+                            href="/his/antimicrobial"
+                            className="text-[#0f4c81] hover:underline text-[11px] font-bold flex items-center gap-1"
+                          >
+                            <span>ICMR Stewardship Audit</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

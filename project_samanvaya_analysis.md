@@ -95,9 +95,45 @@ Based on in-depth operational analysis of Indian civic and district hospitals, t
 
 ---
 
-## 5. Technical Stack & Deployment Telemetry
-- **Frontend**: Next.js 14 App Router, TypeScript, Tailwind CSS, Framer Motion, Lucide Icons.
-- **AI & Vision Pipeline**: NVIDIA Nemotron OCR v2, Moonshot Kimi-K3 / Groq LLaMA 3.3 70B, Sarvam AI Voice TTS (`bulbul`).
-- **Visual RAG**: NVIDIA `llama-nemotron-embed-vl-1b-v2` & `llama-nemotron-rerank-vl-1b-v2` architecture.
+## 5. Phase 2: Clinical Safety & Antimicrobial Stewardship Implementation
+
+### 5.1 ICMR & WHO AWaRe Antimicrobial Stewardship Audit
+- **Public Health Problem**: India is the largest consumer of antibiotics globally, facing rampant Antimicrobial Resistance (AMR) due to routine empirical prescription of broad-spectrum Watch/Reserve agents (Azithromycin, Ceftriaxone, Meropenem) for self-limiting viral coryza and simple UTIs. WHO mandates that at least 60% of hospital antibiotic consumption must be from the **Access** group.
+- **Dynamic Real-Time Engine (`/api/antimicrobial/audit`)**:
+  - Powered by Groq LLM with zero hardcoded drug dictionaries.
+  - Dynamically classifies any prescribed molecule into WHO **Access** (emerald), **Watch** (amber), or **Reserve** (rose).
+  - Audits clinical indication against ICMR National Treatment Guidelines for Antimicrobial Use.
+  - Detects irrational overprescription and recommends specific narrower-spectrum first-line ICMR Access alternatives with dosage and clinical rationale.
+  - Computes an AMR Resistance Pressure Index (0-100).
+- **Interactive UI (`/his/antimicrobial` & `/his/doctor`)**:
+  - Live Hospital Antibiotic Consumption telemetry bar tracking Access vs Watch vs Reserve ratio.
+  - Real-time AWaRe pill badges integrated directly into the Doctor Consultation Desk e-Prescription workflow.
+
+### 5.2 De-Stigmatized Tele-MANAS (14416) Mental Health Screener
+- **Civic Problem**: Mental health carries profound societal stigma in India. Patients frequently present to General Medicine / Ayushman OPDs with somatic complaints (palpitations, bodily heaviness, tension headaches, insomnia, digestive knots) which are physical manifestations of underlying stress and depression.
+- **Dynamic Real-Time Engine (`/api/tele-manas/evaluate`)**:
+  - Validates physical somatic symptoms as natural autonomic mind-body reactions without psychiatric stigmatization.
+  - Triages distress into Mild, Moderate, High, or Urgent categories based on somatic burden.
+  - Generates a customized 3-step coping action plan (box breathing, circadian restoration, supportive connection).
+  - Integrates 1-click direct dialing to the 24x7 National Tele-MANAS helpline (`14416`) in 20+ Indian languages.
+- **Interactive Wellness UI (`/his/tele-manas`)**:
+  - Multi-lingual somatic intake questionnaire.
+  - Interactive Sama Vritti (4-4-4-4 Box Breathing) visual animated pacer with expanding/contracting glow ring.
+
+---
+
+## 6. UIDAI Clean UI Alignment & Design Modernization
+- **Removed Clunky Representations**:
+  - Completely eliminated the awkward 600px A4 document paper sheet simulation, CSS scale/translate zoom transforms, and artificial reticle coordinates from `/his/rag`.
+  - Replaced with clean, responsive, native UIDAI-styled tables (Investigation, Observed Value, Unit, Biological Reference, Status Flag) with clean amber highlighting on target biomarker rows (e.g. HbA1c 8.4%).
+- **Portal Consistency**:
+  - Aligned the entire interface strictly with official UIDAI portal design patterns (`https://uidai.gov.in/en`): light blue-gray `#eef3f8` container, white cards (`min-h-[190px]`), clean stroke icons, subtle badges, circular arrow `(->)` action buttons, and top navy accessibility strip (`#1d2d44`).
+
+---
+
+## 7. Technical Stack & Deployment Telemetry
+- **Frontend**: Next.js App Router, TypeScript, Tailwind CSS, Framer Motion, Lucide Icons.
+- **AI & Vision Pipeline**: NVIDIA Nemotron OCR v2, Groq LLM (gpt-oss-120b), Sarvam AI Voice TTS (`bulbul`).
+- **Visual & Multimodal RAG**: NVIDIA `llama-nemotron-embed-vl-1b-v2` & `llama-nemotron-rerank-vl-1b-v2` architecture.
 - **Mapping & Geolocation**: OpenStreetMap Overpass API for real-time Kendra discovery.
 - **Production Host**: Vercel Serverless Edge Platform (`https://project-samanvaya.vercel.app`).

@@ -24,6 +24,8 @@ CRITICAL INSTRUCTIONS FOR AUDIO PLAYBACK:
    - "Live OPD Queue" (/his/queue): Live token board and SMS queue tracker.
    - "AYUSH Pariksha" (/his/ayush): Prakriti Tridosha diagnostic assessment.
    - "Clinical & Visual RAG" (/his/rag): ICMR clinical guidelines, Nemotron visual flowchart reasoning.
+   - "WHO AWaRe Antimicrobial Stewardship" (/his/antimicrobial): Audit antibiotics into Access/Watch/Reserve, curb AMR, suggest ICMR alternatives.
+   - "Tele-MANAS Mental Health" (/his/tele-manas): De-stigmatized somatic distress screener, box breathing pacer, 24x7 helpline 14416.
    - "Patient Self-Service Portal" (/patient): Download 3D Ayushman ABHA card, medical locker.
    - "DPDP Act 2023" (/his/dpdp): Patient data consent and privacy audit.
 
@@ -31,7 +33,7 @@ RESPONSE FORMAT:
 Return strictly a valid JSON object:
 {
   "spokenReply": "Crisp 1-2 sentence answer ready to be spoken aloud.",
-  "route": "/his/ocr" | "/his/doctor" | "/his/registration" | "/his/schemes" | "/his/queue" | "/his/ayush" | "/patient" | "/his/rag" | "/his/dpdp" | null,
+  "route": "/his/ocr" | "/his/doctor" | "/his/registration" | "/his/schemes" | "/his/queue" | "/his/ayush" | "/patient" | "/his/rag" | "/his/antimicrobial" | "/his/tele-manas" | "/his/dpdp" | null,
   "suggestedActions": [
     { "label": "Button Label", "path": "/his/ocr" }
   ]
@@ -62,10 +64,11 @@ export async function POST(request: Request) {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "User-Agent": "ProjectSamanvaya/1.0"
           },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: "openai/gpt-oss-120b",
             messages: [
               { role: "system", content: SYSTEM_PROMPT },
               { role: "user", content: `User is on page "${currentPath}". User asks: "${trimmed}". Provide spoken reply and actions.` }

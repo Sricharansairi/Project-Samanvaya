@@ -437,6 +437,35 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       return;
     }
 
+    // 10. WHO AWaRe Antimicrobial Stewardship Audit (Phase 2)
+    if (
+      text.includes("amr") || text.includes("antibiotic") || text.includes("aware") || 
+      text.includes("stewardship") || text.includes("icmr antibiotic") || text.includes("drug resistance")
+    ) {
+      router.push("/his/antimicrobial");
+      setLastActionExecuted("Navigated to Antimicrobial Stewardship");
+      reply = "Opening WHO AWaRe Antimicrobial Stewardship Audit and ICMR Prescription Safety Engine.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 11. Tele-MANAS (14416) Mental Health Screener (Phase 2)
+    if (
+      text.includes("tele manas") || text.includes("telemanas") || text.includes("mental health") || 
+      text.includes("14416") || text.includes("stress") || text.includes("anxiety") || 
+      text.includes("breathing") || text.includes("counseling") || text.includes("depression")
+    ) {
+      router.push("/his/tele-manas");
+      setLastActionExecuted("Navigated to Tele-MANAS");
+      reply = "Opening Tele-MANAS 14416 Mental Wellness Screener and Box Breathing guide.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
     // 10. Home / Main Portal
     if (
       text.includes("home") || text.includes("main page") || text.includes("landing page") || 
