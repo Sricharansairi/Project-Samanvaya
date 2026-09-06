@@ -5,7 +5,8 @@ import {
   ArrowLeft, UploadCloud, Camera, FileText, Loader2, 
   CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles, HeartPulse,
   Edit3, Save, Plus, Trash2, ChevronDown, ChevronUp, Copy, Check, Clock,
-  Sun, ZoomIn, ShieldAlert, Activity
+  Sun, ZoomIn, ShieldAlert, Activity, Volume2, Play, Pause, Share2, MapPin, 
+  IndianRupee, Pill, PhoneCall, Store, X
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -48,10 +49,85 @@ export default function OCRScanner() {
   const [editMedications, setEditMedications] = useState<string[]>([]);
   const [newMedication, setNewMedication] = useState("");
 
+  // PMBJP Jan Aushadhi Kendra Locator Modal
+  const [showKendraModal, setShowKendraModal] = useState<boolean>(false);
+
+  // Vernacular Audio Discharge & Instructions State
+  const [audioLang, setAudioLang] = useState<string>("hi-IN");
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState<boolean>(false);
+  const [audioScript, setAudioScript] = useState<string | null>(null);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const [copiedShare, setCopiedShare] = useState<boolean>(false);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const handleGenerateAudio = async (targetLang = audioLang) => {
+    if (!results) return;
+    setIsGeneratingAudio(true);
+    try {
+      const res = await fetch("/api/vision/ocr/discharge-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_name: isEditing ? editPatient : (results.patient_name || "Patient"),
+          language: targetLang,
+          diagnoses: isEditing ? editDiagnoses : (results.diagnoses || []),
+          medications: isEditing ? editMedications : (results.medications || []),
+          vitals: isEditing ? { bp: editBp, pulse: editPulse, temp: editTemp, spo2: editSpo2 } : (results.vitals || {})
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAudioScript(data.script);
+        if (data.audio_base64) {
+          setAudioSrc(data.audio_base64);
+          setIsPlayingAudio(true);
+        } else if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          // Browser TTS fallback if cloud synthesizer busy
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(data.script);
+          utter.lang = targetLang;
+          utter.onend = () => setIsPlayingAudio(false);
+          utter.onerror = () => setIsPlayingAudio(false);
+          window.speechSynthesis.speak(utter);
+          setIsPlayingAudio(true);
+        }
+      }
+    } catch (err) {
+      console.error("[Discharge Audio Generation Error]:", err);
+    } finally {
+      setIsGeneratingAudio(false);
+    }
+  };
+
+  const toggleAudioPlayback = () => {
+    if (audioPlayerRef.current) {
+      if (isPlayingAudio) {
+        audioPlayerRef.current.pause();
+        setIsPlayingAudio(false);
+      } else {
+        audioPlayerRef.current.play();
+        setIsPlayingAudio(true);
+      }
+    } else if (typeof window !== "undefined" && "speechSynthesis" in window && audioScript) {
+      if (isPlayingAudio) {
+        window.speechSynthesis.cancel();
+        setIsPlayingAudio(false);
+      } else {
+        const utter = new SpeechSynthesisUtterance(audioScript);
+        utter.lang = audioLang;
+        utter.onend = () => setIsPlayingAudio(false);
+        utter.onerror = () => setIsPlayingAudio(false);
+        window.speechSynthesis.speak(utter);
+        setIsPlayingAudio(true);
+      }
+    }
+  };
 
   // Sync results with edit state
   useEffect(() => {
@@ -891,6 +967,232 @@ export default function OCRScanner() {
                   )}
                 </div>
 
+                {/* PMBJP Jan Aushadhi Generic Savings & Price Relief Card */}
+                {results.jan_aushadhi && results.jan_aushadhi.items?.length > 0 && (
+                  <div className="p-4 bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-white border border-emerald-300/80 rounded-xl text-xs space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-emerald-600 text-white p-1 rounded-md">
+                          <Pill className="w-3.5 h-3.5" />
+                        </span>
+                        <div>
+                          <div className="font-bold text-emerald-950 flex items-center gap-1.5 text-xs">
+                            PMBJP Jan Aushadhi Generic Savings
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded border border-emerald-300">
+                              Govt of India
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-emerald-700">Citizen Out-of-Pocket Expenditure Relief</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowKendraModal(true)}
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-2xs cursor-pointer transition-colors"
+                      >
+                        <Store className="w-3 h-3" />
+                        Locate Kendra
+                      </button>
+                    </div>
+
+                    {/* Financial Summary Hero */}
+                    <div className="grid grid-cols-3 gap-2 bg-white/90 p-2.5 rounded-lg border border-emerald-200 text-center">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block uppercase font-semibold">Branded MRP</span>
+                        <span className="text-xs font-bold text-slate-700 line-through">
+                          ₹{results.jan_aushadhi.total_market_cost.toFixed(2)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block uppercase font-semibold">Jan Aushadhi</span>
+                        <span className="text-xs font-bold text-emerald-800">
+                          ₹{results.jan_aushadhi.total_pmbjp_cost.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="bg-emerald-100/70 rounded-md py-0.5">
+                        <span className="text-[10px] text-emerald-900 block uppercase font-bold">You Save</span>
+                        <span className="text-xs font-black text-emerald-700">
+                          ₹{results.jan_aushadhi.total_savings_inr.toFixed(2)} ({results.jan_aushadhi.total_savings_percentage}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Itemized Generic Salt Mapping */}
+                    <div className="space-y-1.5">
+                      <div className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Generic Salt & Subsidy Breakdown:</span>
+                        <span className="text-[10px] text-slate-500">{results.jan_aushadhi.items.length} medicines mapped</span>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                        {results.jan_aushadhi.items.map((item: any, idx: number) => (
+                          <div key={idx} className="p-2 bg-white rounded-lg border border-emerald-100 text-[11px] space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="font-bold text-slate-900 block">{item.original_prescribed}</span>
+                                <span className="text-[10px] text-emerald-800 font-semibold block">
+                                  ↳ Generic: {item.generic_salt_name} ({item.strength})
+                                </span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="text-[10px] text-slate-400 line-through block">₹{item.market_brand_mrp.toFixed(2)}</span>
+                                <span className="text-xs font-black text-emerald-700 block">₹{item.pmbjp_generic_mrp.toFixed(2)}</span>
+                              </div>
+                            </div>
+                            {item.notes && (
+                              <p className="text-[10px] text-slate-600 bg-slate-50 p-1 rounded italic">
+                                ℹ️ {item.notes}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Vernacular Audio Discharge & Medication Instructions */}
+                <div className="p-4 bg-gradient-to-br from-indigo-50/90 via-sky-50/50 to-white border border-indigo-200 rounded-xl text-xs space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-[#0f4c81] text-white p-1 rounded-md">
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </span>
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                          Vernacular Audio Medication Guide
+                          <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 rounded border border-blue-200">
+                            Sarvam Voice AI
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500">Accessible voice instructions for patients and attendants</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Language Selector & Synthesize Action */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <div className="flex-1 min-w-[140px]">
+                      <select
+                        value={audioLang}
+                        onChange={(e) => {
+                          const newLang = e.target.value;
+                          setAudioLang(newLang);
+                          if (audioScript) {
+                            handleGenerateAudio(newLang);
+                          }
+                        }}
+                        className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                      >
+                        <option value="hi-IN">🇮🇳 हिन्दी (Hindi)</option>
+                        <option value="te-IN">🇮🇳 తెలుగు (Telugu)</option>
+                        <option value="ta-IN">🇮🇳 தமிழ் (Tamil)</option>
+                        <option value="kn-IN">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+                        <option value="mr-IN">🇮🇳 मराठी (Marathi)</option>
+                        <option value="bn-IN">🇮🇳 বাংলা (Bengali)</option>
+                        <option value="en-IN">🇬🇧 Indian English</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isGeneratingAudio}
+                      onClick={() => handleGenerateAudio()}
+                      className="bg-[#0f4c81] hover:bg-blue-900 disabled:bg-slate-300 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                    >
+                      {isGeneratingAudio ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Synthesizing...
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5" />
+                          {audioScript ? "Re-Generate Voice" : "Generate Voice Guide"}
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Audio Playback Controls & Transcript */}
+                  {audioScript && (
+                    <div className="bg-white p-3 rounded-lg border border-indigo-100 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={toggleAudioPlayback}
+                            className="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center cursor-pointer shadow-2xs"
+                          >
+                            {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                          </button>
+                          <div>
+                            <span className="font-bold text-slate-800 text-[11px] block">
+                              {isPlayingAudio ? "Playing Audio Guidance..." : "Click to Listen"}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">Natural Vernacular Speech</span>
+                          </div>
+                        </div>
+
+                        {/* WhatsApp / Attendant Share */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              const shareText = `*Project Samanvaya - Patient Discharge & Medication Guide*\nPatient: ${results.patient_name || 'Patient'}\n\n*Audio Instructions:*\n${audioScript}\n\n*Nearby Jan Aushadhi:* PMBJK Civil Hospital Kendra`;
+                              navigator.clipboard.writeText(shareText);
+                              setCopiedShare(true);
+                              setTimeout(() => setCopiedShare(false), 2500);
+                            }
+                          }}
+                          className="text-[11px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-1 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {copiedShare ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-700" />
+                              Copied for WhatsApp!
+                            </>
+                          ) : (
+                            <>
+                              <Share2 className="w-3 h-3 text-emerald-700" />
+                              WhatsApp Share
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Animated Soundwave Preview */}
+                      {isPlayingAudio && (
+                        <div className="flex items-center justify-center gap-1 py-1">
+                          {[40, 75, 55, 90, 60, 85, 45, 95, 70, 50, 80, 40].map((h, idx) => (
+                            <motion.span
+                              key={idx}
+                              animate={{ height: [6, h / 3, 6] }}
+                              transition={{ repeat: Infinity, duration: 0.8, delay: idx * 0.05 }}
+                              className="w-1 bg-indigo-500 rounded-full inline-block"
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Vernacular Transcript */}
+                      <div className="text-[11px] text-slate-700 bg-slate-50 p-2 rounded-md border border-slate-200 leading-relaxed italic">
+                        "{audioScript}"
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hidden HTML5 Audio Element for base64 playback */}
+                  {audioSrc && (
+                    <audio
+                      ref={audioPlayerRef}
+                      src={audioSrc}
+                      onEnded={() => setIsPlayingAudio(false)}
+                      className="hidden"
+                    />
+                  )}
+                </div>
+
                 {/* Medical RAG Clinical Decision Support Card */}
                 {results.rag_decision_support && (
                   <div className="p-3.5 bg-gradient-to-br from-indigo-50/80 via-blue-50/60 to-white border border-indigo-200 rounded-xl text-xs space-y-2.5 shadow-2xs">
@@ -1026,6 +1328,84 @@ export default function OCRScanner() {
 
         </div>
       </main>
+
+      {/* Jan Aushadhi Kendra Locator Modal */}
+      <AnimatePresence>
+        {showKendraModal && results?.jan_aushadhi?.nearby_kendras && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200"
+            >
+              <div className="bg-[#0f4c81] text-white p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Store className="w-5 h-5 text-amber-300" />
+                  <div>
+                    <h3 className="font-bold text-sm">Nearby Jan Aushadhi Kendras (PMBJK)</h3>
+                    <p className="text-[11px] text-blue-200">Pradhan Mantri Bhartiya Janaushadhi Pariyojana</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowKendraModal(false)}
+                  className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-3 max-h-[65vh] overflow-y-auto">
+                <p className="text-xs text-slate-600">
+                  Government subsidized generic drug stores located within your civic hospital zone. Carry your prescription to avail up to 88% discount:
+                </p>
+
+                {results.jan_aushadhi.nearby_kendras.map((kendra: any, i: number) => (
+                  <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 hover:border-emerald-300 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-bold text-xs text-slate-900">{kendra.name}</h4>
+                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
+                        {kendra.distance_km} km away
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-1.5 text-[11px] text-slate-600">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                      <span>{kendra.address}, {kendra.city}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        {kendra.operating_hours}
+                      </span>
+                      <a
+                        href={`tel:${kendra.contact_phone}`}
+                        className="text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <PhoneCall className="w-3 h-3" />
+                        {kendra.contact_phone}
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs">
+                <span className="text-[11px] text-slate-500">Toll-free Helpline: 1800-180-8080</span>
+                <button
+                  type="button"
+                  onClick={() => setShowKendraModal(false)}
+                  className="bg-[#0f4c81] text-white font-bold px-4 py-1.5 rounded-lg hover:bg-blue-900 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

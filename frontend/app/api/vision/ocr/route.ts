@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryMedicalRAG } from "@/services/medical_rag";
+import { analyzePrescriptionSavings, JanAushadhiPrescriptionAnalysis } from "@/services/janaushadhi_engine";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ interface NormalizedPrescription {
     recommendedWorkup: string[];
     preliminaryAdvice: string;
   } | null;
+  jan_aushadhi?: JanAushadhiPrescriptionAnalysis | null;
 }
 
 function normalizePrescription(parsed: any, detectedWords: string[]): NormalizedPrescription {
@@ -240,7 +242,8 @@ function normalizePrescription(parsed: any, detectedWords: string[]): Normalized
     diagnoses,
     medications,
     abnormal_labs: Array.isArray(parsed.abnormal_labs) ? parsed.abnormal_labs : [],
-    rag_decision_support: ragDecisionSupport
+    rag_decision_support: ragDecisionSupport,
+    jan_aushadhi: analyzePrescriptionSavings(medications)
   };
 }
 
@@ -464,6 +467,7 @@ OUTPUT SCHEMA (JSON ONLY):
       vitals: { bp: null, pulse: null, temp: null, spo2: null },
       diagnoses: [],
       medications: [],
+      jan_aushadhi: null,
       ocr_engine: "ABDM Clinical OCR Engine",
       raw_ocr_lines: []
     }, { status: 500 });
