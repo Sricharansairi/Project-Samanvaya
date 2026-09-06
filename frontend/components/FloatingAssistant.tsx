@@ -60,7 +60,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   const [clinicalNlpResult, setClinicalNlpResult] = useState<ClinicalTranslationResult | null>(null);
 
   const [assistantResponse, setAssistantResponse] = useState<string>(
-    "Namaste! I am your Samanvaya Autonomous Clinical Co-Pilot. I can assist with clinical intake, translate colloquial symptoms into medical terms, and navigate the hospital system autonomously."
+    "Namaste! I am your Samanvaya Autonomous Clinical Co-Pilot. I can answer medical queries, navigate to any hospital desk, and auto-fill patient details."
   );
 
   const recognitionRef = useRef<any>(null);
@@ -71,6 +71,9 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   const silenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const speechDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastTranscriptRef = useRef<string>("");
+
+  // MUTUAL EXCLUSION REF: Stops mic echo loops & double/triple speaking
+  const isAssistantSpeakingRef = useRef<boolean>(false);
 
   // Load voices from browser for fallback
   useEffect(() => {
@@ -88,6 +91,17 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       const savedMute = localStorage.getItem("samanvaya_voice_muted");
       if (savedMute !== null) setIsMuted(savedMute === "true");
     }
+
+    return () => {
+      stopListening();
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, []);
 
   const changePersona = (personaId: VoicePersona) => {
@@ -100,11 +114,15 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   };
 
   // -------------------------------------------------------------
-  // SARVAM AI VOICE SYNTHESIS + HTML5 AUDIO PLAYBACK
+  // SARVAM AI VOICE SYNTHESIS + STRICT AUDIO LOCKING
   // -------------------------------------------------------------
   const speakResponse = async (text: string, overridePersona?: VoicePersona) => {
     if (isMuted || !text) return;
 
+    // 1. Immediately halt all active listening to avoid picking up speaker voice
+    stopListening();
+
+    // 2. Cancel and destroy any prior speech or audio streams
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
@@ -113,10 +131,13 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       window.speechSynthesis.cancel();
     }
 
+    // 3. Mark mutex locked
+    isAssistantSpeakingRef.current = true;
+    setIsSpeaking(true);
+
     const persona = VOICE_PERSONAS.find(p => p.id === (overridePersona || selectedPersona)) || VOICE_PERSONAS[0];
 
     try {
-      setIsSpeaking(true);
       const res = await fetch("/api/voice/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,14 +153,25 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         if (data.base64_audio) {
           const audio = new Audio(`data:audio/wav;base64,${data.base64_audio}`);
           currentAudioRef.current = audio;
+
+          audio.onplay = () => {
+            isAssistantSpeakingRef.current = true;
+            setIsSpeaking(true);
+          };
+
           audio.onended = () => {
+            isAssistantSpeakingRef.current = false;
             setIsSpeaking(false);
             currentAudioRef.current = null;
           };
+
           audio.onerror = () => {
+            isAssistantSpeakingRef.current = false;
             setIsSpeaking(false);
+            currentAudioRef.current = null;
             fallbackBrowserSpeech(text, persona);
           };
+
           await audio.play();
           return;
         }
@@ -153,21 +185,37 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
   const fallbackBrowserSpeech = (text: string, persona: VoiceConfig) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      isAssistantSpeakingRef.current = false;
       setIsSpeaking(false);
       return;
     }
+
+    window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = persona.lang;
-    utterance.rate = 1.0;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.rate = 1.05;
+
+    utterance.onstart = () => {
+      isAssistantSpeakingRef.current = true;
+      setIsSpeaking(true);
+    };
+
+    utterance.onend = () => {
+      isAssistantSpeakingRef.current = false;
+      setIsSpeaking(false);
+    };
+
+    utterance.onerror = () => {
+      isAssistantSpeakingRef.current = false;
+      setIsSpeaking(false);
+    };
+
     window.speechSynthesis.speak(utterance);
   };
 
   // -------------------------------------------------------------
   // AUTONOMOUS WEB FORM AUTO-FILLER
-  // Capable of filling any field in the web app directly
   // -------------------------------------------------------------
   const autoFillDOMInput = (selector: string, value: string): boolean => {
     if (typeof document === "undefined") return false;
@@ -220,7 +268,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
 
     silenceTimerRef.current = setTimeout(() => {
       stopListening();
-      setAssistantResponse("No voice detected for 8 seconds. Listening paused. Tap the microphone to speak again.");
+      setAssistantResponse("No voice detected for 8 seconds. Listening paused. Tap the microphone whenever you want to speak.");
     }, 8000);
   }, []);
 
@@ -252,13 +300,167 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       return;
     }
 
-    // B. DIRECT WEB FORM AUTO-FILLER (NAME, AGE, PHONE, VITALS, COMPLAINT)
-    const hasFillIntent = text.includes("register") || text.includes("patient") || text.includes("fill") || 
-                          text.includes("name is") || text.includes("named") || text.includes("bp") || 
-                          text.includes("fever") || text.includes("symptom");
+    // ==============================================================
+    // B. NAVIGATION INTENTS (EVALUATED FIRST!)
+    // Directly opens any page in Project Samanvaya reliably
+    // ==============================================================
+    const isNavCommand = 
+      text.startsWith("open") || text.startsWith("go to") || text.startsWith("navigate") || 
+      text.startsWith("show") || text.startsWith("take me to") || text.includes("page") || 
+      text.includes("portal") || text.includes("desk");
+
+    // 1. Prescription OCR & Jan Aushadhi Generic Savings
+    if (
+      text.includes("ocr") || text.includes("prescription") || text.includes("jan aushadhi") || 
+      text.includes("janaushadhi") || text.includes("generic medicine") || text.includes("parchi scan") ||
+      text.includes("medicine savings") || text.includes("kendra locator") || text.includes("scan medicine")
+    ) {
+      router.push("/his/ocr");
+      setLastActionExecuted("Navigated to Prescription OCR & Jan Aushadhi");
+      reply = "Opening Prescription OCR and PMBJP Jan Aushadhi generic savings portal.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 2. Physician Consultation & CDSS Desk
+    if (
+      text.includes("doctor") || text.includes("physician") || text.includes("opd desk") || 
+      text.includes("consultation") || text.includes("cdss") || text.includes("clinical decision")
+    ) {
+      router.push("/his/doctor");
+      setLastActionExecuted("Navigated to Doctor Desk");
+      reply = "Opening Physician Consultation Desk and Clinical Decision Support System.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 3. Smart Parchi Kiosk & Patient Registration
+    if (
+      (isNavCommand && (text.includes("registration") || text.includes("kiosk") || text.includes("admit"))) ||
+      text.includes("smart parchi") || text.includes("patient registration") || text.includes("triage desk")
+    ) {
+      router.push("/his/registration");
+      setLastActionExecuted("Navigated to Patient Registration");
+      reply = "Opening Smart Parchi Patient Registration and Triage Kiosk.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 4. Government Health Schemes & PM-JAY Cashless Claims
+    if (
+      text.includes("scheme") || text.includes("pmjay") || text.includes("ayushman") || 
+      text.includes("insurance") || text.includes("claim") || text.includes("golden card") ||
+      text.includes("aarogyasri") || text.includes("mjpjay")
+    ) {
+      router.push("/his/schemes");
+      setLastActionExecuted("Navigated to Schemes");
+      reply = "Opening Ayushman Bharat PM-JAY and State Health Scheme Navigator.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 5. Live OPD Queue & SMS Token Board
+    if (
+      text.includes("queue") || text.includes("token") || text.includes("opd queue") || 
+      text.includes("wait time") || text.includes("waiting line")
+    ) {
+      router.push("/his/queue");
+      setLastActionExecuted("Navigated to Live Queue");
+      reply = "Opening Live OPD Queue and Smart Token Board.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 6. Patient Self-Service Portal & 3D ABHA Card
+    if (
+      (isNavCommand && text.includes("patient")) || text.includes("patient portal") || 
+      text.includes("my card") || text.includes("abha card") || text.includes("health locker")
+    ) {
+      router.push("/patient");
+      setLastActionExecuted("Navigated to Patient Portal");
+      reply = "Opening Patient Self-Service Portal with 3D Ayushman ABHA Smart Card.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 7. AYUSH Prakriti Pariksha & Integrative Care
+    if (
+      text.includes("ayush") || text.includes("prakriti") || text.includes("ayurveda") || 
+      text.includes("tridosha") || text.includes("vata") || text.includes("pitta") || text.includes("kapha")
+    ) {
+      router.push("/his/ayush");
+      setLastActionExecuted("Navigated to AYUSH");
+      reply = "Opening AYUSH Prakriti Pariksha and Tridosha Assessment.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 8. Clinical RAG & Visual Flowchart Guidelines
+    if (
+      text.includes("rag") || text.includes("guideline") || text.includes("flowchart") || 
+      text.includes("decision tree") || text.includes("icmr protocol") || text.includes("visual rag")
+    ) {
+      router.push("/his/rag");
+      setLastActionExecuted("Navigated to Clinical RAG");
+      reply = "Opening Evidence-Based Clinical RAG and Visual Flowchart Decision System.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 9. DPDP Act 2023 Consent & Audit
+    if (
+      text.includes("dpdp") || text.includes("consent") || text.includes("privacy") || 
+      text.includes("audit log") || text.includes("data protection")
+    ) {
+      router.push("/his/dpdp");
+      setLastActionExecuted("Navigated to DPDP Privacy");
+      reply = "Opening DPDP Act 2023 Digital Consent and Cryptographic Audit Manager.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // 10. Home / Main Portal
+    if (
+      text.includes("home") || text.includes("main page") || text.includes("landing page") || 
+      text.includes("start page")
+    ) {
+      router.push("/");
+      setLastActionExecuted("Navigated to Home");
+      reply = "Returning to Project Samanvaya Home Portal.";
+      setAssistantResponse(reply);
+      speakResponse(reply);
+      setIsProcessing(false);
+      return;
+    }
+
+    // ==============================================================
+    // C. DIRECT WEB FORM AUTO-FILLER (NAME, AGE, PHONE, VITALS, COMPLAINT)
+    // Only runs when demographic/vitals parameters are supplied
+    // ==============================================================
+    const hasFillIntent = 
+      (text.includes("register") || text.includes("fill") || text.includes("name is") || 
+       text.includes("named") || text.includes("bp") || text.includes("fever") || text.includes("temp")) &&
+      !isNavCommand;
 
     if (hasFillIntent) {
-      // Extract patient demographic info with regex
       const nameMatch = rawCmd.match(/(?:named|name is|patient)\s+([A-Za-z\s]+?)(?:\s+(?:age|aged|phone|mobile|having|with|and|\d)|$)/i);
       const ageMatch = rawCmd.match(/(?:age|aged|years old|yr)\s*[:=]?\s*(\d{1,3})/i);
       const phoneMatch = rawCmd.match(/(?:phone|mobile|contact|call)\s*[:=]?\s*(\d{10})/i);
@@ -271,55 +473,52 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       const extractedBp = bpMatch ? bpMatch[1].replace(/\s+/, "/") : "";
       const extractedTemp = tempMatch ? tempMatch[1] : "";
 
-      // Check if user is on registration or if we should navigate
-      const isRegistrationPage = pathname === "/his/registration";
+      const hasExtractedData = extractedName || extractedAge || extractedPhone || extractedBp || extractedTemp;
 
-      if (!isRegistrationPage && (extractedName || text.includes("register"))) {
-        // Save pending autofill to sessionStorage
-        sessionStorage.setItem("samanvaya_pending_fill", JSON.stringify({
+      if (hasExtractedData) {
+        const isRegistrationPage = pathname === "/his/registration";
+
+        if (!isRegistrationPage) {
+          sessionStorage.setItem("samanvaya_pending_fill", JSON.stringify({
+            name: extractedName,
+            age: extractedAge,
+            phone: extractedPhone,
+            bp: extractedBp,
+            temp: extractedTemp,
+            concern: rawCmd
+          }));
+          router.push("/his/registration");
+        }
+
+        let filledFields: string[] = [];
+        if (extractedName) {
+          autoFillDOMInput('input[placeholder*="Suresh" i], input[placeholder*="Name" i], input[name="name"]', extractedName);
+          filledFields.push(`Name: ${extractedName}`);
+        }
+        if (extractedPhone) {
+          autoFillDOMInput('input[placeholder*="9876" i], input[placeholder*="Phone" i], input[name="phone"]', extractedPhone);
+          filledFields.push(`Phone: ${extractedPhone}`);
+        }
+        if (extractedBp) {
+          autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i]', extractedBp);
+          filledFields.push(`BP: ${extractedBp}`);
+        }
+        if (extractedTemp) {
+          autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i]', extractedTemp);
+          filledFields.push(`Temp: ${extractedTemp}°F`);
+        }
+
+        autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i]', rawCmd);
+
+        dispatchInAppAction("fill_form", {
           name: extractedName,
-          age: extractedAge,
           phone: extractedPhone,
           bp: extractedBp,
           temp: extractedTemp,
           concern: rawCmd
-        }));
-        router.push("/his/registration");
-      }
+        });
 
-      // Populate DOM elements directly
-      let filledFields: string[] = [];
-      if (extractedName) {
-        autoFillDOMInput('input[placeholder*="Suresh" i], input[placeholder*="Name" i], input[name="name"]', extractedName);
-        filledFields.push(`Name: ${extractedName}`);
-      }
-      if (extractedPhone) {
-        autoFillDOMInput('input[placeholder*="9876" i], input[placeholder*="Phone" i], input[name="phone"]', extractedPhone);
-        filledFields.push(`Phone: ${extractedPhone}`);
-      }
-      if (extractedBp) {
-        autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i]', extractedBp);
-        filledFields.push(`BP: ${extractedBp}`);
-      }
-      if (extractedTemp) {
-        autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i]', extractedTemp);
-        filledFields.push(`Temp: ${extractedTemp}°F`);
-      }
-      
-      // Auto-fill chief complaint
-      autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i]', rawCmd);
-
-      // Dispatch state sync
-      dispatchInAppAction("fill_form", {
-        name: extractedName,
-        phone: extractedPhone,
-        bp: extractedBp,
-        temp: extractedTemp,
-        concern: rawCmd
-      });
-
-      if (filledFields.length > 0) {
-        reply = `Autonomously filled form with: ${filledFields.join(", ")}.`;
+        reply = `Autonomously filled registration form with: ${filledFields.join(", ")}.`;
         setLastActionExecuted(`Auto-filled: ${filledFields.join(", ")}`);
         setAssistantResponse(reply);
         speakResponse(reply);
@@ -328,72 +527,18 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       }
     }
 
-    // C. NAVIGATION COMMANDS
-    if (text.includes("open scheme") || text.includes("check scheme") || text.includes("pmjay") || text.includes("insurance")) {
-      router.push("/his/schemes");
-      setLastActionExecuted("Navigated to Schemes");
-      reply = "Opening Government Health Scheme & Claim Navigator.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("open doctor") || text.includes("physician desk") || text.includes("doctor view")) {
-      router.push("/his/doctor");
-      setLastActionExecuted("Navigated to Doctor Desk");
-      reply = "Opening Physician Consultation & Clinical Decision Support Desk.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("open ocr") || text.includes("scan prescription") || text.includes("camera")) {
-      router.push("/his/ocr");
-      setLastActionExecuted("Navigated to OCR Scanner");
-      reply = "Opening AI Prescription & Document OCR Scanner.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("open queue") || text.includes("token queue") || text.includes("opd queue")) {
-      router.push("/his/queue");
-      setLastActionExecuted("Navigated to Queue");
-      reply = "Opening Live OPD Queue & SMS Token Board.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("patient portal") || text.includes("my card") || text.includes("abha card")) {
-      router.push("/patient");
-      setLastActionExecuted("Navigated to Patient Portal");
-      reply = "Opening Patient Self-Service Portal with 3D Ayushman Card.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-    if (text.includes("ayush") || text.includes("prakriti")) {
-      router.push("/his/ayush");
-      setLastActionExecuted("Navigated to AYUSH");
-      reply = "Opening AYUSH Prakriti Pariksha.";
-      setAssistantResponse(reply);
-      speakResponse(reply);
-      setIsProcessing(false);
-      return;
-    }
-
-    // D. CLINICAL NLP TRANSLATION & STANDARDIZATION
-    const isClinical = 
+    // ==============================================================
+    // D. CLINICAL NLP SYMPTOM TRANSLATION & STANDARDIZATION
+    // ==============================================================
+    const isClinicalSymptom = 
       text.includes("dard") || text.includes("pain") || text.includes("jalan") || 
       text.includes("bukhar") || text.includes("fever") || text.includes("cough") || 
-      text.includes("khansi") || text.includes("head") || text.includes("chest") || 
-      text.includes("vomit") || text.includes("ulti") || text.includes("seene") ||
-      text.includes("pet") || text.includes("chakkar") || text.includes("dizzy") ||
-      text.includes("jwaram") || text.includes("noppi") || text.includes("asthma");
+      text.includes("khansi") || text.includes("chest") || text.includes("vomit") || 
+      text.includes("ulti") || text.includes("seene") || text.includes("pet") || 
+      text.includes("chakkar") || text.includes("dizzy") || text.includes("jwaram") || 
+      text.includes("noppi") || text.includes("asthma");
 
-    if (isClinical) {
+    if (isClinicalSymptom) {
       const baselineResult = translatePatientToClinical(rawCmd);
       setClinicalNlpResult(baselineResult);
 
@@ -415,17 +560,17 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         console.warn("Clinical NLP async inference fallback:", err);
       }
 
-      setLastActionExecuted(`Clinical NLP: ${finalResult.standardizedMedicalTerm}`);
+      setLastActionExecuted(`Standardized: ${finalResult.standardizedMedicalTerm}`);
 
       if (finalResult.isLifeThreat) {
-        reply = `RED FLAG CLINICAL ALERT: Symptoms standardized to '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}). Routing to Emergency Triage Desk.`;
+        reply = `Red flag clinical alert. Symptoms indicate '${finalResult.standardizedMedicalTerm}' with ICD-10 ${finalResult.icd10Code}. Routing immediately to Emergency Triage.`;
         router.push("/his/registration");
         dispatchInAppAction("fill_form", {
           concern: finalResult.standardizedMedicalTerm,
           icd10: finalResult.icd10Code
         });
       } else {
-        reply = `Clinical NLP Finding: Standardized as '${finalResult.standardizedMedicalTerm}' (ICD-10: ${finalResult.icd10Code}). ${finalResult.patientFriendlyExplanation}`;
+        reply = `Clinical finding: Standardized as '${finalResult.standardizedMedicalTerm}' under ICD-10 ${finalResult.icd10Code}. ${finalResult.patientFriendlyExplanation}`;
       }
 
       setAssistantResponse(reply);
@@ -434,15 +579,55 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       return;
     }
 
-    // E. DEFAULT ACTION DISPATCH
-    reply = `I processed "${rawCmd}". What would you like me to do next?`;
-    setQuickActions([
-      { label: "🏥 Open Schemes", action: () => router.push("/his/schemes"), isPrimary: true },
-      { label: "📄 Open OCR Scanner", action: () => router.push("/his/ocr") },
-      { label: "🩺 Doctor Desk", action: () => router.push("/his/doctor") },
-      { label: "📱 OPD Queue", action: () => router.push("/his/queue") }
-    ]);
+    // ==============================================================
+    // E. DYNAMIC CLINICAL AI REASONING VIA GROQ (CONVERSATIONAL BACKEND)
+    // No more static canned text! Fully intelligent dynamic responses
+    // ==============================================================
+    try {
+      const chatRes = await fetch("/api/assistant/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: rawCmd,
+          currentPath: pathname
+        })
+      });
 
+      if (chatRes.ok) {
+        const chatData = await chatRes.json();
+        reply = chatData.spokenReply || `I can help you navigate Samanvaya. Let's look at available options.`;
+
+        if (chatData.suggestedActions && chatData.suggestedActions.length > 0) {
+          setQuickActions(
+            chatData.suggestedActions.map((act: { label: string; path: string }, idx: number) => ({
+              label: act.label,
+              action: () => router.push(act.path),
+              isPrimary: idx === 0
+            }))
+          );
+        }
+
+        if (chatData.route) {
+          setLastActionExecuted(`Navigating to ${chatData.route}`);
+          setTimeout(() => router.push(chatData.route), 1200);
+        }
+
+        setAssistantResponse(reply);
+        speakResponse(reply);
+        setIsProcessing(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("Assistant dynamic chat API error:", err);
+    }
+
+    // Fallback if API fails
+    reply = `I have received your request. You can scan prescriptions for Jan Aushadhi generic savings, register for an ABHA card, or check PM-JAY schemes.`;
+    setQuickActions([
+      { label: "📄 Prescription OCR & Jan Aushadhi", action: () => router.push("/his/ocr"), isPrimary: true },
+      { label: "🛡️ Check PM-JAY Schemes", action: () => router.push("/his/schemes") },
+      { label: "🩺 Doctor OPD Desk", action: () => router.push("/his/doctor") }
+    ]);
     setAssistantResponse(reply);
     speakResponse(reply);
     setIsProcessing(false);
@@ -454,29 +639,39 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   const startListening = () => {
     if (typeof window === "undefined") return;
 
+    // MUTEX CHECK: Do not start listening if assistant is actively speaking!
+    if (isAssistantSpeakingRef.current) {
+      console.log("Speech recognition start skipped: assistant is currently speaking.");
+      return;
+    }
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       try {
         if (recognitionRef.current) {
-          recognitionRef.current.abort();
+          try { recognitionRef.current.abort(); } catch (e) {}
         }
         const recognition = new SpeechRecognition();
         recognitionRef.current = recognition;
 
         const persona = VOICE_PERSONAS.find(p => p.id === selectedPersona) || VOICE_PERSONAS[0];
         recognition.lang = persona.lang;
-        recognition.continuous = true; // Continuous listening
+        recognition.continuous = true;
         recognition.interimResults = true;
 
         recognition.onstart = () => {
           setIsRecording(true);
           reset8sSilenceTimer();
-          setAssistantResponse("Voice Assistant Active: Listening continuously... Speak naturally.");
+          setAssistantResponse("Voice Assistant Active: Listening... Speak naturally.");
         };
 
         recognition.onresult = (event: any) => {
-          // Voice detected! Reset 8s silence timer
+          // MUTEX CHECK: Completely discard any sound received while assistant is speaking
+          if (isAssistantSpeakingRef.current) {
+            return;
+          }
+
           reset8sSilenceTimer();
 
           let interimTranscript = "";
@@ -494,16 +689,16 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
           setUserInput(currentText);
           lastTranscriptRef.current = currentText;
 
-          // Auto-process on stop speaking (1.4s debounce after speech pause)
+          // Auto-process on stop speaking (1.2s debounce after speech pause)
           if (speechDebounceRef.current) clearTimeout(speechDebounceRef.current);
           speechDebounceRef.current = setTimeout(() => {
-            if (lastTranscriptRef.current.trim().length > 2) {
+            if (lastTranscriptRef.current.trim().length > 2 && !isAssistantSpeakingRef.current) {
               const cmd = lastTranscriptRef.current;
               lastTranscriptRef.current = "";
               stopListening();
               processAutonomousCommand(cmd);
             }
-          }, 1400);
+          }, 1200);
         };
 
         recognition.onerror = (event: any) => {
@@ -511,19 +706,19 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
           if (event.error === "not-allowed") {
             stopListening();
             setAssistantResponse("Microphone permission denied. Please allow microphone access in your browser.");
-          } else if (event.error === "no-speech") {
-            // No speech within recognition interval - let 8s timer manage it
           }
         };
 
         recognition.onend = () => {
-          // If still marked as recording, restart to maintain continuous stream unless 8s expired
-          if (isRecording) {
+          // Only restart if still recording AND assistant is NOT speaking
+          if (isRecording && !isAssistantSpeakingRef.current) {
             try {
               recognition.start();
             } catch (e) {
               setIsRecording(false);
             }
+          } else {
+            setIsRecording(false);
           }
         };
 
@@ -551,6 +746,9 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach(track => track.stop());
+        
+        if (isAssistantSpeakingRef.current) return;
+
         setIsProcessing(true);
         setAssistantResponse("Processing speech via Whisper...");
 
@@ -590,7 +788,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         recognitionRef.current.stop();
       } catch (e) {}
     }
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
         mediaRecorderRef.current.stop();
       } catch (e) {}
@@ -601,6 +799,18 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     if (isRecording) {
       stopListening();
     } else {
+      if (isAssistantSpeakingRef.current) {
+        // Cancel speech if user explicitly clicks mic to speak
+        if (currentAudioRef.current) {
+          currentAudioRef.current.pause();
+          currentAudioRef.current = null;
+        }
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+        isAssistantSpeakingRef.current = false;
+        setIsSpeaking(false);
+      }
       startListening();
     }
   };
@@ -680,6 +890,15 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                   type="button"
                   onClick={() => {
                     stopListening();
+                    if (currentAudioRef.current) {
+                      currentAudioRef.current.pause();
+                      currentAudioRef.current = null;
+                    }
+                    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                      window.speechSynthesis.cancel();
+                    }
+                    isAssistantSpeakingRef.current = false;
+                    setIsSpeaking(false);
                     setIsOpen(false);
                   }}
                   className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
@@ -768,7 +987,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
               {isProcessing ? (
                 <div className="flex items-center gap-2.5 text-[#0f4c81] font-bold">
                   <Loader2 className="w-4 h-4 animate-spin text-[#0f4c81]" />
-                  <span>Clinical NLP reasoning...</span>
+                  <span>Clinical AI dynamic reasoning...</span>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -783,7 +1002,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                     {assistantResponse}
                   </p>
 
-                  {/* Clinical NLP Standardized Pathology & Medication Card */}
+                  {/* Clinical NLP Standardized Pathology Card */}
                   {clinicalNlpResult && (
                     <div className={`mt-2.5 p-3 rounded-2xl border text-xs shadow-xs space-y-2 ${
                       clinicalNlpResult.isLifeThreat
@@ -848,31 +1067,31 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 no-scrollbar text-[10px]">
               <button
                 type="button"
-                onClick={() => processAutonomousCommand("register patient Anita age 19 with high fever and BP 120 over 80")}
+                onClick={() => processAutonomousCommand("open ocr")}
                 className="whitespace-nowrap px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 transition-colors cursor-pointer"
               >
-                ✍️ Auto-Fill: &quot;Register Anita 19F BP 120/80&quot;
-              </button>
-              <button
-                type="button"
-                onClick={() => processAutonomousCommand("pet me tez jalan ho rahi hai khane ke baad")}
-                className="whitespace-nowrap px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-full font-bold border border-indigo-200 transition-colors cursor-pointer"
-              >
-                🔬 &quot;Pet me jalan&quot;
+                📄 Jan Aushadhi & OCR
               </button>
               <button
                 type="button"
                 onClick={() => processAutonomousCommand("open schemes")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors cursor-pointer"
+                className="whitespace-nowrap px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-[#f37021] rounded-full font-bold border border-orange-200 transition-colors cursor-pointer"
               >
-                🏥 Schemes
+                🛡️ PM-JAY Schemes
               </button>
               <button
                 type="button"
-                onClick={() => processAutonomousCommand("open ocr")}
-                className="whitespace-nowrap px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-600 rounded-full font-bold border border-slate-200 transition-colors cursor-pointer"
+                onClick={() => processAutonomousCommand("open doctor")}
+                className="whitespace-nowrap px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-full font-bold border border-purple-200 transition-colors cursor-pointer"
               >
-                📄 OCR
+                🩺 Doctor Desk
+              </button>
+              <button
+                type="button"
+                onClick={() => processAutonomousCommand("register patient Anita age 19 with high fever and BP 120 over 80")}
+                className="whitespace-nowrap px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#0f4c81] rounded-full font-bold border border-blue-200 transition-colors cursor-pointer"
+              >
+                ✍️ Auto-Fill &quot;Anita 19F BP 120/80&quot;
               </button>
             </div>
 
@@ -882,7 +1101,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
                 type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Speak or type (Auto-fills forms & answers)..."
+                placeholder="Ask clinical queries, say 'open doctor', 'open ocr'..."
                 className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-[#0f2942] font-medium outline-none focus:bg-white focus:ring-2 focus:ring-[#0f4c81] transition-all"
                 disabled={isProcessing}
               />
@@ -916,9 +1135,24 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
         onClick={() => {
-          setIsOpen(!isOpen);
-          if (!isOpen && !isRecording) {
-            startListening();
+          const nextState = !isOpen;
+          setIsOpen(nextState);
+          if (nextState) {
+            // Cancel any leftover speech
+            if (currentAudioRef.current) {
+              currentAudioRef.current.pause();
+              currentAudioRef.current = null;
+            }
+            if (typeof window !== "undefined" && "speechSynthesis" in window) {
+              window.speechSynthesis.cancel();
+            }
+            isAssistantSpeakingRef.current = false;
+            setIsSpeaking(false);
+            if (!isRecording) {
+              startListening();
+            }
+          } else {
+            stopListening();
           }
         }}
         className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0f4c81] via-indigo-600 to-purple-600 hover:from-blue-900 hover:to-[#0f4c81] border-2 border-white flex items-center justify-center text-white shadow-2xl relative cursor-pointer"

@@ -6,7 +6,7 @@ import {
   User, Building2, Globe2, Sparkles, ArrowRight, Shield, Stethoscope, 
   FileText, Database, HeartPulse, QrCode, Phone, Download, MapPin, 
   Search, CheckCircle2, AlertCircle, X, ExternalLink, Smartphone, 
-  Activity, ShieldCheck, HelpCircle, FileCheck, Award
+  Activity, ShieldCheck, HelpCircle, FileCheck, Award, Pill, Volume2
 } from "lucide-react";
 import Link from "next/link";
 import TrustBanner from "@/components/TrustBanner";
@@ -129,28 +129,29 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* Card 3: Prescription OCR Scanner */}
+            {/* Card 3: Prescription OCR & PMBJP Jan Aushadhi */}
             <Link 
               href="/his/ocr"
-              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-emerald-500 shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer relative overflow-hidden"
             >
-              <div>
-                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                  <FileText className="w-6 h-6 stroke-[1.75]" />
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-0 opacity-60" />
+              <div className="relative z-10">
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform border border-emerald-100">
+                  <Pill className="w-6 h-6 stroke-[1.75]" />
                 </div>
-                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                  Prescription OCR
+                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-emerald-700 transition-colors mb-1.5 flex items-center gap-1.5">
+                  Prescription & Jan Aushadhi
                 </h3>
                 <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                  Digitize handwritten medical prescriptions and lab slips with optical vision.
+                  Extract handwritten drugs, unlock 85% cheaper PMBJP generic alternatives, and locate nearby Kendras with live GPS.
                 </p>
               </div>
-              <div className="mt-6 flex items-center justify-between">
-                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
+              <div className="mt-6 flex items-center justify-between relative z-10">
+                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-emerald-500 flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-all">
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </div>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  ABDM Standard
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
+                  85% Generic Relief
                 </span>
               </div>
             </Link>
@@ -181,6 +182,111 @@ export default function Home() {
               </div>
             </Link>
 
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* CIVIC HEALTHCARE HERO BANNER: Phase 1 Out-of-Pocket Relief     */}
+        {/* PMBJP Generic Medicine Savings + Vernacular Spoken Audio Guide  */}
+        {/* ============================================================== */}
+        <div className="w-full bg-gradient-to-br from-emerald-950 via-[#0f4c81] to-[#091e3a] text-white rounded-3xl p-6 sm:p-10 mb-12 shadow-xl relative overflow-hidden border border-emerald-500/30">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3.5 py-1 rounded-full text-xs font-bold border border-emerald-400/30 mb-4 backdrop-blur-xs">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span>Phase 1 Deployed: National Civic & Out-of-Pocket Relief Suite</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight mb-3">
+                PMBJP Jan Aushadhi Generic Savings & Vernacular Audio
+              </h2>
+              <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed mb-6 font-medium">
+                Samanvaya automatically decomposes handwritten prescriptions into active generic salts, calculating up to 85% out-of-pocket savings against retail commercial MRP, locating nearest Jan Aushadhi Kendras with live GPS navigation, and generating spoken vernacular audio discharge guides in 6 Indian languages.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
+                  <div className="text-2xl font-black text-emerald-300 mb-1">85% Cheaper</div>
+                  <div className="text-xs text-white/80 font-medium">Active salt decomposition against PMBJP ceiling rates</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
+                  <div className="text-2xl font-black text-blue-300 mb-1">6 Languages</div>
+                  <div className="text-xs text-white/80 font-medium">Vernacular audio instructions via Sarvam AI voice</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15">
+                  <div className="text-2xl font-black text-amber-300 mb-1">Live GPS</div>
+                  <div className="text-xs text-white/80 font-medium">Real-time Kendra locator with Google Maps routing</div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href="/his/ocr"
+                  className="px-6 py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold text-sm shadow-lg transition-all flex items-center gap-2 cursor-pointer group"
+                >
+                  <Pill className="w-4 h-4 text-emerald-950" />
+                  <span>Launch Jan Aushadhi & OCR Studio</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link
+                  href="/his/doctor"
+                  className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Stethoscope className="w-4 h-4 text-blue-300" />
+                  <span>Physician Consultation Desk</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Visual Preview Interactive Graphic Card */}
+            <div className="w-full lg:w-96 bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-5 text-xs shadow-2xl">
+              <div className="flex items-center justify-between border-b border-white/15 pb-3 mb-3">
+                <span className="font-extrabold text-white flex items-center gap-1.5">
+                  💊 Live Savings Demonstration
+                </span>
+                <span className="bg-emerald-400 text-slate-950 font-black px-2 py-0.5 rounded-full text-[10px]">
+                  SAVE ₹495
+                </span>
+              </div>
+              <div className="space-y-2.5 mb-4">
+                <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                  <div>
+                    <div className="text-white font-bold text-[11px]">Augmentin 625 Duo</div>
+                    <div className="text-white/60 text-[10px]">Amoxicillin 500mg + Clavulanate 125mg</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="line-through text-red-300 text-[10px]">MRP ₹204</div>
+                    <div className="text-emerald-300 font-bold">PMBJP ₹48</div>
+                  </div>
+                </div>
+                <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                  <div>
+                    <div className="text-white font-bold text-[11px]">Glycomet-GP 2</div>
+                    <div className="text-white/60 text-[10px]">Metformin 500mg + Glimepiride 2mg</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="line-through text-red-300 text-[10px]">MRP ₹165</div>
+                    <div className="text-emerald-300 font-bold">PMBJP ₹32</div>
+                  </div>
+                </div>
+                <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                  <div>
+                    <div className="text-white font-bold text-[11px]">Pantocid 40</div>
+                    <div className="text-white/60 text-[10px]">Pantoprazole Sodium 40mg</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="line-through text-red-300 text-[10px]">MRP ₹155</div>
+                    <div className="text-emerald-300 font-bold">PMBJP ₹14</div>
+                  </div>
+                </div>
+              </div>
+              <Link
+                href="/his/ocr"
+                className="w-full py-2.5 bg-white text-[#0f2942] hover:bg-slate-100 rounded-xl font-extrabold flex items-center justify-center gap-1.5 text-center transition-colors shadow-sm"
+              >
+                Scan or Upload Your Prescription →
+              </Link>
+            </div>
           </div>
         </div>
 

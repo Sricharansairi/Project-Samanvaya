@@ -38,7 +38,7 @@ export default function TrustBanner({ currentTab = "home", onTabChange, onLangua
       const q = searchQuery.toLowerCase().trim();
       if (q.includes("doctor") || q.includes("physician") || q.includes("consult")) {
         router.push("/his/doctor");
-      } else if (q.includes("ocr") || q.includes("prescription") || q.includes("scan") || q.includes("parchi")) {
+      } else if (q.includes("ocr") || q.includes("prescription") || q.includes("scan") || q.includes("parchi") || q.includes("jan aushadhi") || q.includes("generic") || q.includes("kendra") || q.includes("savings")) {
         router.push("/his/ocr");
       } else if (q.includes("scheme") || q.includes("pmjay") || q.includes("yojana") || q.includes("claim") || q.includes("insurance")) {
         router.push(`/his/schemes?search=${encodeURIComponent(searchQuery)}`);
@@ -239,6 +239,9 @@ export default function TrustBanner({ currentTab = "home", onTabChange, onLangua
           }`}
         >
           📄 {t("nav.ocr")}
+          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-300">
+            85% Off
+          </span>
         </button>
 
         <button

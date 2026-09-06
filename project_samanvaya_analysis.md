@@ -21,64 +21,83 @@ The system operates on a high-throughput, role-based bifurcated architecture:
         - Digital Health Records                         - Physician Desk & E-Rx
         - Scheme Subsidy Checker                         - AI Vision Prescription OCR
         - Jan Aushadhi Generic Finder                    - AYUSH Integrative Assessment
-                                                         - DPDP Consent Auditor
+        - Live GPS Kendra Locator                        - DPDP Consent Auditor
+                                                         - Visual Flowchart RAG (Nemotron)
 ```
 
 ---
 
 ## 3. Civic & Public Healthcare Innovation Roadmap (India Focus)
 
-Based on in-depth operational analysis of Indian civic and district hospitals, the following 8 features comprise the National Civic Healthcare Suite:
+Based on in-depth operational analysis of Indian civic and district hospitals, the following features comprise the National Civic Healthcare Suite:
 
-### Phase 1: Immediate Citizen Out-of-Pocket Relief & Vernacular Clarity
+### Phase 1: Immediate Citizen Out-of-Pocket Relief & Vernacular Clarity (COMPLETED & DEPLOYED)
 1. **PMBJP Generic Medicine Alternative & Cost-Saving Finder**:
-   - Deconstructs branded medicines extracted from OCR prescriptions into active chemical salts and strengths.
-   - Matches against Pradhan Mantri Bhartiya Janaushadhi Pariyojana (PMBJP) and NPPA NLEM ceiling price matrices.
-   - Delivers a clear breakdown showing market costs vs. Jan Aushadhi costs (averaging 70–88% savings).
-   - Locates nearby Pradhan Mantri Bhartiya Janaushadhi Kendras (PMBJK).
+   - Dynamically deconstructs any commercial branded medicine into active pharmacological chemical salts and strengths using zero-hardcoded clinical reasoning.
+   - Computes commercial retail MRP vs. Pradhan Mantri Bhartiya Janaushadhi Pariyojana (PMBJP) subsidized rates, unlocking 50% to 90% direct out-of-pocket savings.
+   - Integrates live OpenStreetMap GPS geo-locator finding real, verified Jan Aushadhi Kendras within 5km radius with turn-by-turn navigation.
 2. **Vernacular Audio Discharge Summary & Medication Instructions**:
-   - Synthesizes natural regional speech (Hindi, Telugu, Tamil, Kannada, Marathi, Bengali, Odia, Gujarati, Punjabi) using Sarvam AI.
-   - Explains dosage timings (*"peeli goli subah khali pet"*), precaution red-flags, and wound care for low-literacy patients.
-   - Delivers in-kiosk playback and WhatsApp-ready downloadable audio guidance.
+   - Synthesizes natural regional speech (Hindi, Telugu, Tamil, Kannada, Marathi, Bengali, English) via Sarvam AI voice engine.
+   - Translates complex prescription directions into dialect-aware spoken instructions (*"peeli goli subah khali pet"*), precaution red flags, and emergency warnings.
+   - Downloadable WhatsApp audio instructions for rural and low-literacy patient families.
+3. **Frontend Visibility & Integration**:
+   - Prominently showcased on Home Landing Page (`/`) with savings demonstration preview.
+   - Integrated with TrustBanner top navigation header (`85% Off` badge) and Physician Consultation Desk (`/his/doctor`).
 
-### Phase 2: Clinical Safety & National Health Priorities
-3. **ICMR & WHO AWaRe Antimicrobial Stewardship Audit**:
+### Phase 1.1 / Phase 1.2: Visual Document & Clinical Flowchart RAG (COMPLETED & DEPLOYED)
+1. **Multimodal Document Retrieval with `llama-nemotron-embed-vl-1b-v2`**:
+   - Represents user queries as text and clinical guideline documents as raw page images.
+   - Overcomes traditional OCR failure on Indian medical guidelines (ICMR, NVBDCP, AIIMS) where clinical guidelines are published as complex multi-branch decision trees, flowcharts, ECG strips, and multi-column diagnostic tables.
+2. **GPU-Accelerated Visual Passage Probability Scoring with `llama-nemotron-rerank-vl-1b-v2`**:
+   - Computes multimodal relevance probability scores (0.00 to 1.00) matching natural clinical inquiries against specific visual flowchart nodes.
+   - Returns exact normalized bounding boxes `[ymin, xmin, ymax, xmax]`, triggering conditions, target dosage windows, and contraindication guardrails.
+3. **Clinical Visual Corpi & Interactive Console (`/his/rag`)**:
+   - **ICMR Acute STEMI Reperfusion Algorithm**: Door-to-Needle thrombolysis (< 30 mins) vs. Primary PCI (< 120 mins) decision nodes and Rescue PCI triggers.
+   - **NVBDCP National Dengue Management Algorithm**: Group A (Ambulatory) vs. Group B (Warning signs: HDU fluid titration 5-7 ml/kg/hr) vs. Group C (Severe Dengue Shock bolus 10-20 ml/kg/hr).
+   - **AIIMS Emergency Code Stroke Protocol**: IV rtPA Alteplase eligibility (< 4.5 hrs, BP < 185/110) and Mechanical Thrombectomy pathway (< 24 hrs).
+   - **WHO / ICMR Multi-Column Complete Blood Count (CBC) Chart**: Critical thrombocytopenia (< 20,000/μL) transfusion thresholds.
+
+### Phase 2: Clinical Safety & National Health Priorities (Next)
+4. **ICMR & WHO AWaRe Antimicrobial Stewardship Audit**:
    - Automated non-blocking audit categorizing every prescribed antibiotic into *Access*, *Watch*, or *Reserve*.
    - Flags reserve antibiotic stewardship alerts to mitigate India's urgent Antimicrobial Resistance (AMR) crisis.
-4. **De-Stigmatized Tele-MANAS Mental Health Screener**:
+5. **De-Stigmatized Tele-MANAS Mental Health Screener**:
    - Somatic symptom screening (PHQ-4 / GAD-2) integrated into vernacular voice triage without psychiatric stigmatization.
    - Direct confidential linkage to the National 24x7 Tele-MANAS Helpline (14416).
 
 ### Phase 3: Civic Operations & Emergency Grid
-5. **ABDM "Scan-to-Queue" Smart OPD Pass with Live Wait-Time Forecast**:
+6. **ABDM "Scan-to-Queue" Smart OPD Pass with Live Wait-Time Forecast**:
    - Rolling-window moving average algorithm forecasting patient wait time by room and physician velocity.
    - Staggered patient arrivals eliminating 5:00 AM hospital queues.
-6. **Civic Bed, ICU & Blood Availability Grid (108 Ambulance Diverter)**:
+7. **Civic Bed, ICU & Blood Availability Grid (108 Ambulance Diverter)**:
    - Real-time district bed and ventilator tracking linked to e-RaktKosh blood bank inventory.
    - Prevents fatal ambulance turnaways by routing 108 emergencies to hospitals with confirmed vacancy.
-7. **U-WIN National Child & Maternal Immunization Dropout Tracker**:
+8. **U-WIN National Child & Maternal Immunization Dropout Tracker**:
    - Syncs with Ministry of Health U-WIN matrices to catch missed booster doses during routine hospital visits.
-8. **Digital Medical Death Certificate (MCCD Form 4/4A) & NOTTO Organ Screening**:
+9. **Digital Medical Death Certificate (MCCD Form 4/4A) & NOTTO Organ Screening**:
    - Standardized WHO ICD-10 mortality cause generator preventing erroneous "cardiopulmonary arrest" entries.
    - Confidential NOTTO brain-stem death screening protocol for deceased organ donation coordination.
 
 ---
 
-## 4. Phase 1 Technical Architecture (Active Implementation)
+## 4. Autonomous Floating Clinical Assistant Overhaul
 
-### A. PMBJP Jan Aushadhi Integration Engine
-- **Salt Mapping Module**: `frontend/services/janaushadhi_engine.ts`
-  - High-speed fuzzy salt normalizer and brand-to-generic dictionary.
-  - Covers top prescribed therapeutic classes: Antibiotics, Antacids/PPIs, Antidiabetics, Antihypertensives, Analgesics, Respiratory.
-  - Price benchmarks: Commercial Branded MRP vs PMBI Jan Aushadhi MRP.
-- **OCR Integration**: `frontend/app/api/vision/ocr/route.ts`
-  - Returns `jan_aushadhi_analysis` containing itemized savings and overall prescription financial relief.
-- **User Interface**: `frontend/app/his/ocr/page.tsx`
-  - UIDAI-styled high-contrast **Jan Aushadhi Generic Savings Card** with total rupees saved, percentage discount, and active salt breakdown.
+### Problem Diagnosis & Fixes:
+1. **Audio Feedback Loop (Speaking Double/Triple)**:
+   - *Root Cause*: Browser microphone remained active while assistant audio was playing through device speakers, capturing its own synthesized voice and triggering cascading recognition loops.
+   - *Fix*: Implemented strict audio mutual exclusion with `isAssistantSpeakingRef`. Microphone recognition is immediately halted when speech starts and all recognition events during speech are silently discarded.
+2. **Navigation Command Trapping**:
+   - *Root Cause*: Form fill intent checking was evaluated before navigation checking, trapping commands like "open registration" or "open patient portal".
+   - *Fix*: Re-ordered intent evaluation to prioritize navigation commands across all 10 Samanvaya routes (`/his/ocr`, `/his/doctor`, `/his/registration`, `/his/schemes`, `/his/queue`, `/patient`, `/his/ayush`, `/his/rag`, `/his/dpdp`, `/`).
+3. **Dynamic Spoken Conversation Engine**:
+   - *Root Cause*: Unrecognized queries returned a static canned string.
+   - *Fix*: Created `/api/assistant/chat` powered by Groq LLM (`llama-3.3-70b-versatile`) that dynamically answers clinical, medical, and navigational inquiries in crisp, spoken-friendly sentences with clickable action links.
 
-### B. Vernacular Audio Instructions Engine
-- **TTS Synthesis Module**: `frontend/app/api/vision/ocr/discharge-audio/route.ts`
-  - Leverages Sarvam AI `bulbul:v1` / `bulbul:v2` with Indian multi-speaker mapping.
-  - Clinical audio script generator tailored to local dialect idioms.
-- **In-Page Audio Player**:
-  - Embedded waveform preview, play/pause controls, language switch, and WhatsApp export simulator.
+---
+
+## 5. Technical Stack & Deployment Telemetry
+- **Frontend**: Next.js 14 App Router, TypeScript, Tailwind CSS, Framer Motion, Lucide Icons.
+- **AI & Vision Pipeline**: NVIDIA Nemotron OCR v2, Moonshot Kimi-K3 / Groq LLaMA 3.3 70B, Sarvam AI Voice TTS (`bulbul`).
+- **Visual RAG**: NVIDIA `llama-nemotron-embed-vl-1b-v2` & `llama-nemotron-rerank-vl-1b-v2` architecture.
+- **Mapping & Geolocation**: OpenStreetMap Overpass API for real-time Kendra discovery.
+- **Production Host**: Vercel Serverless Edge Platform (`https://project-samanvaya.vercel.app`).

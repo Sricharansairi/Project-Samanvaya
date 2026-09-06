@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, Stethoscope, Check, X, AlertTriangle, Mic, MicOff, Save, FileText, Pill, Printer } from "lucide-react";
+import { ArrowLeft, Users, Stethoscope, Check, X, AlertTriangle, Mic, MicOff, Save, FileText, Pill, Printer, ArrowRight } from "lucide-react";
 import TrustBanner from "@/components/TrustBanner";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -111,6 +111,24 @@ export default function DoctorDashboard() {
               <Users className="w-5 h-5 text-[#0f4c81]" /> Queue
             </h1>
           </div>
+
+          {/* Quick Action: Prescription OCR & Jan Aushadhi Savings */}
+          <a 
+            href="/his/ocr"
+            className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl flex items-center justify-between hover:shadow-xs transition-all text-xs group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base">💊</span>
+              <div>
+                <div className="font-bold text-emerald-950 flex items-center gap-1">
+                  Jan Aushadhi & OCR
+                  <span className="bg-emerald-600 text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded-full">85% Off</span>
+                </div>
+                <div className="text-[10px] text-emerald-700">Scan slips & find generic salts</div>
+              </div>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
+          </a>
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             {queue.map((p, idx) => (
