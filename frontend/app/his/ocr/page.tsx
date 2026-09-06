@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles, HeartPulse,
   Edit3, Save, Plus, Trash2, ChevronDown, ChevronUp, Copy, Check, Clock,
   Sun, ZoomIn, ShieldAlert, Activity, Volume2, Play, Pause, Share2, MapPin, 
-  IndianRupee, Pill, PhoneCall, Store, X
+  IndianRupee, Pill, PhoneCall, Store, X, ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,8 +49,48 @@ export default function OCRScanner() {
   const [editMedications, setEditMedications] = useState<string[]>([]);
   const [newMedication, setNewMedication] = useState("");
 
-  // PMBJP Jan Aushadhi Kendra Locator Modal
+  // Real-Time Live GPS Jan Aushadhi Kendra Locator
   const [showKendraModal, setShowKendraModal] = useState<boolean>(false);
+  const [liveKendras, setLiveKendras] = useState<any[]>([]);
+  const [isLoadingKendras, setIsLoadingKendras] = useState<boolean>(false);
+  const [liveCoords, setLiveCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  const fetchLiveKendras = async () => {
+    setShowKendraModal(true);
+    setIsLoadingKendras(true);
+
+    let lat = 28.5672;
+    let lon = 77.2100;
+
+    if (typeof window !== "undefined" && "geolocation" in navigator) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 6000 });
+        });
+        lat = position.coords.latitude;
+        lon = position.coords.longitude;
+        setLiveCoords({ lat, lon });
+      } catch (e) {
+        console.warn("Geolocation permission not granted or timeout; using civic center anchor.");
+      }
+    }
+
+    try {
+      const res = await fetch("/api/vision/ocr/locate-kendras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latitude: lat, longitude: lon, radius: 8000 })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.kendras)) {
+        setLiveKendras(data.kendras);
+      }
+    } catch (err) {
+      console.error("Live Kendra fetch error:", err);
+    } finally {
+      setIsLoadingKendras(false);
+    }
+  };
 
   // Vernacular Audio Discharge & Instructions State
   const [audioLang, setAudioLang] = useState<string>("hi-IN");
@@ -988,11 +1028,11 @@ export default function OCRScanner() {
 
                       <button
                         type="button"
-                        onClick={() => setShowKendraModal(true)}
+                        onClick={fetchLiveKendras}
                         className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-2xs cursor-pointer transition-colors"
                       >
                         <Store className="w-3 h-3" />
-                        Locate Kendra
+                        Live GPS Kendra Search
                       </button>
                     </div>
 
@@ -1331,7 +1371,7 @@ export default function OCRScanner() {
 
       {/* Jan Aushadhi Kendra Locator Modal */}
       <AnimatePresence>
-        {showKendraModal && results?.jan_aushadhi?.nearby_kendras && (
+        {showKendraModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -1343,8 +1383,10 @@ export default function OCRScanner() {
                 <div className="flex items-center gap-2">
                   <Store className="w-5 h-5 text-amber-300" />
                   <div>
-                    <h3 className="font-bold text-sm">Nearby Jan Aushadhi Kendras (PMBJK)</h3>
-                    <p className="text-[11px] text-blue-200">Pradhan Mantri Bhartiya Janaushadhi Pariyojana</p>
+                    <h3 className="font-bold text-sm">Nearby Jan Aushadhi Kendras (Live OpenStreetMap)</h3>
+                    <p className="text-[11px] text-blue-200">
+                      {liveCoords ? `Live GPS: ${liveCoords.lat.toFixed(4)}, ${liveCoords.lon.toFixed(4)}` : "Pradhan Mantri Bhartiya Janaushadhi Pariyojana"}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -1357,43 +1399,74 @@ export default function OCRScanner() {
               </div>
 
               <div className="p-4 space-y-3 max-h-[65vh] overflow-y-auto">
-                <p className="text-xs text-slate-600">
-                  Government subsidized generic drug stores located within your civic hospital zone. Carry your prescription to avail up to 88% discount:
-                </p>
-
-                {results.jan_aushadhi.nearby_kendras.map((kendra: any, i: number) => (
-                  <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 hover:border-emerald-300 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-xs text-slate-900">{kendra.name}</h4>
-                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
-                        {kendra.distance_km} km away
-                      </span>
-                    </div>
-
-                    <div className="flex items-start gap-1.5 text-[11px] text-slate-600">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                      <span>{kendra.address}, {kendra.city}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        {kendra.operating_hours}
-                      </span>
-                      <a
-                        href={`tel:${kendra.contact_phone}`}
-                        className="text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <PhoneCall className="w-3 h-3" />
-                        {kendra.contact_phone}
-                      </a>
-                    </div>
+                {isLoadingKendras ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-2">
+                    <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                    <p className="text-xs font-bold text-slate-700">Connecting to Live OpenStreetMap Healthcare Grid...</p>
+                    <p className="text-[11px] text-slate-400">Locating active government pharmacies within 8 km</p>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-600">
+                      Real-time subsidized drug stores located within your live civic zone. Avail up to 88% discount on your prescribed generic salts:
+                    </p>
+
+                    {(liveKendras.length > 0 ? liveKendras : results?.jan_aushadhi?.nearby_kendras || []).map((kendra: any, i: number) => (
+                      <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 hover:border-emerald-300 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-xs text-slate-900">{kendra.name}</h4>
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
+                            {kendra.distance_km} km away
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-1.5 text-[11px] text-slate-600">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <span>{kendra.address}, {kendra.city}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {kendra.operating_hours}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`tel:${kendra.contact_phone}`}
+                              className="text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <PhoneCall className="w-3 h-3" />
+                              Call
+                            </a>
+                            {kendra.maps_url && (
+                              <a
+                                href={kendra.maps_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Directions
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
 
               <div className="p-3 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs">
-                <span className="text-[11px] text-slate-500">Toll-free Helpline: 1800-180-8080</span>
+                <button
+                  type="button"
+                  onClick={fetchLiveKendras}
+                  disabled={isLoadingKendras}
+                  className="text-blue-700 hover:text-blue-900 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLoadingKendras ? 'animate-spin' : ''}`} />
+                  Refresh Live GPS
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowKendraModal(false)}
