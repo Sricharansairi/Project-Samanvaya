@@ -77,8 +77,115 @@ export async function POST(request: Request) {
     let detectedWords: string[] = [];
     let ocrResultText = "";
     let vlmExtractedText = "";
+    let parsedStructured: any = null;
 
-    // Stage 1: NVIDIA Nemotron OCR v2 with Multi-Key Rotation
+    // =========================================================================
+    // TIER 0: Google Gemini 1.5 / 2.0 Flash (Doctor Handwriting Specialist)
+    // =========================================================================
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+    if (geminiKey) {
+      try {
+        console.log("[Ingestion Gemini Flash Tier] Attempting direct handwriting deciphering...");
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `You are the Chief Clinical Informatics Specialist and ABDM FHIR Architect for Project Samanvaya.
+Deconstruct this clinical history document or prescription photo into 100% structured JSON matching this schema:
+{
+  "document_metadata": {
+    "document_type": "Doctor Prescription (OPD)" | "Hospital Discharge Summary" | "Diagnostic Lab Report" | "Radiology / Ultrasound Scan" | "Surgical Operative Note" | "Vaccination Record",
+    "facility_name": string or null,
+    "doctor_name": string or null,
+    "specialty": string or null,
+    "document_date": string or null
+  },
+  "patient_demographics": { "name": string or null, "age": string or null, "gender": "Male" | "Female" | "Other" | null, "uhid": string or null },
+  "vitals": { "bp": string or null, "pulse": string or null, "temp": string or null, "spo2": string or null, "respiratory_rate": string or null, "weight_kg": string or null },
+  "diagnoses": [ { "condition_name": string, "chronicity": "Acute" | "Chronic" | "Recurrent", "icd10_code": string, "snomed_concept": string } ],
+  "surgical_history": [],
+  "medications": [ { "drug_name": string, "active_generic_molecule": string, "dosage_form": "Tablet" | "Capsule" | "Syrup" | "Injection" | "Drops" | "Inhaler", "strength": string, "frequency": string, "duration": string, "instructions": string } ],
+  "investigations_and_labs": [ { "test_name": string, "observed_value": string, "unit": string, "reference_range": string, "flag": "NORMAL" | "HIGH" | "LOW" | "CRITICAL" } ],
+  "allergies": [],
+  "civic_patient_summary": { "english": string, "hindi": string },
+  "physician_clinical_briefing": string
+}
+Extract ONLY what is supported by the document. Output strict JSON only.`
+                  },
+                  {
+                    inline_data: {
+                      mime_type: "image/jpeg",
+                      data: cleanB64
+                    }
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              response_mime_type: "application/json"
+            }
+          }),
+          signal: AbortSignal.timeout(15000)
+        });
+
+        if (geminiRes.ok) {
+          const gData = await geminiRes.json();
+          const rawText = gData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+          if (rawText) {
+            parsedStructured = JSON.parse(rawText);
+            console.log("[Gemini Flash Ingestion] Successfully parsed document into structured ABDM record.");
+          }
+        }
+      } catch (gemErr: any) {
+        console.warn("Gemini Flash ingestion warning:", gemErr.message);
+      }
+    }
+
+    // =========================================================================
+    // TIER 1: OCR.Space Engine 3 (Specialized Cursive Handwriting OCR)
+    // =========================================================================
+    try {
+      const ocrSpaceKey = process.env.OCR_SPACE_API_KEY || "helloworld";
+      console.log("[OCR.Space Engine 3 Ingestion] Invoking specialized cursive handwriting OCR engine...");
+      const formParams = new URLSearchParams();
+      formParams.append("apikey", ocrSpaceKey);
+      formParams.append("OCREngine", "3");
+      formParams.append("base64Image", formattedImageUrl);
+      formParams.append("isOverlayRequired", "false");
+
+      const ocrSpaceRes = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formParams.toString(),
+        signal: AbortSignal.timeout(14000)
+      });
+
+      if (ocrSpaceRes.ok) {
+        const ocrData = await ocrSpaceRes.json();
+        const parsedResults = ocrData?.ParsedResults || [];
+        for (const pr of parsedResults) {
+          const pText = pr?.ParsedText || "";
+          const lines = pText.split("\n")
+            .map((l: string) => l.replace(/```/g, "").trim())
+            .filter((l: string) => l.length > 0);
+          if (lines.length > 0) {
+            detectedWords = [...detectedWords, ...lines];
+            console.log(`[OCR.Space Engine 3 Ingestion] Extracted ${lines.length} handwritten text segments.`);
+          }
+        }
+      }
+    } catch (osErr: any) {
+      console.warn("OCR.Space Engine 3 ingestion notice:", osErr.message);
+    }
+
+    // =========================================================================
+    // TIER 2: NVIDIA Nemotron OCR v2 with Multi-Key Rotation
+    // =========================================================================
     const nemotronUrl = "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2";
     const nemotronKeys = [
       process.env.NVIDIA_LLAMA_3_3_70B_KEY_1,
@@ -128,10 +235,10 @@ export async function POST(request: Request) {
             return yDiff !== 0 ? yDiff : a.x - b.x;
           });
 
-          detectedWords = detectionsWithCoords.map(d => d.text);
-          if (detectedWords.length > 0) {
-            ocrResultText = detectedWords.join("\n");
-            console.log(`[Ingestion OCR] Nemotron OCR v2 extracted ${detectedWords.length} lines.`);
+          const nWords = detectionsWithCoords.map(d => d.text);
+          if (nWords.length > 0) {
+            detectedWords = [...detectedWords, ...nWords];
+            console.log(`[Ingestion OCR] Nemotron OCR v2 extracted ${nWords.length} lines.`);
             break;
           }
         }
@@ -140,38 +247,19 @@ export async function POST(request: Request) {
       }
     }
 
-    // Stage 2: Beast Multimodal Vision-Language Models (Llama 3.2 90B & 11B Vision)
+    // =========================================================================
+    // TIER 3: Beast Multimodal Vision-Language Models (Llama 3.2 90B & 11B Vision)
+    // =========================================================================
     const visionKeys = [
       process.env.NVIDIA_LLAMA_3_2_90B_KEY_1,
-      process.env.NVIDIA_PHI_4_KEY_1,
       process.env.NVIDIA_LLAMA_3_3_70B_KEY_1,
       process.env.NVIDIA_LLAMA_3_3_70B_KEY_2,
+      process.env.NVIDIA_PHI_4_KEY_1,
     ].filter(Boolean) as string[];
 
-    const hasMedicalTokens = detectedWords.some(w => {
-      const l = w.toLowerCase();
-      return l.includes("tab") || l.includes("cap") || l.includes("syp") || l.includes("dr.") || 
-             l.includes("rx") || l.includes("mg") || l.includes("clinic") || l.includes("hospital") || 
-             l.includes("1-0-1") || l.includes("patient") || l.includes("diag") || l.includes("bp") ||
-             l.includes("report") || l.includes("test") || l.includes("fbs") || l.includes("hba1c");
-    });
-
-    if ((detectedWords.length < 12 || !hasMedicalTokens) && visionKeys.length > 0) {
+    if (!parsedStructured && visionKeys.length > 0) {
       console.log("[Ingestion Beast Tier] Activating Multimodal VLM for deep clinical document transcription...");
-      const vlmPrompt = `You are a Senior Hospital Medical Scribe and Chief Clinical Informatics Specialist.
-Examine this medical document or clinical prescription photo carefully.
-Transcribe every legible item with maximum precision:
-1. Document Type: (Doctor Prescription / Hospital Discharge Summary / Diagnostic Lab Report / Scan)
-2. Facility or Hospital Name and Location
-3. Doctor Name, Qualifications (MBBS, MD), and Specialty
-4. Patient Name, Age, Gender, and UHID / IPD number
-5. Patient Vitals: Blood Pressure (BP), Pulse Rate, Temperature, SpO2, Respiratory Rate
-6. Active Diagnoses, Clinical Signs, or Chief Complaints
-7. Past Surgeries or Procedures
-8. EVERY Prescribed Medication: formulation (Tab, Cap, Syp, Inj), generic/brand name, strength (mg, ml), dosing frequency (1-0-1, OD, BD, TDS, SOS), and instructions
-9. Lab Investigations: test name, observed numerical value, units (mg/dL, %, g/dL), and reference range
-10. Allergies
-Transcribe line by line with highest accuracy.`;
+      const vlmPrompt = "This image shows a handwritten medical document, OPD slip, discharge summary, or lab report. Transcribe all readable handwritten and printed text accurately:\n- Facility or Hospital name and location\n- Doctor name, degrees (MBBS, MD), and specialty\n- Patient demographic details: name, age, gender, date\n- Patient vitals: BP, Pulse, Temperature, SpO2, Respiratory rate\n- Diagnoses, clinical signs, or complaints noted\n- All prescribed medications with formulation (Tab/Cap/Syp/Inj), medicine name, strength (mg/ml), and regimen (1-0-1, OD, BD, TDS, SOS)\n- Lab tests, results, and reference ranges\n- Any notes or instructions\nTranscribe accurately line by line without refusal.";
 
       // 11B Vision First (proven fast & accurate in 1.4s)
       let vlmSuccess = false;
@@ -197,18 +285,17 @@ Transcribe line by line with highest accuracy.`;
               max_tokens: 700,
               temperature: 0.1
             }),
-            signal: AbortSignal.timeout(7000)
+            signal: AbortSignal.timeout(12000)
           });
 
           if (vRes11.ok) {
             const data11 = await vRes11.json();
             const content = data11.choices?.[0]?.message?.content?.trim() || "";
-            if (content && !content.toLowerCase().includes("not able to extract") && !content.toLowerCase().includes("cannot see")) {
+            if (content && !content.toLowerCase().includes("not able to access") && !content.toLowerCase().includes("cannot read")) {
               vlmExtractedText = content;
               const vLines = content.split("\n").map((l: string) => l.replace(/^[-*•\d.]+\s*/, "").trim()).filter((l: string) => l.length > 0);
               detectedWords = [...detectedWords, ...vLines];
-              ocrResultText = detectedWords.join("\n");
-              console.log(`[Ingestion Beast Tier: 11B] Extracted ${vLines.length} clinical lines in ~1.5s.`);
+              console.log(`[Ingestion Beast Tier: 11B] Extracted ${vLines.length} clinical lines.`);
               vlmSuccess = true;
               break;
             }
@@ -242,17 +329,16 @@ Transcribe line by line with highest accuracy.`;
                 max_tokens: 700,
                 temperature: 0.1
               }),
-              signal: AbortSignal.timeout(8000)
+              signal: AbortSignal.timeout(18000)
             });
 
             if (vRes90.ok) {
               const data90 = await vRes90.json();
               const content = data90.choices?.[0]?.message?.content?.trim() || "";
-              if (content && !content.toLowerCase().includes("not able to extract") && !content.toLowerCase().includes("cannot see")) {
+              if (content && !content.toLowerCase().includes("not able to access")) {
                 vlmExtractedText = content;
                 const vLines = content.split("\n").map((l: string) => l.replace(/^[-*•\d.]+\s*/, "").trim()).filter((l: string) => l.length > 0);
                 detectedWords = [...detectedWords, ...vLines];
-                ocrResultText = detectedWords.join("\n");
                 console.log(`[Ingestion Beast Tier: 90B] Extracted ${vLines.length} clinical lines.`);
                 break;
               }
@@ -263,6 +349,8 @@ Transcribe line by line with highest accuracy.`;
         }
       }
     }
+
+    ocrResultText = detectedWords.join("\n");
 
     // Stage 3: Vast Parameterized Clinical Reasoning (Groq 120B / NVIDIA 70B)
     const ocrTranscription = ocrResultText.trim().length > 0 
