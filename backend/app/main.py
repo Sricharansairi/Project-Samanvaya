@@ -101,7 +101,7 @@ async def handle_voice_transcribe(file: UploadFile = File(...)):
 
 @app.post("/api/voice/speak")
 async def handle_voice_speak(request: SpeakRequest):
-    audio_bytes = generate_speech(request.text)
+    audio_bytes = generate_speech(request.text, language=request.target_language, gender=request.gender)
     base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
     return {"base64_audio": base64_audio}
 
@@ -698,7 +698,228 @@ async def handle_medication_rag(request: MedicationRAGRequest):
         in_memory_records=request.in_memory_records
     )
 
+# =============================================================================
+# BHASHINI VOICE PIPELINE ENDPOINTS (22 Indian Languages)
+# =============================================================================
+from app.services.bhashini_service import bhashini_service
+
+class BhashiniASRRequest(BaseModel):
+    base64_audio: str
+    source_language: str = "hi"
+
+class BhashiniNMTRequest(BaseModel):
+    text: str
+    source_language: str = "hi"
+    target_language: str = "en"
+
+class BhashiniTTSRequest(BaseModel):
+    text: str
+    language: Optional[str] = None
+    target_language: Optional[str] = None
+    gender: str = "female"
+    speed: float = 1.0
+
+class BhashiniPipelineRequest(BaseModel):
+    base64_audio: str
+    source_language: str = "hi"
+    target_language: str = "en"
+    gender: str = "female"
+
+class BhashiniALDRequest(BaseModel):
+    base64_audio: str
+
+class ClinicalRAGQueryRequest(BaseModel):
+    query: str
+    source_language: str = "en"
+    target_language: str = "en"
+    use_medical_branch: bool = True
+    use_rag: bool = True
+    speak_response: bool = False
+    voice_gender: str = "female"
+
+@app.post("/api/bhashini/transcribe")
+async def bhashini_transcribe(request: BhashiniASRRequest):
+    """Bhashini ASR: Speech-to-text for any of 22 Indian languages."""
+    result = bhashini_service.speech_to_text(
+        base64_audio=request.base64_audio,
+        source_language=request.source_language
+    )
+    if "error" in result and not result.get("text"):
+        raise HTTPException(status_code=502, detail=result["error"])
+    return result
+
+@app.post("/api/bhashini/translate")
+async def bhashini_translate(request: BhashiniNMTRequest):
+    """Bhashini NMT: Translate text between any Indic language pair."""
+    result = bhashini_service.translate_text(
+        text=request.text,
+        source_language=request.source_language,
+        target_language=request.target_language
+    )
+    if "error" in result and not result.get("translated_text"):
+        raise HTTPException(status_code=502, detail=result["error"])
+    return result
+
+@app.post("/api/bhashini/speak")
+async def bhashini_speak(request: BhashiniTTSRequest):
+    """Bhashini TTS: Convert text to spoken audio with gender & speed control."""
+    selected_lang = request.language or request.target_language or "hi"
+    result = bhashini_service.text_to_speech(
+        text=request.text,
+        language=selected_lang,
+        gender=request.gender,
+        speed=request.speed
+    )
+    if "error" in result and not result.get("audio_base64"):
+        raise HTTPException(status_code=502, detail=result["error"])
+    return result
+
+@app.post("/api/bhashini/pipeline")
+async def bhashini_pipeline(request: BhashiniPipelineRequest):
+    """Full Bhashini ASR→NMT→TTS combo pipeline in a single call."""
+    result = bhashini_service.voice_to_voice(
+        base64_audio=request.base64_audio,
+        source_language=request.source_language,
+        target_language=request.target_language,
+        gender=request.gender
+    )
+    if "error" in result:
+        raise HTTPException(status_code=502, detail=result["error"])
+    return result
+
+@app.post("/api/bhashini/detect-language")
+async def bhashini_detect_language(request: BhashiniALDRequest):
+    """Bhashini ALD: Auto-detect spoken language from raw audio."""
+    result = bhashini_service.detect_language(
+        base64_audio=request.base64_audio
+    )
+    return result
+
+@app.get("/api/bhashini/health")
+async def bhashini_health():
+    """Health check for Bhashini credentials and pipeline connectivity."""
+    return bhashini_service.health_check()
+
+# =============================================================================
+# UNIFIED CLINICAL RAG + DUAL-BRANCH LLM QUERY ENDPOINT
+# =============================================================================
+from app.services.medical_rag import retrieve_medical_guideline, synthesize_clinical_rag
+
+@app.post("/api/clinical/rag-query")
+async def clinical_rag_query(request: ClinicalRAGQueryRequest):
+    """
+    Unified clinical intelligence endpoint:
+    1. Translates Indic input → English via Bhashini NMT (if non-English)
+    2. Retrieves grounded evidence from Medical RAG (StatPearls/ICMR/CDSCO)
+    3. Routes to Dual-Branch LLM (Branch 1: 120B Beast / Branch 2: 70B Medical)
+    4. Translates response back to target language
+    5. Optionally speaks the response via Bhashini TTS
+    """
+    import time as _t
+    pipeline_start = _t.time()
+
+    query_text = request.query
+    source_lang = request.source_language
+    target_lang = request.target_language
+
+    # Step 1: Translate to English if needed
+    english_query = query_text
+    translation_meta = None
+    if source_lang != "en":
+        nmt_result = bhashini_service.translate_text(query_text, source_lang, "en")
+        english_query = nmt_result.get("translated_text", query_text)
+        translation_meta = {"input_translation": nmt_result}
+
+    # Step 2: Medical RAG retrieval
+    rag_context = ""
+    rag_meta = None
+    if request.use_rag:
+        rag_result = retrieve_medical_guideline(english_query)
+        guideline = rag_result.get("guideline", {})
+        rag_context = (
+            f"Condition: {guideline.get('condition', '')}\n"
+            f"Department: {guideline.get('department', '')}\n"
+            f"ICD-10: {guideline.get('icd10', '')}\n"
+            f"Source: {guideline.get('source', '')}\n"
+            f"Red Flags: {', '.join(guideline.get('redFlags', []))}\n"
+            f"Preliminary Advice: {guideline.get('preliminaryAdvice', '')}\n"
+            f"Contraindications: {', '.join(guideline.get('contraindications', []))}"
+        )
+        rag_meta = {
+            "matched_condition": guideline.get("condition"),
+            "is_emergency": rag_result.get("is_emergency", False),
+            "confidence": rag_result.get("confidence", 0),
+            "retrieval_architecture": rag_result.get("retrieval_architecture", {}),
+            "source": rag_result.get("source", "")
+        }
+
+    # Step 3: Dual-Branch LLM query
+    augmented_prompt = english_query
+    if rag_context:
+        augmented_prompt = (
+            f"CLINICAL EVIDENCE CONTEXT (from StatPearls/ICMR/CDSCO):\n{rag_context}\n\n"
+            f"PATIENT QUERY: {english_query}\n\n"
+            f"Using the evidence above, provide a clinically accurate, concise response."
+        )
+
+    if request.use_medical_branch:
+        llm_result = dual_model_service.query_medical_branch(augmented_prompt)
+    else:
+        llm_result = dual_model_service.query_high_param_branch(augmented_prompt)
+
+    ai_response_en = llm_result.get("content", "")
+
+    # Step 4: Translate response back if needed
+    final_text = ai_response_en
+    response_translation_meta = None
+    if target_lang != "en" and ai_response_en:
+        response_nmt = bhashini_service.translate_text(ai_response_en, "en", target_lang)
+        final_text = response_nmt.get("translated_text", ai_response_en)
+        response_translation_meta = {"output_translation": response_nmt}
+
+    # Step 5: TTS if requested
+    tts_meta = None
+    if request.speak_response and final_text:
+        tts_result = bhashini_service.text_to_speech(final_text, target_lang, request.voice_gender)
+        tts_meta = tts_result
+
+    pipeline_latency = round((_t.time() - pipeline_start) * 1000)
+
+    return {
+        "query": query_text,
+        "response": final_text,
+        "response_english": ai_response_en,
+        "llm_metadata": {
+            "branch": llm_result.get("branch"),
+            "model": llm_result.get("model"),
+            "parameter_scale": llm_result.get("parameter_scale"),
+            "tier": llm_result.get("tier"),
+            "llm_latency_seconds": llm_result.get("latency_seconds")
+        },
+        "rag_metadata": rag_meta,
+        "translation_metadata": {
+            "input": translation_meta,
+            "output": response_translation_meta
+        },
+        "tts": tts_meta,
+        "pipeline_latency_ms": pipeline_latency,
+        "source_language": source_lang,
+        "target_language": target_lang
+    }
+
+
+class BhashiniOCRRequest(BaseModel):
+    base64_image: str
+    source_language: str = "hi"
+
+@app.post("/api/bhashini/ocr")
+async def bhashini_ocr_endpoint(request: BhashiniOCRRequest):
+    """
+    Bhashini OCR Document Text Extraction Endpoint.
+    Extracts text from medical prescriptions and lab reports across 22 Scheduled Indian Languages.
+    """
+    return bhashini_service.ocr_document(request.base64_image, request.source_language)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-

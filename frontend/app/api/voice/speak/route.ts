@@ -1,56 +1,68 @@
 import { NextResponse } from "next/server";
 
-// Sarvam AI API Key Pool (with fallback failover)
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+// Sarvam AI API Key Pool (fallback tier)
 const ENCODED_KEYS = [
   "c2tfMmtkMTU3OWZfWmFHNEFuNnFsMFppTTZnbXJDaGY1eGln",
   "c2tfZm1ieG42OTJfRUV6VGkwdUNFVjRJRldVMEZvTXVuelJJ",
   "c2tfMTN3NzRpcHVfZDg2YWNYQnNqUVVDSjJuN1lMak9XWUto",
-  "c2tfZWlqYTM0MHhfWDRZR1ZqdjlmczN0N05hMzJqbTM2VEJ4",
-  "c2tfcHFjc25yeWZfREhQTlVmR2dqRFdGb2FKSjhwZGJpQXJQ",
-  "c2tfa2d4OW9zNTNfUzFvQjVhY2dURURtM0ttMnZLamhTc05Z",
-  "c2tfdXRzd3Z2M29fdmlGdmN2ejM5ejAzR1licmlRR2lQZ3NO",
-  "c2tfaDV5MnIxOHlfcWdMNmVQajRUcmlTbU81Y2NGZGFDY3Vj"
+  "c2tfZWlqYTM0MHhfWDRZR1ZqdjlmczN0N05hMzJqbTM2VEJ4"
 ];
 
 const SARVAM_KEYS = (process.env.SARVAM_API_KEY ? [process.env.SARVAM_API_KEY] : []).concat(
   ENCODED_KEYS.map(k => Buffer.from(k, "base64").toString("utf-8"))
 );
 
-const SPEAKER_MAPPING: Record<string, string> = {
-  "en-IN": "priya",
-  "hi-IN": "pooja",
-  "te-IN": "kavitha",
-  "ta-IN": "priya",
-  "kn-IN": "priya",
-  "ml-IN": "priya",
-  "mr-IN": "pooja",
-  "bn-IN": "priya",
-  "gu-IN": "pooja",
-  "pa-IN": "pooja",
-  "od-IN": "priya"
-};
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { 
       text = "Namaste, welcome to Project Samanvaya", 
-      language_code = "en-IN", 
-      speaker = "priya",
-      pace = 1.0,
-      pitch = 0
+      language_code = "hi-IN", 
+      gender = "female"
     } = body;
 
-    // Sanitize text length for optimal TTS latency
     const cleanText = text.slice(0, 500).replace(/[\n\r]+/g, " ").trim();
     if (!cleanText) {
       return NextResponse.json({ error: "Empty text" }, { status: 400 });
     }
 
-    // Determine target speaker based on language if default
-    const targetSpeaker = speaker || SPEAKER_MAPPING[language_code] || "priya";
+    const bhashiniLang = language_code.split("-")[0] || "hi";
 
-    // Attempt call across key pool
+    // =========================================================================
+    // TIER 1: BHASHINI GOVERNMENT AI API (PRIMARY TTS ENGINE)
+    // =========================================================================
+    try {
+      const bhashiniRes = await fetch(`${BACKEND_URL}/api/bhashini/speak`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: cleanText,
+          language: bhashiniLang,
+          target_language: bhashiniLang,
+          gender: gender
+        })
+      });
+
+      if (bhashiniRes.ok) {
+        const bhashiniData = await bhashiniRes.json();
+        if (bhashiniData.base64_audio && bhashiniData.base64_audio.length > 100) {
+          return NextResponse.json({
+            base64_audio: bhashiniData.base64_audio,
+            mime_type: "audio/wav",
+            provider: "bhashini-government-ai",
+            language: bhashiniLang
+          });
+        }
+      }
+    } catch (err: any) {
+      console.warn("[Voice Speak Route] Bhashini primary failed, falling back:", err.message);
+    }
+
+    // =========================================================================
+    // TIER 2: SARVAM AI BULBUL V3 (SECONDARY FALLBACK ENGINE)
+    // =========================================================================
     for (const apiKey of SARVAM_KEYS) {
       try {
         const sarvamRes = await fetch("https://api.sarvam.ai/text-to-speech", {
@@ -62,15 +74,15 @@ export async function POST(request: Request) {
           body: JSON.stringify({
             inputs: [cleanText],
             target_language_code: language_code,
-            speaker: targetSpeaker,
-            pitch: pitch,
-            pace: pace,
+            speaker: gender === "female" ? "pooja" : "aditya",
+            pitch: 0,
+            pace: 1.0,
             loudness: 1.5,
             speech_sample_rate: 22050,
             enable_preprocessing: true,
             model: "bulbul:v3"
           }),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(6000)
         });
 
         if (sarvamRes.ok) {
@@ -81,7 +93,6 @@ export async function POST(request: Request) {
               base64_audio: base64Audio,
               mime_type: "audio/wav",
               provider: "sarvam-ai-bulbul-v3",
-              speaker: targetSpeaker,
               language: language_code
             });
           }
@@ -93,7 +104,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       base64_audio: null,
-      error: "Sarvam AI rate-limited or unavailable; use client speech synthesis fallback."
+      error: "All voice engines unavailable; use client speech synthesis fallback."
     });
   } catch (error: any) {
     return NextResponse.json({ base64_audio: null, error: error.message }, { status: 500 });

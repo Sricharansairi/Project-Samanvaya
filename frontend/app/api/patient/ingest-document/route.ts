@@ -424,10 +424,16 @@ OUTPUT JSON SCHEMA:
   "physician_clinical_briefing": string
 }`;
 
+<<<<<<< Updated upstream
     parsedStructured = null;
 
     // Try Groq 120B
     for (const apiKey of GROQ_KEYS) {
+=======
+    // Try Groq 120B if Gemini didn't parse already
+    if (!parsedStructured) {
+      for (const apiKey of GROQ_KEYS) {
+>>>>>>> Stashed changes
       try {
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
@@ -460,6 +466,7 @@ OUTPUT JSON SCHEMA:
         console.warn("Groq 120B ingestion attempt failed:", err.message);
       }
     }
+  }
 
     // Try NVIDIA 70B Fallback
     if (!parsedStructured && visionKeys.length > 0) {
