@@ -284,7 +284,13 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             fallbackBrowserSpeech(text, persona);
           };
 
-          await audio.play();
+          try {
+            await audio.play();
+          } catch (playErr: any) {
+            if (playErr?.name !== "AbortError") {
+              console.warn("Audio play error:", playErr);
+            }
+          }
           return;
         }
       }

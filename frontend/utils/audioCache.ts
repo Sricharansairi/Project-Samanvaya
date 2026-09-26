@@ -39,5 +39,9 @@ export const setCachedAudio = (text: string, language: string, base64Audio: stri
 
 export const playCachedAudio = (base64Audio: string) => {
     const audio = new Audio(`data:audio/wav;base64,${base64Audio}`);
-    audio.play();
+    audio.play().catch((err) => {
+        if (err?.name !== "AbortError") {
+            console.warn("Cached audio playback error:", err);
+        }
+    });
 };
