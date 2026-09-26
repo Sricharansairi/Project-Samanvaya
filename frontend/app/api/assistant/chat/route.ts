@@ -206,34 +206,50 @@ Return strictly a valid JSON object:
 
     // Dynamic fallback if Groq is temporarily slow or unreachable
     const lower = trimmed.toLowerCase();
-    let reply = `I have received your query about ${trimmed}. Let me assist you.`;
+    let reply = `I have received your query about ${trimmed}. How may I guide you through the hospital portals?`;
     let route: string | null = null;
-    let chips: string[] = ["📄 Scan Prescriptions", "🩺 Doctor OPD Desk", "🏥 Registration Kiosk"];
+    let chips: string[] = ["📄 Scan Prescriptions", "🩺 Doctor OPD Desk", "🏥 Registration Kiosk", "📜 Health Schemes"];
 
-    if (lower.includes("ocr") || lower.includes("scan") || lower.includes("prescription") || lower.includes("parchi")) {
-      reply = "Opening Prescription OCR and generic medicine savings.";
+    if (lower.includes("scheme") || lower.includes("pmjay") || lower.includes("ayushman") || lower.includes("yojna") || lower.includes("bpl") || lower.includes("ration") || lower.includes("subsidy")) {
+      reply = "Opening Government Health Schemes Eligibility portal. What is your approximate annual household income, or do you hold a BPL / Ayushman ration card?";
+      route = "/his/schemes";
+      chips = ["Income < ₹2.5 Lakhs", "Income ₹2.5L - ₹5L", "BPL / Ration Card Holder", "Check PM-JAY Coverage"];
+    } else if (lower.includes("ocr") || lower.includes("scan") || lower.includes("prescription") || lower.includes("parchi") || lower.includes("generic") || lower.includes("jan aushadhi")) {
+      reply = "Opening Prescription OCR and generic medicine savings. Please upload your prescription slip or mention your medicine name to calculate 80% savings at PMBJP Jan Aushadhi!";
       route = "/his/ocr";
-      chips = ["Upload Prescription", "Locate Kendra", "Listen to Audio"];
-    } else if (lower.includes("doctor") || lower.includes("physician") || lower.includes("opd")) {
-      reply = "Opening Physician Consultation Desk.";
+      chips = ["Upload Prescription", "Locate Jan Aushadhi", "Check 80% Savings", "Listen to Audio Dosage"];
+    } else if (lower.includes("doctor") || lower.includes("physician") || lower.includes("opd") || lower.includes("consult")) {
+      reply = "Opening Physician Consultation Desk. Which patient token shall we review from the OPD queue today?";
       route = "/his/doctor";
-      chips = ["Review Queue", "Prescribe Medicines", "Clinical Decision"];
+      chips = ["Review Queue", "Prescribe Medicines", "Clinical Decision", "Lab Investigations"];
     } else if (lower.includes("ayush") || lower.includes("prakriti") || lower.includes("dosha") || lower.includes("ayurved")) {
-      reply = "Opening AYUSH Pariksha and Tridosha constitutional assessment.";
+      reply = "Opening AYUSH Prakriti Pariksha. To assess your Vata, Pitta, and Kapha constitution, how is your digestion, sleep quality, and body temperature tolerance?";
       route = "/his/ayush";
-      chips = ["Start Prakriti Quiz", "Tridosha Balance", "Herb-Drug Safety"];
-    } else if (lower.includes("register") || lower.includes("token") || lower.includes("admit") || lower.includes("kiosk")) {
-      reply = "Opening Smart Parchi Patient Registration and Triage.";
+      chips = ["Start Prakriti Quiz", "Tridosha Balance", "Herb-Drug Safety", "Dietary Regimen"];
+    } else if (lower.includes("register") || lower.includes("token") || lower.includes("admit") || lower.includes("kiosk") || lower.includes("triage")) {
+      reply = "Opening Smart Parchi Patient Registration and Triage. What is the patient's full name, age, and primary symptom today?";
       route = "/his/registration";
-      chips = ["Enter ABHA ID", "Record Vitals", "Generate Token"];
-    } else if (lower.includes("queue") || lower.includes("wait")) {
-      reply = "Opening Live OPD Queue Board.";
+      chips = ["Enter ABHA ID", "Record Vitals", "Generate Token", "Emergency Triage"];
+    } else if (lower.includes("queue") || lower.includes("wait") || lower.includes("line")) {
+      reply = "Opening Live OPD Queue Board. What is your Token Number or OPD department (General, Cardiology, AYUSH) to track your live wait time?";
       route = "/his/queue";
-      chips = ["View Token List", "Estimated Wait", "SMS Alerts"];
-    } else if (lower.includes("card") || lower.includes("patient") || lower.includes("history")) {
-      reply = "Opening Patient Self-Service Portal.";
+      chips = ["View Token List", "Estimated Wait", "SMS Alerts", "Department Status"];
+    } else if (lower.includes("card") || lower.includes("patient") || lower.includes("history") || lower.includes("locker") || lower.includes("abha")) {
+      reply = "Opening Patient Self-Service Portal. Would you like to view your 3D Ayushman ABHA Smart Card, review past prescriptions, or download your medical QR code?";
       route = "/patient";
-      chips = ["View ABHA Card", "Past Prescriptions", "Health Locker"];
+      chips = ["View ABHA Card", "Past Prescriptions", "Health Locker", "Download QR"];
+    } else if (lower.includes("antibiotic") || lower.includes("antimicrobial") || lower.includes("aware") || lower.includes("icmr")) {
+      reply = "Opening WHO AWaRe Antimicrobial Stewardship Audit. Which prescribed antibiotic, dose, and clinical indication shall we evaluate against ICMR safety guidelines?";
+      route = "/his/antimicrobial";
+      chips = ["Audit Amoxicillin", "Check AWaRe Category", "ICMR Guidelines", "Dosage Safety"];
+    } else if (lower.includes("mental") || lower.includes("depression") || lower.includes("stress") || lower.includes("tele-manas") || lower.includes("phq")) {
+      reply = "Opening Tele-MANAS 14416 Mental Health Portal. Would you like to take a confidential PHQ-9 wellness assessment, practice guided box breathing, or call the 14416 helpline?";
+      route = "/his/tele-manas";
+      chips = ["Take PHQ-9 Assessment", "Guided Breathing", "Call 14416 Helpline", "Doctor Tele-Consult"];
+    } else if (lower.includes("privacy") || lower.includes("consent") || lower.includes("dpdp")) {
+      reply = "Opening DPDP 2023 Digital Health Consent Manager. Would you like to review active data sharing consents or verify the cryptographic audit trail?";
+      route = "/his/dpdp";
+      chips = ["Review Consents", "Revoke Access", "Audit Trail", "Data Principal Rights"];
     }
 
     return NextResponse.json({
