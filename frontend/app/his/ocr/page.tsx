@@ -341,19 +341,38 @@ export default function OCRScanner() {
     setError(null);
 
     try {
-      const response = await fetch("/api/vision/ocr", {
+      const byteCharacters = atob(base64Image);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "image/jpeg" });
+
+      const formData = new FormData();
+      formData.append("file", blob, "scan.jpg");
+      formData.append("language", "English");
+
+      const response = await fetch("http://127.0.0.1:8000/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64_image: base64Image }),
+        body: formData,
       });
-      
-      if (!response.ok) throw new Error("Failed to scan document with Clinical Digitizer");
+
+      if (!response.ok) {
+        let errMsg = "Failed to scan document with Clinical Digitizer";
+        try {
+          const errData = await response.json();
+          if (errData.error) errMsg = errData.error;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
+
       const data = await response.json();
       setResults(data);
       setIsEditing(false);
     } catch (err: any) {
       console.error(err);
-      setError("Prescription scan extraction error. Please check image clarity and try again.");
+      setError(err.message || "Prescription scan extraction error. Please check image clarity and try again.");
     }
     setIsScanning(false);
   };
