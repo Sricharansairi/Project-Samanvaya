@@ -175,7 +175,11 @@ export default function QueueTrackerPage() {
       const data = await res.json();
       if (data.base64_audio) {
         const audio = new Audio(`data:audio/wav;base64,${data.base64_audio}`);
-        audio.play();
+        audio.play().catch((err) => {
+          if (err?.name !== "AbortError") {
+            console.warn("Queue audio callout error:", err);
+          }
+        });
         return;
       }
     } catch (e) {

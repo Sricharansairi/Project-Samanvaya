@@ -135,7 +135,11 @@ export async function playAudioBase64(base64Audio: string): Promise<void> {
     // Fallback: use Audio element with data URL
     console.warn("[Bhashini] AudioContext failed, falling back to Audio element:", err);
     const audio = new Audio(`data:audio/wav;base64,${base64Audio}`);
-    return audio.play();
+    return audio.play().catch((err) => {
+      if (err?.name !== "AbortError") {
+        console.warn("[Bhashini] Audio playback failed:", err);
+      }
+    });
   }
 }
 

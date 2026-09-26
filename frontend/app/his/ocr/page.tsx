@@ -152,7 +152,11 @@ export default function OCRScanner() {
         audioPlayerRef.current.pause();
         setIsPlayingAudio(false);
       } else {
-        audioPlayerRef.current.play();
+        audioPlayerRef.current.play().catch((err: any) => {
+          if (err?.name !== "AbortError") {
+            console.warn("OCR audio play error:", err);
+          }
+        });
         setIsPlayingAudio(true);
       }
     } else if (typeof window !== "undefined" && "speechSynthesis" in window && audioScript) {

@@ -196,7 +196,13 @@ Nemotron Rerank-VL Match Probability: ${(d.rerankScore * 100).toFixed(1)}%`;
             setIsSpeakingSummary(false);
             fallbackBrowserSpeech(text);
           };
-          await audio.play();
+          try {
+            await audio.play();
+          } catch (playErr: any) {
+            if (playErr?.name !== "AbortError") {
+              console.warn("RAG audio play error:", playErr);
+            }
+          }
           return;
         }
       }
