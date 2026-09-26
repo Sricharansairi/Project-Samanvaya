@@ -114,7 +114,7 @@ Reference: ${result.icmrCitation}`;
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans selection:bg-[#0f4c81] selection:text-white" id="main-content">
       {/* Official Top Navigation Bar */}
-      <TrustBanner currentTab="doctor" />
+      <TrustBanner currentTab="antimicrobial" />
 
       {/* Main Container */}
       <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-8">

@@ -285,7 +285,7 @@ export default function RegistrationDashboard() {
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans">
-      <TrustBanner currentTab="home" onTabChange={() => {}} onLanguageChange={() => {}} />
+      <TrustBanner currentTab="kiosk" onTabChange={() => {}} onLanguageChange={() => {}} />
 
       <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 relative">
         

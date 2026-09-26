@@ -149,7 +149,7 @@ export default function DpdpConsentPage() {
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans">
-      <TrustBanner currentTab="his" onTabChange={() => {}} onLanguageChange={() => {}} />
+      <TrustBanner currentTab="dpdp" onTabChange={() => {}} onLanguageChange={() => {}} />
 
       <div className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         

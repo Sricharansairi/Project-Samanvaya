@@ -268,7 +268,7 @@ export default function PatientPortal() {
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans">
-      <TrustBanner currentTab="home" onTabChange={() => {}} onLanguageChange={() => {}} />
+      <TrustBanner currentTab="patient" onTabChange={() => {}} onLanguageChange={() => {}} />
 
       {!isAuthenticated ? (
         /* Login Screen */

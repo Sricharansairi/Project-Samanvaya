@@ -577,7 +577,7 @@ export default function DoctorDashboard() {
       
       {/* Top Header - Hidden in Print */}
       <div className="print:hidden">
-        <TrustBanner currentTab="home" onTabChange={() => {}} onLanguageChange={() => {}} />
+        <TrustBanner currentTab="doctor" onTabChange={() => {}} onLanguageChange={() => {}} />
 
         {/* Doctor Console Sub-Header & OPD Switcher Bar */}
         <div className="bg-white border-b border-gray-200 shadow-xs px-4 sm:px-8 py-3">

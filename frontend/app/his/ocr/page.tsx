@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import TrustBanner from "@/components/TrustBanner";
 
 export default function OCRScanner() {
   const [activeTab, setActiveTab] = useState<"camera" | "upload">("camera");
@@ -402,30 +403,24 @@ export default function OCRScanner() {
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/"
-              className="p-2 -ml-2 rounded-xl text-gray-500 hover:text-[#0f4c81] hover:bg-slate-100 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
+      {/* Official Government Header with Role-Based Navigation */}
+      <TrustBanner currentTab="ocr" />
+
+      {/* Sub-Header Breadcrumb */}
+      <div className="w-full bg-white border-b border-gray-100 py-2.5 px-4 sm:px-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <Link href="/" className="hover:text-[#0f4c81] font-semibold flex items-center gap-1">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
             </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-[#0f2942] text-lg leading-none">Prescription & Clinical Document OCR</h1>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                  ABDM Clinical Digitizer
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-500 mt-0.5">
-                High-Precision Optical Medical Transcription & Autonomous Clinical Structuring
-              </p>
-            </div>
+            <span>/</span>
+            <span className="font-semibold text-[#0f2942]">Prescription OCR & Jan Aushadhi Savings</span>
           </div>
+          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 hidden sm:inline-flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-emerald-700" /> ABDM Clinical Digitizer
+          </span>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col">

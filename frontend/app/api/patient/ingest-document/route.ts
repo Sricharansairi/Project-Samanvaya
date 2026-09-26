@@ -424,7 +424,7 @@ OUTPUT JSON SCHEMA:
   "physician_clinical_briefing": string
 }`;
 
-    let parsedStructured: any = null;
+    parsedStructured = null;
 
     // Try Groq 120B
     for (const apiKey of GROQ_KEYS) {
