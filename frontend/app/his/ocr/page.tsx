@@ -353,7 +353,9 @@ export default function OCRScanner() {
       formData.append("file", blob, "scan.jpg");
       formData.append("language", "English");
 
-      const response = await fetch("http://127.0.0.1:8000/api/analyze", {
+      const apiUrl = "/api/vision/ocr";
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         body: formData,
       });
