@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, ShieldCheck, CheckCircle2, AlertCircle, 
@@ -24,6 +24,40 @@ export default function SchemeNavigatorPage() {
   const [activeModalTab, setActiveModalTab] = useState<"docs" | "apply" | "claim">("docs");
   const [tickedDocs, setTickedDocs] = useState<Record<string, boolean>>({});
   const [activeTabFilter, setActiveTabFilter] = useState<"all" | "direct" | "conditional" | "relief">("all");
+
+  // Autonomous Assistant Form Fill & Filter Listener
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const pendingRaw = sessionStorage.getItem("samanvaya_pending_fill");
+      if (pendingRaw) {
+        try {
+          const p = JSON.parse(pendingRaw);
+          if (p.income) setIncome(Number(p.income));
+          if (p.age) setAge(Number(p.age));
+          if (p.state) setSelectedState(p.state.toUpperCase());
+          if (p.rationCard) setRationCard(p.rationCard.toUpperCase());
+          if (p.gender) setGender(p.gender);
+          sessionStorage.removeItem("samanvaya_pending_fill");
+        } catch (e) {
+          console.warn("Failed to parse schemes pending fill:", e);
+        }
+      }
+    }
+
+    const handleAssistantAction = (e: any) => {
+      const { action, payload } = e.detail || {};
+      if (action === "fill_form" || action === "filter_schemes") {
+        if (payload?.income) setIncome(Number(payload.income));
+        if (payload?.age) setAge(Number(payload.age));
+        if (payload?.state) setSelectedState(payload.state.toUpperCase());
+        if (payload?.rationCard) setRationCard(payload.rationCard.toUpperCase());
+        if (payload?.gender) setGender(payload.gender);
+      }
+    };
+
+    window.addEventListener("samanvaya:assistant-action", handleAssistantAction);
+    return () => window.removeEventListener("samanvaya:assistant-action", handleAssistantAction);
+  }, []);
 
   // Real-time evaluation calculation (sub-50ms reactive)
   const evaluatedResults = useMemo(() => {

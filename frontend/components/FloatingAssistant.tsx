@@ -522,11 +522,22 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         }
 
         // Autonomous Portal Navigation
-        if (data.route && data.route !== pathname) {
-          setLastActionExecuted(`Autonomous Navigation -> ${data.route}`);
-          setTimeout(() => {
-            router.push(data.route);
-          }, 600);
+        if (data.route) {
+          const target = data.route.trim();
+          const current = (pathname || "").trim();
+          if (target && target !== current) {
+            setLastActionExecuted(`Navigating to ${target}...`);
+            try {
+              router.push(target);
+            } catch (err) {
+              window.location.href = target;
+            }
+            setTimeout(() => {
+              if (typeof window !== "undefined" && window.location.pathname !== target) {
+                window.location.href = target;
+              }
+            }, 350);
+          }
         }
 
         // Interactive Chips
@@ -571,36 +582,68 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     // 3. DYNAMIC FALLBACK ROUTER (If Groq API temporarily unavailable)
     let fallbackReply = `I have received your request regarding: "${rawCmd}". Directing to relevant desk.`;
     let fallbackRoute: string | null = null;
+    let fallbackChips: string[] = ["📄 Scan Prescriptions", "🩺 Doctor Desk", "🏥 Registration", "🌿 AYUSH"];
 
-    if (text.includes("ocr") || text.includes("scan") || text.includes("prescription") || text.includes("parchi") || text.includes("jan aushadhi") || text.includes("generic")) {
-      fallbackReply = "Opening Prescription OCR and PMBJP Jan Aushadhi generic savings portal.";
-      fallbackRoute = "/his/ocr";
-    } else if (text.includes("doctor") || text.includes("physician") || text.includes("opd") || text.includes("consult")) {
-      fallbackReply = "Opening Physician Consultation Desk and Clinical Decision Support System.";
-      fallbackRoute = "/his/doctor";
-    } else if (text.includes("register") || text.includes("triage") || text.includes("kiosk") || text.includes("admit") || text.includes("token")) {
-      fallbackReply = "Opening Smart Parchi Patient Registration and Triage Kiosk.";
-      fallbackRoute = "/his/registration";
-    } else if (text.includes("ayush") || text.includes("prakriti") || text.includes("ayurved") || text.includes("dosha")) {
-      fallbackReply = "Opening AYUSH Prakriti Pariksha and Tridosha Assessment.";
-      fallbackRoute = "/his/ayush";
-    } else if (text.includes("queue") || text.includes("wait")) {
-      fallbackReply = "Opening Live OPD Queue and Smart Token Board.";
-      fallbackRoute = "/his/queue";
-    } else if (text.includes("patient") || text.includes("card") || text.includes("abha") || text.includes("locker")) {
-      fallbackReply = "Opening Patient Self-Service Portal with 3D Ayushman ABHA Smart Card.";
-      fallbackRoute = "/patient";
-    } else if (text.includes("scheme") || text.includes("pmjay") || text.includes("ayushman") || text.includes("insurance")) {
-      fallbackReply = "Opening Ayushman Bharat PM-JAY and State Health Scheme Navigator.";
+    if (text.includes("scheme") || text.includes("pmjay") || text.includes("ayushman") || text.includes("insurance") || text.includes("yojna") || text.includes("bpl") || text.includes("ration")) {
+      fallbackReply = "Opening Ayushman Bharat PM-JAY and Government Health Scheme Navigator. What is your annual family income or do you hold a BPL ration card?";
       fallbackRoute = "/his/schemes";
+      fallbackChips = ["Income < ₹2.5 Lakhs", "Income ₹2.5L - ₹5L", "BPL / Ration Card Holder", "Check PM-JAY Coverage"];
+    } else if (text.includes("ocr") || text.includes("scan") || text.includes("prescription") || text.includes("parchi") || text.includes("jan aushadhi") || text.includes("generic")) {
+      fallbackReply = "Opening Prescription OCR and PMBJP Jan Aushadhi generic savings portal. Please upload your prescription slip or enter your medicine name.";
+      fallbackRoute = "/his/ocr";
+      fallbackChips = ["Upload Prescription", "Locate Jan Aushadhi", "Check 80% Savings", "Audio Dosage"];
+    } else if (text.includes("doctor") || text.includes("physician") || text.includes("opd") || text.includes("consult")) {
+      fallbackReply = "Opening Physician Consultation Desk and Clinical Decision Support System. Which patient token shall we review?";
+      fallbackRoute = "/his/doctor";
+      fallbackChips = ["Review Queue", "Prescribe Medicines", "Clinical Decision", "Lab Investigations"];
+    } else if (text.includes("register") || text.includes("triage") || text.includes("kiosk") || text.includes("admit") || text.includes("token")) {
+      fallbackReply = "Opening Smart Parchi Patient Registration and Triage Kiosk. What is the patient's full name, age, and chief symptom?";
+      fallbackRoute = "/his/registration";
+      fallbackChips = ["Enter ABHA ID", "Record Vitals", "Generate Token", "Emergency Triage"];
+    } else if (text.includes("ayush") || text.includes("prakriti") || text.includes("ayurved") || text.includes("dosha")) {
+      fallbackReply = "Opening AYUSH Prakriti Pariksha and Tridosha Assessment. How is your digestion, sleep, and body temperature tolerance?";
+      fallbackRoute = "/his/ayush";
+      fallbackChips = ["Start Prakriti Quiz", "Tridosha Balance", "Herb-Drug Safety", "Dietary Regimen"];
+    } else if (text.includes("queue") || text.includes("wait")) {
+      fallbackReply = "Opening Live OPD Queue and Smart Token Board. What is your Token Number or OPD department?";
+      fallbackRoute = "/his/queue";
+      fallbackChips = ["View Token List", "Estimated Wait", "SMS Alerts", "Department Status"];
+    } else if (text.includes("patient") || text.includes("card") || text.includes("abha") || text.includes("locker")) {
+      fallbackReply = "Opening Patient Self-Service Portal with 3D Ayushman ABHA Smart Card. Would you like to view your card or medical locker?";
+      fallbackRoute = "/patient";
+      fallbackChips = ["View ABHA Card", "Past Prescriptions", "Health Locker", "Download QR"];
+    } else if (text.includes("antibiotic") || text.includes("antimicrobial") || text.includes("aware")) {
+      fallbackReply = "Opening WHO AWaRe Antimicrobial Stewardship Audit. Which antibiotic and indication shall we evaluate?";
+      fallbackRoute = "/his/antimicrobial";
+      fallbackChips = ["Audit Amoxicillin", "Check AWaRe Category", "ICMR Guidelines"];
+    } else if (text.includes("mental") || text.includes("depression") || text.includes("stress") || text.includes("tele-manas")) {
+      fallbackReply = "Opening Tele-MANAS 14416 Mental Health Portal. Would you like a PHQ-9 wellness check or guided breathing?";
+      fallbackRoute = "/his/tele-manas";
+      fallbackChips = ["Take PHQ-9 Assessment", "Guided Breathing", "Call 14416 Helpline"];
+    } else if (text.includes("privacy") || text.includes("consent") || text.includes("dpdp")) {
+      fallbackReply = "Opening DPDP 2023 Digital Health Consent Manager. Would you like to review active data sharing consents?";
+      fallbackRoute = "/his/dpdp";
+      fallbackChips = ["Review Consents", "Revoke Access", "Audit Trail"];
     }
 
-    if (fallbackRoute && fallbackRoute !== pathname) {
-      router.push(fallbackRoute);
-      setLastActionExecuted(`Navigated to ${fallbackRoute}`);
+    if (fallbackRoute) {
+      const target = fallbackRoute.trim();
+      const current = (pathname || "").trim();
+      if (target && target !== current) {
+        setLastActionExecuted(`Navigating to ${target}...`);
+        try {
+          router.push(target);
+        } catch (e) {
+          window.location.href = target;
+        }
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location.pathname !== target) {
+            window.location.href = target;
+          }
+        }, 350);
+      }
     }
 
-    const fallbackChips = ["📄 Scan Prescriptions", "🩺 Doctor Desk", "🏥 Registration", "🌿 AYUSH"];
     setAssistantResponse(fallbackReply);
     setChatMessages(prev => [
       ...prev,

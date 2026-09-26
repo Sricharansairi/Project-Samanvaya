@@ -66,29 +66,34 @@ export async function POST(request: Request) {
     const langName = LANG_NAMES[langCode] || "Hindi";
 
     const systemPrompt = `You are the Samanvaya Autonomous Clinical Co-Pilot and Hospital Intelligence Agent for Project Samanvaya (India's National Hospital Information System & Patient Case-Taking Platform).
-You converse with patients and doctors naturally, intelligently, empathetically, and conversationally in their native Indian language.
-
-CURRENT INTERACTION CONTEXT:
-- Patient Target Language: ${langName} (ISO code: ${langCode})
-- Current Application Page: "${currentPath}"
-
-CORE AUTONOMOUS AGENT RESPONSIBILITIES:
+You converse with patients CORE AUTONOMOUS AGENT RESPONSIBILITIES:
 1. FORMULATE SPOKEN REPLY IN TARGET LANGUAGE:
    - Formulate "spokenReply" strictly in ${langName}.
-   - Keep it natural, conversational, warm, and between 20-45 words (ideal for spoken text-to-speech audio).
+   - Keep it natural, conversational, warm, and between 25-50 words (ideal for spoken text-to-speech audio).
    - If the patient asked a clinical question, provide preliminary medical guidance grounded in standard care (ICMR/StatPearls) and advise consultation.
-   - If the patient asked to do something, state what action you are taking.
 
-2. AUTONOMOUS PORTAL ROUTING:
-   Determine if the patient's intent requires navigating to a specific hospital portal:
+2. AUTONOMOUS PORTAL ROUTING & PROACTIVE INTAKE INTERACTION:
+   Determine if the patient's intent requires navigating to a specific hospital portal, OR if they are currently on that portal:
    - Document upload / Paper prescriptions / Lab reports / Jan Aushadhi generic medicines -> route: "/his/ocr"
+     PROACTIVE INTAKE: Announce opening/being at the OCR portal, and ask: "Please upload your doctor's prescription slip, or tell me which branded medicine you were prescribed so I can calculate your 80% generic savings at PMBJP Jan Aushadhi Kendra!"
    - Doctor consultation / Clinical findings / Prescriptions / CDSS -> route: "/his/doctor"
+     PROACTIVE INTAKE: Announce opening/being at Doctor Desk, and ask: "Which patient token shall we review from the OPD queue, or would you like to prescribe medications and verify contraindications?"
    - Patient intake / Registration / Token generation / Vitals check / Emergency admission -> route: "/his/registration"
-   - Ayurvedic assessment / Prakriti / Dosha / Tridosha radar / Ayurvedic regimen -> route: "/his/ayush"
+     PROACTIVE INTAKE: Announce opening/being at Smart Parchi Registration, and ask: "What is the patient's full name, age, phone number, and primary complaint or symptoms today?"
+   - Government welfare schemes / PM-JAY / Cashless claims -> route: "/his/schemes"
+     PROACTIVE INTAKE: Announce opening/being at Government Schemes, and ask: "What is your annual family income or do you hold a Ration Card (BPL/Antyodaya)? Tell me your state to check your eligible 5 Lakh PM-JAY and state cashless benefits!"
    - Live OPD queue / Token waiting list / Wait time -> route: "/his/queue"
+     PROACTIVE INTAKE: Announce opening/being at Live Queue Board, and ask: "What is your Token Number or OPD department (General, Cardiology, AYUSH) to track your live wait time and SMS status?"
+   - Ayurvedic assessment / Prakriti / Dosha / Tridosha radar / Ayurvedic regimen -> route: "/his/ayush"
+     PROACTIVE INTAKE: Announce opening/being at AYUSH Prakriti Pariksha, and ask: "To analyze your Vata, Pitta, and Kapha constitution, how is your digestion, sleep quality, and body temperature tolerance?"
    - ABHA card / Personal health records / Medical locker -> route: "/patient"
+     PROACTIVE INTAKE: Announce opening/being at Patient Health Locker, and ask: "Would you like to view your 3D Ayushman ABHA Smart Card, view past prescriptions, or download your medical QR code?"
    - DPDP 2023 Consent / Privacy audit -> route: "/his/dpdp"
-   - Government welfare schemes / PM-JAY -> route: "/his/schemes"
+     PROACTIVE INTAKE: Announce opening/being at DPDP Privacy Manager, and ask: "Would you like to review active data consent permissions or verify the cryptographic audit trail?"
+   - WHO AWaRe Antimicrobial Stewardship -> route: "/his/antimicrobial"
+     PROACTIVE INTAKE: Announce opening/being at Antibiotic Audit, and ask: "Which prescribed antibiotic, dose, and clinical indication shall we audit against ICMR safety guidelines?"
+   - Tele-MANAS 14416 Mental Wellness -> route: "/his/tele-manas"
+     PROACTIVE INTAKE: Announce opening/being at Tele-MANAS 14416, and ask: "Would you like to take a confidential wellness check, practice guided box breathing, or connect to the 14416 national helpline?"
    - General conversation or query relevant to the current page -> route: null
 
 3. RED-FLAG EMERGENCY TRIAGE:
@@ -109,15 +114,18 @@ CORE AUTONOMOUS AGENT RESPONSIBILITIES:
      "severity": "Normal" | "High" | "Emergency"
    }
 
-5. INTERACTIVE CONVERSATION CHIPS:
-   Provide 3 to 4 context-relevant chips in ${langName} that the patient can tap or say next (e.g., onset, severity, next steps).
+5. MANDATORY INTERACTIVE CONVERSATION CHIPS:
+   You MUST ALWAYS provide 3 to 4 context-relevant chips in ${langName} that directly answer or provide one-tap actions for the question you just asked! NEVER return an empty array!
+   Examples for schemes: ["Below 2.5 Lakh / BPL", "Ration Card Holder", "Check PM-JAY 5 Lakh", "State Health Schemes"]
+   Examples for registration: ["Enter ABHA ID", "Fever & Cough", "Severe Chest Pain", "Routine OPD"]
+   Examples for OCR: ["Upload Prescription", "Locate Jan Aushadhi", "Check Generic Prices", "Audio Dosage"]
 
 RESPONSE FORMAT:
 Return strictly a valid JSON object:
 {
-  "spokenReply": "Warm sentence in ${langName}",
+  "spokenReply": "Warm interactive sentence in ${langName} with proactive question",
   "englishExplanation": "Concise English translation of your reply",
-  "route": "/his/ocr" | "/his/doctor" | "/his/registration" | "/his/schemes" | "/his/queue" | "/his/ayush" | "/patient" | "/his/dpdp" | null,
+  "route": "/his/ocr" | "/his/doctor" | "/his/registration" | "/his/schemes" | "/his/queue" | "/his/ayush" | "/patient" | "/his/dpdp" | "/his/antimicrobial" | "/his/tele-manas" | null,
   "isEmergency": boolean,
   "formAutoFill": {
     "name": string | null,
@@ -128,7 +136,7 @@ Return strictly a valid JSON object:
     "concern": string | null,
     "severity": "Normal" | "High" | "Emergency"
   },
-  "suggestedChips": ["string in ${langName}", "string in ${langName}", "string in ${langName}"],
+  "suggestedChips": ["string in ${langName}", "string in ${langName}", "string in ${langName}", "string in ${langName}"],
   "clinicalCondition": string | null,
   "icd10": string | null
 }`;
@@ -198,34 +206,50 @@ Return strictly a valid JSON object:
 
     // Dynamic fallback if Groq is temporarily slow or unreachable
     const lower = trimmed.toLowerCase();
-    let reply = `I have received your query about ${trimmed}. Let me assist you.`;
+    let reply = `I have received your query about ${trimmed}. How may I guide you through the hospital portals?`;
     let route: string | null = null;
-    let chips: string[] = ["📄 Scan Prescriptions", "🩺 Doctor OPD Desk", "🏥 Registration Kiosk"];
+    let chips: string[] = ["📄 Scan Prescriptions", "🩺 Doctor OPD Desk", "🏥 Registration Kiosk", "📜 Health Schemes"];
 
-    if (lower.includes("ocr") || lower.includes("scan") || lower.includes("prescription") || lower.includes("parchi")) {
-      reply = "Opening Prescription OCR and generic medicine savings.";
+    if (lower.includes("scheme") || lower.includes("pmjay") || lower.includes("ayushman") || lower.includes("yojna") || lower.includes("bpl") || lower.includes("ration") || lower.includes("subsidy")) {
+      reply = "Opening Government Health Schemes Eligibility portal. What is your approximate annual household income, or do you hold a BPL / Ayushman ration card?";
+      route = "/his/schemes";
+      chips = ["Income < ₹2.5 Lakhs", "Income ₹2.5L - ₹5L", "BPL / Ration Card Holder", "Check PM-JAY Coverage"];
+    } else if (lower.includes("ocr") || lower.includes("scan") || lower.includes("prescription") || lower.includes("parchi") || lower.includes("generic") || lower.includes("jan aushadhi")) {
+      reply = "Opening Prescription OCR and generic medicine savings. Please upload your prescription slip or mention your medicine name to calculate 80% savings at PMBJP Jan Aushadhi!";
       route = "/his/ocr";
-      chips = ["Upload Prescription", "Locate Kendra", "Listen to Audio"];
-    } else if (lower.includes("doctor") || lower.includes("physician") || lower.includes("opd")) {
-      reply = "Opening Physician Consultation Desk.";
+      chips = ["Upload Prescription", "Locate Jan Aushadhi", "Check 80% Savings", "Listen to Audio Dosage"];
+    } else if (lower.includes("doctor") || lower.includes("physician") || lower.includes("opd") || lower.includes("consult")) {
+      reply = "Opening Physician Consultation Desk. Which patient token shall we review from the OPD queue today?";
       route = "/his/doctor";
-      chips = ["Review Queue", "Prescribe Medicines", "Clinical Decision"];
+      chips = ["Review Queue", "Prescribe Medicines", "Clinical Decision", "Lab Investigations"];
     } else if (lower.includes("ayush") || lower.includes("prakriti") || lower.includes("dosha") || lower.includes("ayurved")) {
-      reply = "Opening AYUSH Pariksha and Tridosha constitutional assessment.";
+      reply = "Opening AYUSH Prakriti Pariksha. To assess your Vata, Pitta, and Kapha constitution, how is your digestion, sleep quality, and body temperature tolerance?";
       route = "/his/ayush";
-      chips = ["Start Prakriti Quiz", "Tridosha Balance", "Herb-Drug Safety"];
-    } else if (lower.includes("register") || lower.includes("token") || lower.includes("admit") || lower.includes("kiosk")) {
-      reply = "Opening Smart Parchi Patient Registration and Triage.";
+      chips = ["Start Prakriti Quiz", "Tridosha Balance", "Herb-Drug Safety", "Dietary Regimen"];
+    } else if (lower.includes("register") || lower.includes("token") || lower.includes("admit") || lower.includes("kiosk") || lower.includes("triage")) {
+      reply = "Opening Smart Parchi Patient Registration and Triage. What is the patient's full name, age, and primary symptom today?";
       route = "/his/registration";
-      chips = ["Enter ABHA ID", "Record Vitals", "Generate Token"];
-    } else if (lower.includes("queue") || lower.includes("wait")) {
-      reply = "Opening Live OPD Queue Board.";
+      chips = ["Enter ABHA ID", "Record Vitals", "Generate Token", "Emergency Triage"];
+    } else if (lower.includes("queue") || lower.includes("wait") || lower.includes("line")) {
+      reply = "Opening Live OPD Queue Board. What is your Token Number or OPD department (General, Cardiology, AYUSH) to track your live wait time?";
       route = "/his/queue";
-      chips = ["View Token List", "Estimated Wait", "SMS Alerts"];
-    } else if (lower.includes("card") || lower.includes("patient") || lower.includes("history")) {
-      reply = "Opening Patient Self-Service Portal.";
+      chips = ["View Token List", "Estimated Wait", "SMS Alerts", "Department Status"];
+    } else if (lower.includes("card") || lower.includes("patient") || lower.includes("history") || lower.includes("locker") || lower.includes("abha")) {
+      reply = "Opening Patient Self-Service Portal. Would you like to view your 3D Ayushman ABHA Smart Card, review past prescriptions, or download your medical QR code?";
       route = "/patient";
-      chips = ["View ABHA Card", "Past Prescriptions", "Health Locker"];
+      chips = ["View ABHA Card", "Past Prescriptions", "Health Locker", "Download QR"];
+    } else if (lower.includes("antibiotic") || lower.includes("antimicrobial") || lower.includes("aware") || lower.includes("icmr")) {
+      reply = "Opening WHO AWaRe Antimicrobial Stewardship Audit. Which prescribed antibiotic, dose, and clinical indication shall we evaluate against ICMR safety guidelines?";
+      route = "/his/antimicrobial";
+      chips = ["Audit Amoxicillin", "Check AWaRe Category", "ICMR Guidelines", "Dosage Safety"];
+    } else if (lower.includes("mental") || lower.includes("depression") || lower.includes("stress") || lower.includes("tele-manas") || lower.includes("phq")) {
+      reply = "Opening Tele-MANAS 14416 Mental Health Portal. Would you like to take a confidential PHQ-9 wellness assessment, practice guided box breathing, or call the 14416 helpline?";
+      route = "/his/tele-manas";
+      chips = ["Take PHQ-9 Assessment", "Guided Breathing", "Call 14416 Helpline", "Doctor Tele-Consult"];
+    } else if (lower.includes("privacy") || lower.includes("consent") || lower.includes("dpdp")) {
+      reply = "Opening DPDP 2023 Digital Health Consent Manager. Would you like to review active data sharing consents or verify the cryptographic audit trail?";
+      route = "/his/dpdp";
+      chips = ["Review Consents", "Revoke Access", "Audit Trail", "Data Principal Rights"];
     }
 
     return NextResponse.json({
