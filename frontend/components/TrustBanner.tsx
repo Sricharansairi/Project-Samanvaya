@@ -12,6 +12,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { INDIAN_LANGUAGES, Language } from "@/i18n/translations";
 import HISAuthModal, { StaffUser } from "./HISAuthModal";
+import DoctorLoginModal, { DoctorSession } from "./DoctorLoginModal";
 
 interface TrustBannerProps {
   currentTab?: string;
@@ -48,11 +49,13 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
     return "home";
   })();
 
-  // HIS Staff Authentication state
+  // HIS Staff & Doctor Authentication state
   const [staffUser, setStaffUser] = useState<StaffUser | null>(null);
   const [hisModalOpen, setHisModalOpen] = useState(false);
+  const [doctorSession, setDoctorSession] = useState<DoctorSession | null>(null);
+  const [doctorModalOpen, setDoctorModalOpen] = useState(false);
 
-  // Check stored staff authentication on mount
+  // Check stored staff & doctor authentication on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("samanvaya_staff_auth");
@@ -65,15 +68,35 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
         } catch (e) {}
       }
 
+      const storedDoc = localStorage.getItem("samanvaya_doctor_session");
+      if (storedDoc) {
+        try {
+          const parsedDoc = JSON.parse(storedDoc);
+          if (parsedDoc && parsedDoc.isAuthenticated) {
+            setDoctorSession(parsedDoc);
+          }
+        } catch (e) {}
+      }
+
       const handleOpenHis = () => setHisModalOpen(true);
+      const handleOpenDocModal = () => setDoctorModalOpen(true);
       const handleAuthChanged = (e: any) => {
         setStaffUser(e.detail || null);
       };
+      const handleDocAuthChanged = (e: any) => {
+        setDoctorSession(e.detail || null);
+      };
+
       window.addEventListener("samanvaya:open-his-modal", handleOpenHis);
+      window.addEventListener("samanvaya:open-doctor-modal", handleOpenDocModal);
       window.addEventListener("samanvaya:staff-auth-changed", handleAuthChanged);
+      window.addEventListener("samanvaya:doctor-auth-changed", handleDocAuthChanged);
+
       return () => {
         window.removeEventListener("samanvaya:open-his-modal", handleOpenHis);
+        window.removeEventListener("samanvaya:open-doctor-modal", handleOpenDocModal);
         window.removeEventListener("samanvaya:staff-auth-changed", handleAuthChanged);
+        window.removeEventListener("samanvaya:doctor-auth-changed", handleDocAuthChanged);
       };
     }
   }, []);
@@ -131,6 +154,17 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
         pathname.startsWith("/his/antimicrobial") || 
         pathname.startsWith("/his/dpdp")) {
       router.push("/");
+    }
+  };
+
+  const handleDoctorLogout = () => {
+    setDoctorSession(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("samanvaya_doctor_session");
+      window.dispatchEvent(new CustomEvent("samanvaya:doctor-auth-changed", { detail: null }));
+    }
+    if (pathname.startsWith("/his/doctor")) {
+      router.push("/his");
     }
   };
 
@@ -346,36 +380,60 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
             </div>
           </div>
 
-          {/* Hospital & Staff Login (HIS) Button or Profile Badge */}
-          {staffUser ? (
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 pl-3 pr-1.5 py-1 rounded-xl text-xs text-[#0f4c81] font-bold shadow-2xs">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <Stethoscope className="w-3.5 h-3.5 text-[#0f4c81]" />
-              <span className="max-w-[140px] truncate">{staffUser.name}</span>
-              <span className="text-[9px] bg-blue-100 text-[#0f4c81] px-1.5 py-0.5 rounded-md uppercase font-extrabold">
-                {staffUser.role === "doctor" ? "Doctor" : "Staff"}
-              </span>
-              <button
-                type="button"
-                onClick={handleStaffLogout}
-                className="ml-1 px-2 py-1 bg-white hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-lg border border-gray-200 transition-colors flex items-center gap-1 text-[10px] font-semibold cursor-pointer"
-                title="Logout from Hospital Information System"
+          {/* Portal-Aware Top-Right Action Controls */}
+          {pathname.startsWith("/his") ? (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-gray-700 rounded-xl text-xs font-semibold transition-all border border-gray-200"
+                title="Switch to Citizen & Patient Portal"
               >
-                <LogOut className="w-3 h-3" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
+                <User className="w-3.5 h-3.5 text-blue-600" />
+                <span>Patient Portal</span>
+              </Link>
+
+              {doctorSession ? (
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 pl-3 pr-1.5 py-1 rounded-xl text-xs text-emerald-950 font-bold shadow-2xs">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <Stethoscope className="w-3.5 h-3.5 text-emerald-700" />
+                  <Link href="/his/doctor" className="hover:underline max-w-[130px] truncate">
+                    {doctorSession.name}
+                  </Link>
+                  <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-extrabold uppercase">
+                    {doctorSession.department}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDoctorLogout}
+                    className="ml-1 px-2 py-0.5 bg-white hover:bg-rose-50 text-gray-500 hover:text-rose-600 rounded-md border border-gray-200 transition-colors text-[10px] cursor-pointer"
+                    title="Sign out from Doctor Desk"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDoctorModalOpen(true)}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-extrabold shadow-xs hover:shadow-md transition-all cursor-pointer border border-emerald-600"
+                  title="Doctor Clinic Sign In"
+                >
+                  <Stethoscope className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Doctor Login</span>
+                  <Lock className="w-3 h-3 text-emerald-200 opacity-80" />
+                </button>
+              )}
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setHisModalOpen(true)}
-              className="flex items-center gap-2 bg-[#0f4c81] hover:bg-[#0b3860] text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer border border-[#0f4c81]"
-              title="Hospital & Staff (HIS) Login"
+            <Link
+              href="/his"
+              className="flex items-center gap-2 bg-[#0f4c81] hover:bg-[#0b3860] text-white px-3.5 py-1.5 rounded-xl text-xs font-extrabold shadow-xs hover:shadow-md transition-all cursor-pointer border border-[#0f4c81]"
+              title="Open Hospital Staff (HIS) Portal"
             >
               <Building2 className="w-3.5 h-3.5 text-blue-200" />
-              <span>Hospital & Staff (HIS)</span>
-              <Lock className="w-3 h-3 text-blue-300 opacity-75" />
-            </button>
+              <span>Hospital Staff (HIS)</span>
+              <ArrowRight className="w-3.5 h-3.5 text-blue-200" />
+            </Link>
           )}
 
           {/* Quick Command Palette Dropdown */}
@@ -531,7 +589,7 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
         </nav>
       </div>
 
-      {/* HIS Doctor & Staff Login Modal */}
+      {/* HIS Staff Login Modal */}
       <HISAuthModal 
         isOpen={hisModalOpen}
         onClose={() => setHisModalOpen(false)}
@@ -539,6 +597,15 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
           setStaffUser(user);
           setActiveRole("staff");
           handleRoleChange("staff");
+        }}
+      />
+
+      {/* Strict Doctor Authentication Modal */}
+      <DoctorLoginModal
+        isOpen={doctorModalOpen}
+        onClose={() => setDoctorModalOpen(false)}
+        onSuccess={(session) => {
+          setDoctorSession(session);
         }}
       />
     </header>

@@ -6,22 +6,29 @@ import {
   Save, FileText, Pill, Printer, ArrowRight, ShieldAlert, ShieldCheck, 
   Search, Sparkles, Plus, Trash2, Edit3, RefreshCw, Clock, Building, 
   HeartPulse, Activity, AlertCircle, Copy, CheckCircle2, ChevronRight, 
-  QrCode, FileCheck, History, Calendar, Eye, HelpCircle, Lock, Unlock
+  QrCode, FileCheck, History, Calendar, Eye, HelpCircle, Lock, Unlock,
+  Filter, UserCheck, Shield, CheckSquare, Square, FlaskConical
 } from "lucide-react";
 import Link from "next/link";
 import TrustBanner from "@/components/TrustBanner";
+import DoctorLoginModal, { DoctorSession, VERIFIED_DOCTORS } from "@/components/DoctorLoginModal";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PrescriptionItem {
   id: string;
   med: string;
   generic_name?: string;
+  formulation: "Tablet" | "Syrup" | "Capsule" | "Injection" | "Drops" | "Ointment" | "Inhaler";
   dosage: string;
   freq: string;
   days: string;
   food_relation: string;
   notes: string;
   aware_category?: "Access" | "Watch" | "Reserve";
+  is_syrup: boolean;
+  syrup_volume?: string;
+  syrup_shake_well?: boolean;
+  syrup_measuring_cup?: boolean;
 }
 
 interface PatientRecord {
@@ -42,14 +49,176 @@ interface PatientRecord {
   estimatedWaitMinutes?: number;
 }
 
+// 1-Click Fast Presets for Doctors
+const COMMON_MEDICINE_PRESETS = [
+  {
+    category: "Syrups (खांसी व बाल चिकित्सा)",
+    icon: "🧪",
+    items: [
+      {
+        name: "Ascoril LS Cough Syrup",
+        formulation: "Syrup" as const,
+        is_syrup: true,
+        dosage: "10 ml (2 tsp)",
+        syrup_volume: "10 ml (2 tsp)",
+        freq: "1-0-1",
+        days: "5 days",
+        food_relation: "After food",
+        notes: "Shake bottle well before use. Mix with lukewarm water.",
+        syrup_shake_well: true,
+        syrup_measuring_cup: true,
+        aware: "Access" as const
+      },
+      {
+        name: "Paracetamol Pediatric Syrup (120mg/5ml)",
+        formulation: "Syrup" as const,
+        is_syrup: true,
+        dosage: "5 ml (1 tsp)",
+        syrup_volume: "5 ml (1 tsp)",
+        freq: "SOS",
+        days: "3 days",
+        food_relation: "After food",
+        notes: "Shake well. Give with measuring syringe for fever >100°F.",
+        syrup_shake_well: true,
+        syrup_measuring_cup: true,
+        aware: "Access" as const
+      },
+      {
+        name: "Amoxicillin Oral Suspension (125mg/5ml)",
+        formulation: "Syrup" as const,
+        is_syrup: true,
+        dosage: "5 ml (1 tsp)",
+        syrup_volume: "5 ml (1 tsp)",
+        freq: "1-0-1",
+        days: "5 days",
+        food_relation: "After food",
+        notes: "Shake well. Store reconstituted suspension in cool place.",
+        syrup_shake_well: true,
+        syrup_measuring_cup: true,
+        aware: "Access" as const
+      },
+      {
+        name: "Digene Antacid Gel / Syrup",
+        formulation: "Syrup" as const,
+        is_syrup: true,
+        dosage: "10 ml (2 tsp)",
+        syrup_volume: "10 ml (2 tsp)",
+        freq: "1-0-1",
+        days: "7 days",
+        food_relation: "1 hr after food & at bedtime",
+        notes: "Shake well before use. Do not drink water immediately.",
+        syrup_shake_well: true,
+        syrup_measuring_cup: true,
+        aware: "Access" as const
+      },
+      {
+        name: "Zincovit Multivitamin Syrup",
+        formulation: "Syrup" as const,
+        is_syrup: true,
+        dosage: "5 ml (1 tsp)",
+        syrup_volume: "5 ml (1 tsp)",
+        freq: "1-0-0",
+        days: "14 days",
+        food_relation: "After food",
+        notes: "Shake well before use. Daily nutritional boost.",
+        syrup_shake_well: true,
+        syrup_measuring_cup: true,
+        aware: "Access" as const
+      }
+    ]
+  },
+  {
+    category: "Tablets & Capsules (सामान्य गोलियां)",
+    icon: "💊",
+    items: [
+      {
+        name: "Paracetamol 650mg",
+        formulation: "Tablet" as const,
+        is_syrup: false,
+        dosage: "650 mg",
+        freq: "1-0-1",
+        days: "5 days",
+        food_relation: "After food",
+        notes: "SOS for fever > 100°F or body pain",
+        aware: "Access" as const
+      },
+      {
+        name: "Azithromycin 500mg",
+        formulation: "Tablet" as const,
+        is_syrup: false,
+        dosage: "500 mg",
+        freq: "1-0-0",
+        days: "3 days",
+        food_relation: "1 hr before food",
+        notes: "Take at the exact same hour every day. Complete full course.",
+        aware: "Watch" as const
+      },
+      {
+        name: "Amoxicillin + Clavulanic Acid 625mg",
+        formulation: "Tablet" as const,
+        is_syrup: false,
+        dosage: "625 mg",
+        freq: "1-0-1",
+        days: "5 days",
+        food_relation: "With food",
+        notes: "Take at start of meals to avoid stomach upset.",
+        aware: "Access" as const
+      },
+      {
+        name: "Pantoprazole 40mg",
+        formulation: "Tablet" as const,
+        is_syrup: false,
+        dosage: "40 mg",
+        freq: "1-0-0",
+        days: "7 days",
+        food_relation: "Empty stomach (30 mins before breakfast)",
+        notes: "Swallow whole, do not crush or chew.",
+        aware: "Access" as const
+      },
+      {
+        name: "Cetirizine 10mg",
+        formulation: "Tablet" as const,
+        is_syrup: false,
+        dosage: "10 mg",
+        freq: "0-0-1",
+        days: "5 days",
+        food_relation: "At bedtime",
+        notes: "May cause mild drowsiness. Avoid night driving.",
+        aware: "Access" as const
+      },
+      {
+        name: "Telmisartan 40mg",
+        formulation: "Tablet" as const,
+        is_syrup: false,
+        dosage: "40 mg",
+        freq: "1-0-0",
+        days: "30 days",
+        food_relation: "Morning with water",
+        notes: "Regular blood pressure maintenance. Do not skip.",
+        aware: "Access" as const
+      }
+    ]
+  }
+];
+
 export default function DoctorDashboard() {
   const { t } = useLanguage();
   
-  // Doctor Profile & Assigned OPDs
-  const [doctorName] = useState("Dr. Arvind Sharma, MBBS, MD");
-  const [doctorReg] = useState("MCI-84920 / DMC");
+  // Doctor Profile & Authenticated Session
+  const [doctorSession, setDoctorSession] = useState<DoctorSession>({
+    isAuthenticated: true,
+    name: VERIFIED_DOCTORS[0].name,
+    registrationNumber: VERIFIED_DOCTORS[0].registrationNumber,
+    department: VERIFIED_DOCTORS[0].department,
+    roomNumber: VERIFIED_DOCTORS[0].roomNumber,
+    specialty: VERIFIED_DOCTORS[0].specialty,
+    loginTime: "09:00 AM"
+  });
+  const [showDoctorLoginModal, setShowDoctorLoginModal] = useState(false);
+  const [onlyMyAssigned, setOnlyMyAssigned] = useState(true);
+
   const assignedOpds = [
-    { id: "All", name: "All My OPDs", room: "Multiple Rooms", icon: "🏥" },
+    { id: "All", name: "All Hospital OPDs", room: "Multiple Rooms", icon: "🏥" },
     { id: "General Medicine", name: "General Medicine OPD", room: "Room 101", icon: "🩺" },
     { id: "Cardiology", name: "Cardiology OPD", room: "Room 102", icon: "❤️" },
     { id: "Pulmonology", name: "Chest & Pulmonology OPD", room: "Room 103", icon: "🫁" },
@@ -57,7 +226,7 @@ export default function DoctorDashboard() {
     { id: "AYUSH / Integrative", name: "AYUSH & Integrative OPD", room: "Room 105", icon: "🌿" },
     { id: "Pediatrics", name: "Pediatrics OPD", room: "Room 106", icon: "🧸" }
   ];
-  const [selectedOpd, setSelectedOpd] = useState("All");
+  const [selectedOpd, setSelectedOpd] = useState("General Medicine");
 
   // Queue State
   const [queue, setQueue] = useState<PatientRecord[]>([]);
@@ -96,29 +265,36 @@ export default function DoctorDashboard() {
     follow_up: "5 days or SOS"
   });
 
-  // Prescriptions State
+  // Prescriptions State (Initialized with Tablet & Syrup)
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>([
     {
       id: "rx-1",
-      med: "Azithromycin 500mg",
-      generic_name: "Azithromycin",
-      dosage: "500 mg",
-      freq: "1-0-0",
-      days: "3 days",
-      food_relation: "1 hr before food",
-      notes: "Complete full 3-day course",
-      aware_category: "Watch"
+      med: "Ascoril LS Cough Syrup",
+      generic_name: "Levosalbutamol + Ambroxol + Guaiphenesin",
+      formulation: "Syrup",
+      dosage: "10 ml (2 tsp)",
+      freq: "1-0-1",
+      days: "5 days",
+      food_relation: "After food",
+      notes: "Shake bottle well before use. Mix with lukewarm water.",
+      aware_category: "Access",
+      is_syrup: true,
+      syrup_volume: "10 ml (2 tsp)",
+      syrup_shake_well: true,
+      syrup_measuring_cup: true
     },
     {
       id: "rx-2",
       med: "Paracetamol 650mg",
       generic_name: "Paracetamol",
+      formulation: "Tablet",
       dosage: "650 mg",
       freq: "1-0-1",
       days: "5 days",
       food_relation: "After food",
-      notes: "SOS for fever > 100°F",
-      aware_category: "Access"
+      notes: "SOS for fever > 100°F or body pain",
+      aware_category: "Access",
+      is_syrup: false
     }
   ]);
 
@@ -148,12 +324,37 @@ export default function DoctorDashboard() {
   // =========================================================================
   // 1. FETCH ASSIGNED OPD QUEUE (DYNAMIC REAL-TIME)
   // =========================================================================
+  // Session hydration & Event Listener for doctor auth changes
+  useEffect(() => {
+    const syncDoctorSession = () => {
+      try {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("samanvaya_doctor_session") : null;
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.name) {
+            setDoctorSession(parsed);
+            setSelectedOpd(parsed.department || "General Medicine");
+          }
+        }
+      } catch {}
+    };
+
+    syncDoctorSession();
+    window.addEventListener("samanvaya:doctor-auth-changed", syncDoctorSession);
+    return () => window.removeEventListener("samanvaya:doctor-auth-changed", syncDoctorSession);
+  }, []);
+
+  // =========================================================================
+  // 1. FETCH ASSIGNED OPD QUEUE (DYNAMIC REAL-TIME & STRICT ASSIGNMENT)
+  // =========================================================================
   const fetchQueue = async () => {
     setIsLoadingQueue(true);
     let loaded: PatientRecord[] = [];
 
+    const activeDept = onlyMyAssigned ? doctorSession.department : selectedOpd;
+
     try {
-      const res = await fetch(`/api/patient/opd-queue?department=${encodeURIComponent(selectedOpd)}`);
+      const res = await fetch(`/api/patient/opd-queue?department=${encodeURIComponent(activeDept)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.queue && Array.isArray(data.queue)) {
@@ -161,6 +362,176 @@ export default function DoctorDashboard() {
         }
       }
     } catch {}
+
+    // Department-specific seed patients to ensure doctor ALWAYS has their assigned clinical cases
+    const departmentSeeds: Record<string, PatientRecord[]> = {
+      "General Medicine": [
+        {
+          token_number: "OPD-GM-101",
+          tokenNumber: 101,
+          patientName: "Ramesh Sharma",
+          age: "52",
+          gender: "Male",
+          abhaId: "14-8921-4320-7712",
+          phone: "+91 98452 11982",
+          department: "General Medicine",
+          roomNumber: doctorSession.roomNumber || "Room 101",
+          doctorName: doctorSession.name,
+          urgency: "High",
+          status: "WAITING",
+          chief_concern: "High fever for 4 days with nocturnal chills and productive cough",
+          registrationTime: "09:15 AM",
+          estimatedWaitMinutes: 8
+        },
+        {
+          token_number: "OPD-GM-107",
+          tokenNumber: 107,
+          patientName: "Suresh Verma",
+          age: "45",
+          gender: "Male",
+          abhaId: "14-9901-2345-6789",
+          phone: "+91 98111 22334",
+          department: "General Medicine",
+          roomNumber: doctorSession.roomNumber || "Room 101",
+          doctorName: doctorSession.name,
+          urgency: "Normal",
+          status: "WAITING",
+          chief_concern: "Acute bronchitis, dry cough, throat irritation",
+          registrationTime: "09:40 AM",
+          estimatedWaitMinutes: 15
+        },
+        {
+          token_number: "OPD-GM-108",
+          tokenNumber: 108,
+          patientName: "Kamala Devi",
+          age: "49",
+          gender: "Female",
+          abhaId: "14-7712-4433-2211",
+          phone: "+91 94450 99881",
+          department: "General Medicine",
+          roomNumber: doctorSession.roomNumber || "Room 101",
+          doctorName: doctorSession.name,
+          urgency: "Normal",
+          status: "WAITING",
+          chief_concern: "Viral syndrome, generalized fatigue, myalgia",
+          registrationTime: "10:05 AM",
+          estimatedWaitMinutes: 22
+        }
+      ],
+      "Cardiology": [
+        {
+          token_number: "OPD-CARD-102",
+          tokenNumber: 102,
+          patientName: "Meenakshi Sundaram",
+          age: "61",
+          gender: "Female",
+          abhaId: "14-3312-9845-6621",
+          phone: "+91 97120 44512",
+          department: "Cardiology",
+          roomNumber: doctorSession.roomNumber || "Room 102",
+          doctorName: doctorSession.name,
+          urgency: "Emergency",
+          status: "WAITING",
+          chief_concern: "Exertional retrosternal chest heaviness, diaphoresis, radiating to shoulder",
+          registrationTime: "09:30 AM",
+          estimatedWaitMinutes: 0
+        },
+        {
+          token_number: "OPD-CARD-109",
+          tokenNumber: 109,
+          patientName: "R. Krishnamurthy",
+          age: "68",
+          gender: "Male",
+          abhaId: "14-6655-4433-2211",
+          phone: "+91 98222 33445",
+          department: "Cardiology",
+          roomNumber: doctorSession.roomNumber || "Room 102",
+          doctorName: doctorSession.name,
+          urgency: "High",
+          status: "WAITING",
+          chief_concern: "Hypertensive urgency follow-up, palpitations on climbing stairs",
+          registrationTime: "10:10 AM",
+          estimatedWaitMinutes: 12
+        }
+      ],
+      "Pulmonology": [
+        {
+          token_number: "OPD-PULM-103",
+          tokenNumber: 103,
+          patientName: "Abdul Ghaffar",
+          age: "48",
+          gender: "Male",
+          abhaId: "14-5544-2211-9988",
+          phone: "+91 98200 33412",
+          department: "Pulmonology",
+          roomNumber: doctorSession.roomNumber || "Room 103",
+          doctorName: doctorSession.name,
+          urgency: "Normal",
+          status: "WAITING",
+          chief_concern: "Chronic cough for 3 weeks, mild exertional dyspnea, needs cough syrup review",
+          registrationTime: "09:45 AM",
+          estimatedWaitMinutes: 16
+        },
+        {
+          token_number: "OPD-PULM-110",
+          tokenNumber: 110,
+          patientName: "Sunita Devi",
+          age: "54",
+          gender: "Female",
+          abhaId: "14-8899-1122-3344",
+          phone: "+91 94111 55667",
+          department: "Pulmonology",
+          roomNumber: doctorSession.roomNumber || "Room 103",
+          doctorName: doctorSession.name,
+          urgency: "High",
+          status: "WAITING",
+          chief_concern: "Bronchial asthma exacerbation with nocturnal wheezing and tightness",
+          registrationTime: "10:20 AM",
+          estimatedWaitMinutes: 10
+        }
+      ],
+      "Pediatrics": [
+        {
+          token_number: "OPD-PEDS-106",
+          tokenNumber: 106,
+          patientName: "Master Aarav Patel",
+          age: "6",
+          gender: "Male",
+          abhaId: "14-1122-3344-5566",
+          phone: "+91 98112 33445",
+          department: "Pediatrics",
+          roomNumber: doctorSession.roomNumber || "Room 106",
+          doctorName: doctorSession.name,
+          urgency: "High",
+          status: "WAITING",
+          chief_concern: "High fever (102°F) since last night, decreased oral intake, needs pediatric syrup",
+          registrationTime: "10:30 AM",
+          estimatedWaitMinutes: 12
+        },
+        {
+          token_number: "OPD-PEDS-111",
+          tokenNumber: 111,
+          patientName: "Baby Ananya Sharma",
+          age: "4",
+          gender: "Female",
+          abhaId: "14-2233-4455-6677",
+          phone: "+91 98450 11223",
+          department: "Pediatrics",
+          roomNumber: doctorSession.roomNumber || "Room 106",
+          doctorName: doctorSession.name,
+          urgency: "Normal",
+          status: "WAITING",
+          chief_concern: "Spasmodic cough, runny nose, chest congestion, requires syrup suspension",
+          registrationTime: "10:45 AM",
+          estimatedWaitMinutes: 18
+        }
+      ]
+    };
+
+    // If loaded is empty for doctor's department, populate from departmentSeeds
+    if (loaded.length === 0 && departmentSeeds[doctorSession.department]) {
+      loaded = [...departmentSeeds[doctorSession.department]];
+    }
 
     // Merge with localStorage dynamic queue
     try {
@@ -176,9 +547,9 @@ export default function DoctorDashboard() {
             gender: p.gender || "Male",
             abhaId: p.abhaId || p.patients?.abha_id || "14-8921-4320-7712",
             phone: p.phone || p.patients?.phone || "+91 98452 11982",
-            department: p.department || "General Medicine",
-            roomNumber: p.roomNumber || "Room 101",
-            doctorName: doctorName,
+            department: p.department || doctorSession.department,
+            roomNumber: p.roomNumber || doctorSession.roomNumber,
+            doctorName: p.doctorName || doctorSession.name,
             urgency: p.urgency || "Normal",
             status: p.status || "WAITING",
             chief_concern: p.chief_concern || (p.department ? `${p.department} Consultation` : "Clinical Review"),
@@ -186,14 +557,13 @@ export default function DoctorDashboard() {
             estimatedWaitMinutes: p.estimatedWaitMinutes || 10
           }));
 
-          const filteredStored = selectedOpd === "All" 
-            ? formattedStored 
-            : formattedStored.filter(p => p.department.toLowerCase().includes(selectedOpd.toLowerCase()));
-
-          // Merge without duplicate tokens
           const tokenSet = new Set(loaded.map(l => l.token_number));
-          filteredStored.forEach(item => {
-            if (!tokenSet.has(item.token_number)) {
+          formattedStored.forEach(item => {
+            const matchesFilter = onlyMyAssigned
+              ? (item.department.toLowerCase().includes(doctorSession.department.toLowerCase()) || item.doctorName === doctorSession.name)
+              : (selectedOpd === "All" || item.department.toLowerCase().includes(selectedOpd.toLowerCase()));
+
+            if (matchesFilter && !tokenSet.has(item.token_number)) {
               loaded.push(item);
             }
           });
@@ -201,11 +571,22 @@ export default function DoctorDashboard() {
       }
     } catch {}
 
+    // Strict filter when onlyMyAssigned is active
+    if (onlyMyAssigned) {
+      loaded = loaded.filter(p => 
+        p.department.toLowerCase().includes(doctorSession.department.toLowerCase()) || 
+        p.doctorName?.toLowerCase().includes(doctorSession.name.toLowerCase())
+      );
+      if (loaded.length === 0 && departmentSeeds[doctorSession.department]) {
+        loaded = [...departmentSeeds[doctorSession.department]];
+      }
+    }
+
     setQueue(loaded);
     setIsLoadingQueue(false);
 
-    // Auto-select first patient if none active
-    if (!activePatient && loaded.length > 0) {
+    // Auto-select first patient if none active or active not in current queue
+    if (loaded.length > 0 && (!activePatient || !loaded.some(l => l.token_number === activePatient.token_number))) {
       handleSelectPatient(loaded[0]);
     }
   };
@@ -214,7 +595,7 @@ export default function DoctorDashboard() {
     fetchQueue();
     const interval = setInterval(fetchQueue, 15000);
     return () => clearInterval(interval);
-  }, [selectedOpd]);
+  }, [selectedOpd, onlyMyAssigned, doctorSession]);
 
   // =========================================================================
   // 2. PATIENT SELECTION & ABHA HISTORY EXTRACTION
@@ -451,7 +832,7 @@ export default function DoctorDashboard() {
 
       const payload = {
         abha_id: activePatient.abhaId,
-        doctor_name: doctorName,
+        doctor_name: doctorSession.name,
         opd_department: activePatient.department || "General Medicine",
         encounter_id: uploadResult?.encounter_id || `abdm-enc-${Date.now()}`,
         is_amendment: isAmendmentAction,
@@ -462,12 +843,16 @@ export default function DoctorDashboard() {
         medications: prescriptions.map(p => ({
           name: p.med,
           generic_name: p.generic_name || p.med,
+          formulation: p.formulation,
           dosage: p.dosage,
           frequency: p.freq,
           duration: p.days,
           food_relation: p.food_relation,
           instructions: p.notes,
-          aware_category: p.aware_category
+          aware_category: p.aware_category,
+          is_syrup: p.is_syrup,
+          syrup_volume: p.syrup_volume,
+          syrup_shake_well: p.syrup_shake_well
         })),
         clinical_summary: fullSummary,
         patient_advice: patientAdvice
@@ -524,7 +909,7 @@ export default function DoctorDashboard() {
       phone: "+91 98" + Math.floor(10000000 + Math.random() * 90000000),
       department: newPatientDept,
       roomNumber: assignedOpds.find(o => o.id === newPatientDept)?.room || "Room 101",
-      doctorName: doctorName,
+      doctorName: doctorSession.name,
       urgency: "Normal",
       status: "WAITING",
       chief_concern: newPatientComplaint.trim() || `${newPatientDept} walk-in consultation`,
@@ -553,19 +938,45 @@ export default function DoctorDashboard() {
   };
 
   // Add / Delete Prescription Handlers
-  const addPrescriptionRow = () => {
+  const addPrescriptionRow = (initialFormulation: "Tablet" | "Syrup" = "Tablet") => {
+    const isSyrup = initialFormulation === "Syrup";
     const newItem: PrescriptionItem = {
       id: `rx-${Date.now()}`,
       med: "",
       generic_name: "",
-      dosage: "",
+      formulation: initialFormulation,
+      dosage: isSyrup ? "10 ml (2 tsp)" : "500 mg",
       freq: "1-0-1",
       days: "5 days",
       food_relation: "After food",
-      notes: "Take with plain water",
-      aware_category: "Access"
+      notes: isSyrup ? "Shake bottle well before use." : "Take with plain water",
+      aware_category: "Access",
+      is_syrup: isSyrup,
+      syrup_volume: isSyrup ? "10 ml (2 tsp)" : undefined,
+      syrup_shake_well: isSyrup,
+      syrup_measuring_cup: isSyrup
     };
-    setPrescriptions([...prescriptions, newItem]);
+    setPrescriptions(prev => [...prev, newItem]);
+  };
+
+  const addFromPreset = (item: any) => {
+    const newItem: PrescriptionItem = {
+      id: `rx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      med: item.name,
+      generic_name: item.name,
+      formulation: item.formulation,
+      dosage: item.dosage,
+      freq: item.freq,
+      days: item.days,
+      food_relation: item.food_relation,
+      notes: item.notes,
+      aware_category: item.aware,
+      is_syrup: !!item.is_syrup,
+      syrup_volume: item.syrup_volume,
+      syrup_shake_well: item.syrup_shake_well,
+      syrup_measuring_cup: item.syrup_measuring_cup
+    };
+    setPrescriptions(prev => [...prev, newItem]);
   };
 
   const removePrescriptionRow = (id: string) => {
@@ -583,71 +994,92 @@ export default function DoctorDashboard() {
         <div className="bg-white border-b border-gray-200 shadow-xs px-4 sm:px-8 py-3">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
             
-            {/* Doctor Info */}
+            {/* Doctor Info with MCI Registration & Switch Doctor Button */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 text-[#0f4c81] flex items-center justify-center font-bold text-lg border border-blue-200">
+              <div className="w-11 h-11 rounded-full bg-blue-100 text-[#0f4c81] flex items-center justify-center font-bold text-lg border border-blue-200 shadow-xs">
                 👨‍⚕️
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base font-extrabold text-[#0f2942]">{doctorName}</h1>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                    Reg: {doctorReg}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-base font-extrabold text-[#0f2942]">{doctorSession.name}</h1>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full border border-emerald-300">
+                    {doctorSession.registrationNumber}
+                  </span>
+                  <span className="text-[10px] bg-blue-100 text-blue-900 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                    {doctorSession.department} • {doctorSession.roomNumber}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 flex items-center gap-2">
-                  <span>National Health Authority (NHA) Verified Provider</span>
+                <div className="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                  <span className="text-[#0f4c81] font-semibold">{doctorSession.specialty}</span>
                   <span>•</span>
-                  <span className="text-blue-700 font-semibold">ABDM M3 Compliant Desk</span>
+                  <span className="text-emerald-700 font-medium">NHA Verified Provider</span>
                 </div>
               </div>
             </div>
 
-            {/* OPD Switcher Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
-              {assignedOpds.map(opd => {
-                const isSelected = selectedOpd === opd.id;
-                const count = opd.id === "All" 
-                  ? queue.length 
-                  : queue.filter(q => q.department.toLowerCase().includes(opd.id.toLowerCase())).length;
-
-                return (
-                  <button
-                    key={opd.id}
-                    onClick={() => setSelectedOpd(opd.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
-                      isSelected 
-                        ? "bg-[#0f4c81] text-white shadow-xs" 
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/70"
-                    }`}
-                  >
-                    <span>{opd.icon}</span>
-                    <span>{opd.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                      isSelected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex items-center gap-2">
+            {/* OPD Switcher Chips & Switch Doctor CTA */}
+            <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={() => setShowAddWalkIn(true)}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                onClick={() => setShowDoctorLoginModal(true)}
+                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#0f4c81] border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> Walk-in Token
+                <UserCheck className="w-3.5 h-3.5 text-blue-700" />
+                <span>Switch Doctor (MCI / NUID)</span>
               </button>
-              <button
-                onClick={fetchQueue}
-                title="Refresh Assigned Queues"
-                className="p-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoadingQueue ? 'animate-spin text-blue-600' : ''}`} />
-              </button>
+
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full">
+                {assignedOpds.map(opd => {
+                  const isSelected = selectedOpd === opd.id;
+                  const isDoctorDept = doctorSession.department.toLowerCase().includes(opd.id.toLowerCase());
+                  const count = opd.id === "All" 
+                    ? queue.length 
+                    : queue.filter(q => q.department.toLowerCase().includes(opd.id.toLowerCase())).length;
+
+                  return (
+                    <button
+                      key={opd.id}
+                      onClick={() => {
+                        setSelectedOpd(opd.id);
+                        if (opd.id !== "All") setOnlyMyAssigned(false);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1 transition-all cursor-pointer ${
+                        isSelected 
+                          ? "bg-[#0f4c81] text-white shadow-xs" 
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/70"
+                      }`}
+                    >
+                      <span>{opd.icon}</span>
+                      <span>{opd.name.replace(" OPD", "")}</span>
+                      {isDoctorDept && (
+                        <span className="text-[9px] bg-emerald-500 text-white px-1 rounded font-bold">You</span>
+                      )}
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                        isSelected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setShowAddWalkIn(true)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Walk-in
+                </button>
+                <button
+                  onClick={fetchQueue}
+                  title="Refresh Assigned Queues"
+                  className="p-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingQueue ? 'animate-spin text-blue-600' : ''}`} />
+                </button>
+              </div>
+
             </div>
 
           </div>
@@ -665,12 +1097,26 @@ export default function DoctorDashboard() {
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-[#0f4c81]" />
               <h2 className="font-bold text-sm text-[#0f2942]">
-                {selectedOpd === "All" ? "All Assigned OPD Patients" : `${selectedOpd} Queue`}
+                {onlyMyAssigned ? `Assigned to You (${doctorSession.department})` : `${selectedOpd} Queue`}
               </h2>
             </div>
             <span className="text-xs bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded border border-blue-200">
               {queue.length} Waiting
             </span>
+          </div>
+
+          {/* Assigned Patients Filter Toggle Bar */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-2.5 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 text-[#0f4c81] font-bold">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{onlyMyAssigned ? `Assigned to ${doctorSession.department}` : "Viewing All Hospital OPDs"}</span>
+            </div>
+            <button
+              onClick={() => setOnlyMyAssigned(!onlyMyAssigned)}
+              className="px-2 py-0.5 bg-white border border-blue-300 hover:bg-blue-50 text-[#0f4c81] rounded text-[10px] font-extrabold shadow-2xs transition-colors cursor-pointer"
+            >
+              {onlyMyAssigned ? "View All OPDs" : "Lock to My Patients"}
+            </button>
           </div>
 
           {/* Queue Patient Cards List */}
@@ -1176,17 +1622,19 @@ export default function DoctorDashboard() {
                       </div>
                     )}
 
-                    {/* Prescription Table & Medicine Builder */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-                      <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                    {/* Prescription Table & Visual Smart Medicine Builder */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 pb-3 gap-3">
                         <div>
                           <h3 className="text-sm font-bold text-[#0f2942] flex items-center gap-2">
                             <Pill className="w-4 h-4 text-[#0f4c81]" /> E-Prescription (ABDM MedicationStatement)
                           </h3>
-                          <p className="text-xs text-gray-500 mt-0.5">WHO AWaRe classifications & Jan Aushadhi generic alternatives computed in real time</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Formulation-aware builder (Tablets, Syrups, Inhalers) with automatic dosage, timing, duration & Jan Aushadhi generic savings
+                          </p>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={runPharmacovigilanceAudit}
                             disabled={isAuditingPharma}
@@ -1196,67 +1644,297 @@ export default function DoctorDashboard() {
                             {isAuditingPharma ? "Screening..." : "Re-Check Safety"}
                           </button>
                           <button
-                            onClick={addPrescriptionRow}
-                            className="px-3 py-1.5 bg-[#0f4c81] text-white hover:bg-blue-900 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            onClick={() => addPrescriptionRow("Tablet")}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#0f4c81] border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                           >
-                            <Plus className="w-3.5 h-3.5" /> Add Medicine
+                            <Plus className="w-3.5 h-3.5" /> + Tablet / Cap
+                          </button>
+                          <button
+                            onClick={() => addPrescriptionRow("Syrup")}
+                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                          >
+                            <FlaskConical className="w-3.5 h-3.5" /> + Add Syrup (Liquid)
                           </button>
                         </div>
                       </div>
 
-                      {/* Medicines List */}
-                      <div className="space-y-3">
+                      {/* 1-Click Fast Presets Toolbar */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-extrabold text-[#0f2942] uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> ⚡ 1-Click Fast Presets (Click to add immediately)
+                          </span>
+                          <span className="text-[10px] text-gray-400">Pre-configured with dosage, timing & instructions</span>
+                        </div>
+
+                        {COMMON_MEDICINE_PRESETS.map((cat, ci) => (
+                          <div key={ci} className="space-y-1.5">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                              <span>{cat.icon}</span>
+                              <span>{cat.category}</span>
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {cat.items.map((item, ii) => (
+                                <button
+                                  key={ii}
+                                  onClick={() => addFromPreset(item)}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                    item.is_syrup
+                                      ? "bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
+                                      : "bg-white text-gray-800 border border-gray-200 hover:bg-blue-50 hover:text-blue-900 hover:border-blue-300"
+                                  }`}
+                                >
+                                  <span>{item.is_syrup ? "🧪" : "💊"}</span>
+                                  <span>{item.name}</span>
+                                  <span className="text-[10px] font-mono text-gray-400">({item.freq}, {item.days})</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Medicines List Cards */}
+                      <div className="space-y-4">
                         {prescriptions.map((rx, idx) => {
                           const aware = getAwarePill(rx.med);
+                          const isSyrup = rx.is_syrup || rx.formulation === "Syrup";
+
                           return (
-                            <div key={rx.id} className="p-3.5 bg-gray-50/80 rounded-xl border border-gray-200 space-y-2.5">
-                              <div className="grid grid-cols-12 gap-2.5 items-end">
-                                
-                                {/* Medicine Name */}
-                                <div className="col-span-12 sm:col-span-4">
-                                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                                    Medicine Name & Strength
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={rx.med}
-                                    onChange={e => {
-                                      const updated = [...prescriptions];
-                                      updated[idx].med = e.target.value;
-                                      setPrescriptions(updated);
-                                    }}
-                                    placeholder="e.g., Amoxicillin 500mg, Telmisartan 40mg"
-                                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold"
-                                  />
+                            <div 
+                              key={rx.id} 
+                              className={`p-4 rounded-xl border transition-all space-y-3 ${
+                                isSyrup
+                                  ? "bg-amber-50/40 border-amber-300 shadow-2xs" 
+                                  : "bg-white border-gray-200 shadow-2xs"
+                              }`}
+                            >
+                              {/* Row 1: Formulation Selector Chips & Delete */}
+                              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-extrabold text-gray-500 uppercase mr-1">
+                                    Formulation:
+                                  </span>
+                                  {(["Tablet", "Syrup", "Capsule", "Injection", "Drops", "Ointment", "Inhaler"] as const).map(fmt => {
+                                    const isActive = rx.formulation === fmt;
+                                    const isFmtSyrup = fmt === "Syrup";
+
+                                    return (
+                                      <button
+                                        key={fmt}
+                                        onClick={() => {
+                                          const updated = [...prescriptions];
+                                          updated[idx].formulation = fmt;
+                                          updated[idx].is_syrup = isFmtSyrup;
+                                          if (isFmtSyrup) {
+                                            updated[idx].dosage = updated[idx].dosage || "10 ml (2 tsp)";
+                                            updated[idx].syrup_volume = updated[idx].syrup_volume || "10 ml (2 tsp)";
+                                            updated[idx].syrup_shake_well = true;
+                                            updated[idx].syrup_measuring_cup = true;
+                                            if (!updated[idx].notes.includes("Shake")) {
+                                              updated[idx].notes = "Shake bottle well before use. " + updated[idx].notes;
+                                            }
+                                          }
+                                          setPrescriptions(updated);
+                                        }}
+                                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                          isActive 
+                                            ? isFmtSyrup
+                                              ? "bg-amber-500 text-white shadow-2xs"
+                                              : "bg-[#0f4c81] text-white shadow-2xs"
+                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                        }`}
+                                      >
+                                        {fmt === "Tablet" ? "💊 Tab" : fmt === "Syrup" ? "🧪 Syrup" : fmt === "Capsule" ? "💊 Cap" : fmt === "Injection" ? "💉 Inj" : fmt === "Drops" ? "💧 Drops" : fmt === "Ointment" ? "🧴 Oint" : "💨 Inhaler"}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
 
-                                {/* Frequency (1-0-1) */}
-                                <div className="col-span-6 sm:col-span-2">
-                                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                                    Frequency
-                                  </label>
-                                  <select
-                                    value={rx.freq}
-                                    onChange={e => {
-                                      const updated = [...prescriptions];
-                                      updated[idx].freq = e.target.value;
-                                      setPrescriptions(updated);
-                                    }}
-                                    className="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-xs font-bold"
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-gray-400">#{idx + 1}</span>
+                                  <button
+                                    onClick={() => removePrescriptionRow(rx.id)}
+                                    title="Delete medicine"
+                                    className="p-1 text-gray-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
                                   >
-                                    <option value="1-0-1">1-0-1 (Morning & Night)</option>
-                                    <option value="1-0-0">1-0-0 (Morning only)</option>
-                                    <option value="0-0-1">0-0-1 (Night only)</option>
-                                    <option value="1-1-1">1-1-1 (Thrice daily)</option>
-                                    <option value="SOS">SOS (As needed)</option>
-                                  </select>
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                                 </div>
+                              </div>
 
-                                {/* Duration */}
-                                <div className="col-span-6 sm:col-span-2">
-                                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                                    Duration
-                                  </label>
+                              {/* Row 2: Medicine Name & Strength Input */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                                  Medicine / Salt Name & Strength
+                                </label>
+                                <input
+                                  type="text"
+                                  value={rx.med}
+                                  onChange={e => {
+                                    const updated = [...prescriptions];
+                                    updated[idx].med = e.target.value;
+                                    setPrescriptions(updated);
+                                  }}
+                                  placeholder={isSyrup ? "e.g., Ascoril LS Syrup, Paracetamol Pediatric 120mg/5ml, Digene Gel" : "e.g., Paracetamol 650mg, Azithromycin 500mg, Telmisartan 40mg"}
+                                  className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-bold text-[#0f2942] focus:ring-1 focus:ring-[#0f4c81] outline-none"
+                                />
+                              </div>
+
+                              {/* Row 3: Dedicated Amber Syrup Controls Box (Rendered when Syrup is active) */}
+                              {isSyrup && (
+                                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-3.5 space-y-2.5 shadow-2xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-extrabold text-amber-950 flex items-center gap-1.5">
+                                      <FlaskConical className="w-4 h-4 text-amber-600" />
+                                      <span>🧪 SYRUP & LIQUID DOSAGE CONTROLS (तरल / सिरप की खुराक)</span>
+                                    </span>
+                                    <span className="text-[10px] bg-amber-200 text-amber-900 font-extrabold px-2 py-0.5 rounded-full">
+                                      Liquid Formulation
+                                    </span>
+                                  </div>
+
+                                  {/* Volume Dose Buttons */}
+                                  <div>
+                                    <span className="block text-[10px] font-bold text-amber-900 uppercase mb-1">
+                                      Volume Dose per Administration:
+                                    </span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {[
+                                        "2.5 ml (1/2 tsp)",
+                                        "5 ml (1 tsp)",
+                                        "10 ml (2 tsp)",
+                                        "15 ml (1 tbsp)"
+                                      ].map(vol => {
+                                        const isSelected = rx.dosage === vol || rx.syrup_volume === vol;
+                                        return (
+                                          <button
+                                            key={vol}
+                                            onClick={() => {
+                                              const updated = [...prescriptions];
+                                              updated[idx].dosage = vol;
+                                              updated[idx].syrup_volume = vol;
+                                              setPrescriptions(updated);
+                                            }}
+                                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                              isSelected
+                                                ? "bg-amber-600 text-white shadow-2xs scale-105"
+                                                : "bg-white text-amber-900 border border-amber-200 hover:bg-amber-100"
+                                            }`}
+                                          >
+                                            {vol}
+                                          </button>
+                                        );
+                                      })}
+                                      <input
+                                        type="text"
+                                        value={rx.dosage}
+                                        onChange={e => {
+                                          const updated = [...prescriptions];
+                                          updated[idx].dosage = e.target.value;
+                                          updated[idx].syrup_volume = e.target.value;
+                                          setPrescriptions(updated);
+                                        }}
+                                        placeholder="Custom dose (e.g. 7.5 ml)"
+                                        className="bg-white border border-amber-200 rounded-lg px-2 py-1 text-xs w-32 font-bold text-amber-950"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Syrup Checkbox Guidelines */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-amber-200/60 text-xs">
+                                    <label className="flex items-center gap-2 text-amber-950 font-semibold cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={rx.syrup_shake_well ?? true}
+                                        onChange={e => {
+                                          const updated = [...prescriptions];
+                                          updated[idx].syrup_shake_well = e.target.checked;
+                                          setPrescriptions(updated);
+                                        }}
+                                        className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                                      />
+                                      <span>Shake bottle well before use (हिलाकर पिएं)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-amber-950 font-semibold cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={rx.syrup_measuring_cup ?? true}
+                                        onChange={e => {
+                                          const updated = [...prescriptions];
+                                          updated[idx].syrup_measuring_cup = e.target.checked;
+                                          setPrescriptions(updated);
+                                        }}
+                                        className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                                      />
+                                      <span>Use calibrated measuring cup / syringe</span>
+                                    </label>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Row 4: Timing Schedule Buttons ("At Which Time") */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                                  At Which Time (Timing Schedule)
+                                </label>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {[
+                                    { label: "1-0-1 (Morning & Night)", val: "1-0-1", icon: "☀️🌙" },
+                                    { label: "1-0-0 (Morning Only)", val: "1-0-0", icon: "☀️" },
+                                    { label: "0-0-1 (Night Only)", val: "0-0-1", icon: "🌙" },
+                                    { label: "1-1-1 (Thrice Daily)", val: "1-1-1", icon: "☀️⛅🌙" },
+                                    { label: "SOS (When Needed)", val: "SOS", icon: "🚨" }
+                                  ].map(freqItem => {
+                                    const isSelected = rx.freq === freqItem.val;
+                                    return (
+                                      <button
+                                        key={freqItem.val}
+                                        onClick={() => {
+                                          const updated = [...prescriptions];
+                                          updated[idx].freq = freqItem.val;
+                                          setPrescriptions(updated);
+                                        }}
+                                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                                          isSelected
+                                            ? "bg-[#0f4c81] text-white shadow-2xs scale-102"
+                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/80"
+                                        }`}
+                                      >
+                                        <span>{freqItem.icon}</span>
+                                        <span>{freqItem.label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Row 5: Duration ("For How Many Days") Chips */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                                  For How Many Days (Duration)
+                                </label>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {["3 days", "5 days", "7 days", "10 days", "14 days", "1 month"].map(dayOption => {
+                                    const isSelected = rx.days === dayOption;
+                                    return (
+                                      <button
+                                        key={dayOption}
+                                        onClick={() => {
+                                          const updated = [...prescriptions];
+                                          updated[idx].days = dayOption;
+                                          setPrescriptions(updated);
+                                        }}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                          isSelected
+                                            ? "bg-emerald-600 text-white shadow-2xs"
+                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/80"
+                                        }`}
+                                      >
+                                        {dayOption}
+                                      </button>
+                                    );
+                                  })}
                                   <input
                                     type="text"
                                     value={rx.days}
@@ -1265,44 +1943,88 @@ export default function DoctorDashboard() {
                                       updated[idx].days = e.target.value;
                                       setPrescriptions(updated);
                                     }}
-                                    placeholder="5 days"
-                                    className="w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-xs font-bold"
+                                    placeholder="Custom days"
+                                    className="bg-white border border-gray-300 rounded px-2 py-1 text-xs w-28 font-bold"
                                   />
                                 </div>
-
-                                {/* Food Relation */}
-                                <div className="col-span-8 sm:col-span-3">
-                                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                                    Food Relation & Notes
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={rx.food_relation}
-                                    onChange={e => {
-                                      const updated = [...prescriptions];
-                                      updated[idx].food_relation = e.target.value;
-                                      setPrescriptions(updated);
-                                    }}
-                                    placeholder="After food / Empty stomach"
-                                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs"
-                                  />
-                                </div>
-
-                                {/* Delete Row */}
-                                <div className="col-span-4 sm:col-span-1 flex justify-end">
-                                  <button
-                                    onClick={() => removePrescriptionRow(rx.id)}
-                                    title="Delete medicine"
-                                    className="p-1.5 text-gray-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-
                               </div>
 
-                              {/* WHO AWaRe & Jan Aushadhi Savings Badge */}
-                              <div className="flex items-center justify-between pt-1 border-t border-gray-200 text-xs">
+                              {/* Row 6: Food Relation Chips */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                                  Relation to Food (Meal Instructions)
+                                </label>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {[
+                                    { label: "After Food (खाने के बाद)", val: "After food" },
+                                    { label: "Before Food / Empty Stomach (खाली पेट)", val: "Before food" },
+                                    { label: "With Meals (खाने के साथ)", val: "With food" },
+                                    { label: "At Bedtime (सोते समय)", val: "At bedtime" }
+                                  ].map(foodItem => {
+                                    const isSelected = rx.food_relation.toLowerCase().includes(foodItem.val.toLowerCase());
+                                    return (
+                                      <button
+                                        key={foodItem.val}
+                                        onClick={() => {
+                                          const updated = [...prescriptions];
+                                          updated[idx].food_relation = foodItem.val;
+                                          setPrescriptions(updated);
+                                        }}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                          isSelected
+                                            ? "bg-indigo-700 text-white shadow-2xs"
+                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/80"
+                                        }`}
+                                      >
+                                        {foodItem.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Row 7: Clinical Notes & Instructions */}
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                                  Specific Instructions & Counseling Notes
+                                </label>
+                                <input
+                                  type="text"
+                                  value={rx.notes}
+                                  onChange={e => {
+                                    const updated = [...prescriptions];
+                                    updated[idx].notes = e.target.value;
+                                    setPrescriptions(updated);
+                                  }}
+                                  placeholder="e.g., Take with lukewarm water. Complete entire course even if feeling better."
+                                  className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-800"
+                                />
+                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[11px]">
+                                  <span className="text-gray-400">Quick suggestions:</span>
+                                  {[
+                                    "Take with lukewarm water",
+                                    "Complete full course",
+                                    "Do not skip doses",
+                                    "Avoid cold drinks",
+                                    "Store below 25°C"
+                                  ].map(suggestion => (
+                                    <button
+                                      key={suggestion}
+                                      onClick={() => {
+                                        const updated = [...prescriptions];
+                                        updated[idx].notes = updated[idx].notes ? `${updated[idx].notes}. ${suggestion}` : suggestion;
+                                        setPrescriptions(updated);
+                                      }}
+                                      className="px-2 py-0.5 bg-gray-100 hover:bg-blue-50 hover:text-blue-800 rounded border border-gray-200 text-gray-600 font-medium cursor-pointer"
+                                    >
+                                      + {suggestion}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Row 8: WHO AWaRe & Jan Aushadhi Savings Badge */}
+                              <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs flex-wrap gap-2">
                                 <div className="flex items-center gap-2">
                                   {aware && (
                                     <span className={`px-2 py-0.5 rounded-full border text-[10px] font-extrabold flex items-center gap-1 ${aware.color}`}>
@@ -1311,14 +2033,15 @@ export default function DoctorDashboard() {
                                     </span>
                                   )}
                                   <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded font-bold">
-                                    PMBJP Generic Salt: ~₹15-25 (Save up to 80%)
+                                    PMBJP Generic Alternative: ~₹15-25 (Save up to 80%)
                                   </span>
                                 </div>
 
                                 <span className="text-[10px] text-gray-500 font-mono">
-                                  ICD-10 / SNOMED Mapped
+                                  SNOMED-CT / ICD-10 Mapped
                                 </span>
                               </div>
+
                             </div>
                           );
                         })}
@@ -1631,9 +2354,9 @@ export default function DoctorDashboard() {
                         </div>
 
                         <div className="text-right text-xs">
-                          <p className="font-extrabold text-[#0f2942]">{doctorName}</p>
-                          <p className="text-gray-600 font-medium">{doctorReg}</p>
-                          <p className="text-[#0f4c81] font-bold text-[11px]">{activePatient.department}</p>
+                          <p className="font-extrabold text-[#0f2942]">{doctorSession.name}</p>
+                          <p className="text-gray-600 font-medium">{doctorSession.registrationNumber}</p>
+                          <p className="text-[#0f4c81] font-bold text-[11px]">{doctorSession.department} • {doctorSession.roomNumber}</p>
                           <p className="text-gray-500 text-[10px]">Date: {new Date().toLocaleDateString('en-IN')}</p>
                         </div>
                       </div>
@@ -1672,7 +2395,7 @@ export default function DoctorDashboard() {
                         </div>
                       </div>
 
-                      {/* Rx Prescriptions Table */}
+                      {/* Rx Prescriptions Table with Formulation & Syrup Details */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-lg font-black font-serif text-[#0f2942]">℞ PRESCRIPTION</span>
@@ -1683,35 +2406,53 @@ export default function DoctorDashboard() {
                           <thead>
                             <tr className="bg-gray-100 text-left font-bold text-gray-700">
                               <th className="border border-gray-300 p-2 w-8">#</th>
-                              <th className="border border-gray-300 p-2">Medicine & Strength</th>
-                              <th className="border border-gray-300 p-2 w-32 text-center">Schedule</th>
+                              <th className="border border-gray-300 p-2">Medicine, Strength & Formulation</th>
+                              <th className="border border-gray-300 p-2 w-36 text-center">Timing & Schedule</th>
                               <th className="border border-gray-300 p-2 w-24">Duration</th>
-                              <th className="border border-gray-300 p-2">Instructions & Food Relation</th>
+                              <th className="border border-gray-300 p-2">Instructions & Administration</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {prescriptions.map((rx, idx) => (
-                              <tr key={idx} className="border-b border-gray-200">
-                                <td className="border border-gray-300 p-2 font-bold text-center">{idx + 1}</td>
-                                <td className="border border-gray-300 p-2">
-                                  <span className="font-bold text-sm block">{rx.med}</span>
-                                  {rx.aware_category && (
-                                    <span className="text-[9px] text-gray-500">WHO AWaRe: {rx.aware_category}</span>
-                                  )}
-                                </td>
-                                <td className="border border-gray-300 p-2 text-center">
-                                  <span className="font-mono font-extrabold text-sm block">{rx.freq}</span>
-                                  <span className="text-[9px] text-gray-500">
-                                    {rx.freq === "1-0-1" ? "☀️ Morning + 🌙 Night" : rx.freq === "1-0-0" ? "☀️ Morning only" : rx.freq === "0-0-1" ? "🌙 Night only" : "Thrice daily"}
-                                  </span>
-                                </td>
-                                <td className="border border-gray-300 p-2 font-semibold">{rx.days}</td>
-                                <td className="border border-gray-300 p-2">
-                                  <span className="font-bold block">{rx.food_relation}</span>
-                                  <span className="text-gray-600 text-[11px]">{rx.notes}</span>
-                                </td>
-                              </tr>
-                            ))}
+                            {prescriptions.map((rx, idx) => {
+                              const isSyrup = rx.is_syrup || rx.formulation === "Syrup";
+                              return (
+                                <tr key={idx} className="border-b border-gray-200">
+                                  <td className="border border-gray-300 p-2 font-bold text-center">{idx + 1}</td>
+                                  <td className="border border-gray-300 p-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded border bg-gray-50">
+                                        {isSyrup ? "🧪 Syrup" : `💊 ${rx.formulation || "Tablet"}`}
+                                      </span>
+                                      <span className="font-bold text-sm">{rx.med}</span>
+                                    </div>
+                                    {isSyrup && rx.syrup_volume && (
+                                      <span className="text-[10px] text-amber-900 font-bold block mt-0.5">
+                                        Dose: {rx.syrup_volume}
+                                      </span>
+                                    )}
+                                    {rx.aware_category && (
+                                      <span className="text-[9px] text-gray-500 block">WHO AWaRe: {rx.aware_category}</span>
+                                    )}
+                                  </td>
+                                  <td className="border border-gray-300 p-2 text-center">
+                                    <span className="font-mono font-extrabold text-sm block">{rx.freq}</span>
+                                    <span className="text-[9px] text-gray-600 font-medium">
+                                      {rx.freq === "1-0-1" ? "☀️ Morning + 🌙 Night" : rx.freq === "1-0-0" ? "☀️ Morning only" : rx.freq === "0-0-1" ? "🌙 Night only" : rx.freq === "1-1-1" ? "☀️ Noon 🌙 Thrice" : "SOS (As Needed)"}
+                                    </span>
+                                  </td>
+                                  <td className="border border-gray-300 p-2 font-semibold">{rx.days}</td>
+                                  <td className="border border-gray-300 p-2">
+                                    <span className="font-bold block text-blue-900">{rx.food_relation}</span>
+                                    {isSyrup && rx.syrup_shake_well && (
+                                      <span className="text-[10px] font-bold text-amber-800 block">
+                                        ⚠️ Shake bottle well before use (हिलाकर पिएं)
+                                      </span>
+                                    )}
+                                    <span className="text-gray-600 text-[11px]">{rx.notes}</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1737,8 +2478,9 @@ export default function DoctorDashboard() {
 
                         <div className="text-center">
                           <div className="h-10 border-b border-gray-400 w-48 mx-auto mb-1"></div>
-                          <p className="font-extrabold text-sm">{doctorName}</p>
-                          <p className="text-[10px] text-gray-500">Authorized Physician Signature & Seal</p>
+                          <p className="font-extrabold text-sm">{doctorSession.name}</p>
+                          <p className="text-[10px] text-gray-500">{doctorSession.registrationNumber} • {doctorSession.department}</p>
+                          <p className="text-[9px] text-gray-400">Authorized Physician Signature & Seal</p>
                         </div>
                       </div>
 
@@ -1826,6 +2568,19 @@ export default function DoctorDashboard() {
           </div>
         </div>
       )}
+
+      {/* =================================================================== */}
+      {/* DOCTOR LOGIN / VERIFICATION MODAL */}
+      {/* =================================================================== */}
+      <DoctorLoginModal
+        isOpen={showDoctorLoginModal}
+        onClose={() => setShowDoctorLoginModal(false)}
+        onSuccess={(session) => {
+          setDoctorSession(session);
+          setSelectedOpd(session.department || "General Medicine");
+          setShowDoctorLoginModal(false);
+        }}
+      />
 
     </main>
   );
