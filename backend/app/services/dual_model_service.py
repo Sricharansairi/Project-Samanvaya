@@ -72,58 +72,82 @@ class DualModelService:
             return None
 
     # =========================================================================
-    # BRANCH 1: HIGH-PARAMETERIZED GENERAL FOUNDATION MODELS (120B / 70B / 27B)
+    # BRANCH 1: HIGH-PARAMETERIZED GENERAL FOUNDATION MODELS (550B / 253B / 120B / 90B)
     # Deep multi-hop clinical reasoning, triage arbitration, and system orchestration
     # =========================================================================
     def query_high_param_branch(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 600, temperature: float = 0.2) -> Dict[str, Any]:
-        sys = system_prompt or "You are an Elite 120B+ Clinical Foundation Model for Hospital Triage & Diagnostics. Output concise, evidence-based recommendations."
+        sys = system_prompt or "You are an Elite 500B+ Clinical Foundation Model for Hospital Triage & Diagnostics. Output concise, evidence-based recommendations."
         messages = [
             {"role": "system", "content": sys},
             {"role": "user", "content": prompt}
         ]
         start_time = time.time()
 
-        # Tier 1 (Primary High-Param Beast Workhorse): Groq LPU 120B (openai/gpt-oss-120b)
-        t1_ans = self._call_groq("openai/gpt-oss-120b", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
-        if t1_ans:
+        # Tier 1 (550B Monster): NVIDIA Nemotron-3 Ultra 550B
+        t1_550b = self._call_nvidia("nvidia/nemotron-3-ultra-550b-a55b", messages, max_tokens=max_tokens, timeout=15.0, temperature=temperature)
+        if t1_550b:
             return {
-                "branch": "Branch 1: High-Parameterized General",
+                "branch": "Branch 1: High-Parameterized General (550B)",
+                "model": "nvidia/nemotron-3-ultra-550b-a55b",
+                "parameter_scale": "550 Billion Parameters",
+                "latency_seconds": round(time.time() - start_time, 2),
+                "content": t1_550b,
+                "tier": "Tier 1 (550B Nemotron Ultra Beast)"
+            }
+
+        # Tier 2 (253B Beast): NVIDIA Llama-3.1 Nemotron Ultra 253B
+        t2_253b = self._call_nvidia("nvidia/llama-3.1-nemotron-ultra-253b-v1", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
+        if t2_253b:
+            return {
+                "branch": "Branch 1: High-Parameterized General (253B)",
+                "model": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+                "parameter_scale": "253 Billion Parameters",
+                "latency_seconds": round(time.time() - start_time, 2),
+                "content": t2_253b,
+                "tier": "Tier 2 (253B Nemotron Ultra)"
+            }
+
+        # Tier 3 (120B Workhorse): Groq LPU 120B (openai/gpt-oss-120b)
+        t3_120b = self._call_groq("openai/gpt-oss-120b", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
+        if t3_120b:
+            return {
+                "branch": "Branch 1: High-Parameterized General (120B)",
                 "model": "openai/gpt-oss-120b (Groq LPU)",
                 "parameter_scale": "120 Billion Parameters",
                 "latency_seconds": round(time.time() - start_time, 2),
-                "content": t1_ans,
-                "tier": "Tier 1 (120B LPU Ultra-Fast)"
+                "content": t3_120b,
+                "tier": "Tier 3 (120B LPU Ultra-Fast)"
             }
 
-        # Tier 2 (NVIDIA NIM 70B Beast): meta/llama-3.3-70b-instruct
-        t2_nim = self._call_nvidia("meta/llama-3.3-70b-instruct", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
-        if t2_nim:
+        # Tier 4 (90B Vision/Text): NVIDIA meta/llama-3.2-90b-vision-instruct
+        t4_90b = self._call_nvidia("meta/llama-3.2-90b-vision-instruct", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
+        if t4_90b:
             return {
-                "branch": "Branch 1: High-Parameterized General",
-                "model": "meta/llama-3.3-70b-instruct (70B NIM)",
-                "parameter_scale": "70 Billion Parameters",
+                "branch": "Branch 1: High-Parameterized General (90B)",
+                "model": "meta/llama-3.2-90b-vision-instruct",
+                "parameter_scale": "90 Billion Parameters",
                 "latency_seconds": round(time.time() - start_time, 2),
-                "content": t2_nim,
-                "tier": "Tier 2 (70B NIM Instruct)"
+                "content": t4_90b,
+                "tier": "Tier 4 (90B Vision-Text Model)"
             }
 
-        # Tier 3: Groq LPU Fast Multilingual Workhorse (qwen/qwen3.8-27b)
-        t3_ans = self._call_groq("qwen/qwen3.8-27b", messages, max_tokens=max_tokens, timeout=8.0, temperature=temperature)
-        if t3_ans:
+        # Tier 5: Groq LPU Fast Multilingual (qwen/qwen3.8-27b)
+        t5_ans = self._call_groq("qwen/qwen3.8-27b", messages, max_tokens=max_tokens, timeout=8.0, temperature=temperature)
+        if t5_ans:
             return {
                 "branch": "Branch 1: High-Parameterized General",
                 "model": "qwen/qwen3.8-27b (Groq LPU)",
                 "parameter_scale": "27 Billion Parameters",
                 "latency_seconds": round(time.time() - start_time, 2),
-                "content": t3_ans,
-                "tier": "Tier 3 (27B Fast Reasoning)"
+                "content": t5_ans,
+                "tier": "Tier 5 (27B Fast Reasoning)"
             }
 
         # Final Fallback to Branch 2
         return self.query_medical_branch(prompt, system_prompt, max_tokens, temperature)
 
     # =========================================================================
-    # BRANCH 2: DEDICATED SPECIALIZED MEDICAL FOUNDATION MODELS (70B CLINICAL)
+    # BRANCH 2: DEDICATED SPECIALIZED MEDICAL FOUNDATION MODELS (70B / 120B / 550B CLINICAL)
     # Pharmacovigilance, contraindications, ICMR/StatPearls evidence, and drug safety
     # =========================================================================
     def query_medical_branch(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 600, temperature: float = 0.2) -> Dict[str, Any]:
@@ -138,8 +162,10 @@ class DualModelService:
         ]
         start_time = time.time()
 
-        # Tier 1: Dedicated Medical Model (Palmyra-Med-70B / Meditron-70B on NVIDIA NIM)
-        t1_med = self._call_nvidia("writer/palmyra-med-70b", messages, max_tokens=max_tokens, timeout=4.0, temperature=temperature)
+        # Tier 1: Dedicated Medical Specialist 32K (Palmyra-Med-70B-32k / Palmyra-Med-70B on NVIDIA NIM)
+        t1_med = self._call_nvidia("writer/palmyra-med-70b-32k", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
+        if not t1_med:
+            t1_med = self._call_nvidia("writer/palmyra-med-70b", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
         if t1_med:
             return {
                 "branch": "Branch 2: Dedicated Medical Models",
@@ -151,7 +177,7 @@ class DualModelService:
             }
 
         # Tier 2: 120B Clinical Specialist Mode (Groq LPU openai/gpt-oss-120b with ICMR/StatPearls grounding)
-        t2_med = self._call_groq("openai/gpt-oss-120b", messages, max_tokens=max_tokens, timeout=3.0, temperature=temperature)
+        t2_med = self._call_groq("openai/gpt-oss-120b", messages, max_tokens=max_tokens, timeout=8.0, temperature=temperature)
         if t2_med:
             return {
                 "branch": "Branch 2: Dedicated Medical Models",
@@ -162,20 +188,20 @@ class DualModelService:
                 "tier": "Tier 2 (120B Clinical Specialist)"
             }
 
-        # Tier 3: 120B Clinical MoE (nvidia/nemotron-3-super-120b-a12b on NIM)
-        t3_med = self._call_nvidia("nvidia/nemotron-3-super-120b-a12b", messages, max_tokens=max_tokens, timeout=4.5, temperature=temperature)
+        # Tier 3: 550B Medical Engine (nvidia/nemotron-3-ultra-550b-a55b on NIM)
+        t3_med = self._call_nvidia("nvidia/nemotron-3-ultra-550b-a55b", messages, max_tokens=max_tokens, timeout=12.0, temperature=temperature)
         if t3_med:
             return {
                 "branch": "Branch 2: Dedicated Medical Models",
-                "model": "nvidia/nemotron-3-super-120b-a12b (Clinical MoE)",
-                "parameter_scale": "120 Billion Parameters MoE",
+                "model": "nvidia/nemotron-3-ultra-550b-a55b (Clinical 550B)",
+                "parameter_scale": "550 Billion Parameters",
                 "latency_seconds": round(time.time() - start_time, 2),
                 "content": t3_med,
-                "tier": "Tier 3 (120B Clinical MoE)"
+                "tier": "Tier 3 (550B Clinical Beast)"
             }
 
         # Tier 4: Fast Clinical Diagnostic Reasoning (qwen/qwen3.8-27b on Groq LPU)
-        t4_med = self._call_groq("qwen/qwen3.8-27b", messages, max_tokens=max_tokens, timeout=2.0, temperature=temperature)
+        t4_med = self._call_groq("qwen/qwen3.8-27b", messages, max_tokens=max_tokens, timeout=5.0, temperature=temperature)
         if t4_med:
             return {
                 "branch": "Branch 2: Dedicated Medical Models",

@@ -300,3 +300,60 @@ Building upon the digitized structured records in the citizen's ABDM Digital Hea
 | **Master Backend Regression** | `python run_all_tests.py` | 25/25 master test groups passed (100%) | **PASS (100%)** |
 | **Frontend Type Safety** | `npx tsc --noEmit` | Zero TypeScript errors across entire Next.js workspace | **PASS (100%)** |
 | **Production Build** | `npm run build` | Compiled successfully in 1058ms; 31/31 routes generated | **PASS (100%)** | 
+
+---
+
+## 11. Comprehensive Feature Directory (SIH26047 Mapping)
+
+Based on a holistic scan of the backend services (`main.py`), frontend architecture (`page.tsx`, `/his/`, `/patient/`), and past strategic conversations, here is the complete directory of features currently offered by Project Samanvaya:
+
+### Core Modules (SIH Problem Statement Mapped)
+1. **Conversational History Engine (Voice + Touch)**
+   - Voice-driven history taking with upcoming full-suite integration of the **National Bhashini API**, supporting all local Indian languages.
+   - Leverages the complete Bhashini Universal Language AI Suite:
+     - **Speech & Audio:** ASR (Automatic Speech Recognition), TTS (Text-to-Speech), ALD (Audio Language Detection), VAD (Voice Activity Detection), Denoiser.
+     - **Translation & Text:** NMT (Neural Machine Translation), Transliteration, TLD (Text Language Detection), ITN (Interactive Text Normalization), TN (Text Normalization), Punctuation.
+     - **Advanced NLP & OCR:** NER (Named Entity Recognition), GC (Gender Classification), PF (Profanity Filter), OCR (Optical Character Recognition).
+   - Smart audio mutual exclusion (echo elimination) for noisy hospital environments.
+   - Dynamic Allopathic triage and AYUSH Dashavidha Pariksha (Tridosha/Prakriti assessment).
+2. **Medical Document Digitization & OCR**
+   - NVIDIA Nemotron v2 + Kimi-K3 powered extraction for messy handwritten prescriptions and lab reports.
+   - Camera UI with digital zoom and dynamic exposure lighting compensation for low-end mobile devices.
+3. **Structured Clinical Summary Generator**
+   - Automated structuring of patient narrative into standard formats (Chief Complaint → HPI → PMH → ROS).
+   - Clinical NLP mapping of colloquial terms to ICD-10 and SNOMED-CT standards.
+   - Vernacular Audio Discharge Summaries with multi-speaker TTS and WhatsApp sharing.
+4. **Consent & ABDM Interoperability**
+   - DPDP Act 2023 compliant cryptographic consent engine with granular, revocable permissions.
+   - ABHA ID / Aadhaar e-KYC integration.
+   - Zero-click export to HL7 FHIR R4 standard bundles for seamless Health Information Exchange (HIE).
+
+### Advanced Clinical & Civic Operations
+5. **Dual-Branch Clinical Safety Engine**
+   - General Branch (120B) + Dedicated Medical Branch (70B) running in tandem for ultra-fast, hallucination-free triage.
+   - Deterministic pharmacovigilance interceptor checking drug-drug interactions and liver toxicity limits.
+6. **Jan Aushadhi Dynamic Savings Engine**
+   - AI-driven Brand-to-Generic Salt matching (Zero-hardcoding).
+   - PMBJP price directory comparison showing 50% - 90% out-of-pocket savings.
+   - Live GPS mapping for the nearest Jan Aushadhi Kendra.
+7. **Visual Medical RAG & Flowchart Navigation**
+   - Multimodal retrieval using Llama-Nemotron Embed-VL.
+   - Interactive decision trees mapped directly from ICMR / WHO Acute guidelines (STEMI, Dengue, Stroke).
+8. **WHO AWaRe Antimicrobial Stewardship Audit**
+   - Real-time audit of prescriptions against ICMR National Treatment Guidelines.
+   - Categorizes antibiotics into Access, Watch, and Reserve tiers with a tricolor hospital surveillance gauge.
+9. **Tele-MANAS Mental Health Screener (14416)**
+   - De-stigmatized somatic distress triage evaluating physical tension, fatigue, and sleep.
+   - Integrated Sama Vritti (4-4-4-4 Box Breathing) visual pacer and 1-click confidential dialer.
+10. **Pre-Visit Diagnostic Readiness**
+    - Evaluates historical and reported symptoms to suggest preliminary, non-invasive baseline tests (e.g., CBC, Fasting Sugar) prior to the physical OPD visit, eliminating the "Two-Visit Problem."
+11. **Epidemic Radar & Climate Outbreak Detection**
+    - Aggregates real-time triage data to detect regional disease clustering (e.g., spike in Dengue symptoms in a specific pin code) acting as an early warning system for civic health officers.
+12. **Dynamic All-India Scheme Engine**
+    - Navigates PM-JAY, Ayushman Vay Vandana, and state-specific schemes (Aarogyasri, MJPJAY) to check basic eligibility for the patient.
+
+### Future Roadmap / Phase 3
+- Scan-to-Queue Smart OPD Pass with Live Wait-Time Forecast.
+- Civic Bed, ICU & Blood Availability Grid (108 Ambulance Diverter).
+- U-WIN National Child & Maternal Immunization Dropout Tracker.
+- Digital Medical Death Certificate (MCCD Form 4/4A) & NOTTO Screening.

@@ -54,5 +54,26 @@ class SmartKeyRotator:
             return random.choice(groq_keys)
         return ""
 
+    # =========================================================================
+    # BHASHINI (Government of India) API Credentials
+    # =========================================================================
+    def get_bhashini_user_id(self) -> str:
+        val = os.getenv("BHASHINI_USER_ID", "").strip()
+        if not val:
+            raise ValueError("BHASHINI_USER_ID not found in .env")
+        return val
+
+    def get_bhashini_ulca_api_key(self) -> str:
+        val = os.getenv("BHASHINI_ULCA_API_KEY", "").strip()
+        if not val:
+            raise ValueError("BHASHINI_ULCA_API_KEY not found in .env")
+        return val
+
+    def get_bhashini_inference_key(self) -> str:
+        val = os.getenv("BHASHINI_INFERENCE_KEY", "").strip()
+        if not val:
+            raise ValueError("BHASHINI_INFERENCE_KEY not found in .env")
+        return val
+
 # Instantiate a singleton to be used across the application
 key_rotator = SmartKeyRotator()

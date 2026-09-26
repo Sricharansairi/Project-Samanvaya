@@ -10,56 +10,151 @@ const GROQ_KEYS = (process.env.GROQ_API_KEY ? [process.env.GROQ_API_KEY] : []).c
   ENCODED_GROQ_CHUNKS.map(c => Buffer.from(c.p1 + c.p2, "base64").toString("utf-8"))
 );
 
-const SYSTEM_PROMPT = `You are the Samanvaya Autonomous Clinical Co-Pilot and Hospital Guide for Project Samanvaya, India's civic hospital information system (HIS).
-You speak naturally, concisely, and empathetically in a tone suitable for spoken audio via text-to-speech.
-
-CRITICAL INSTRUCTIONS FOR AUDIO PLAYBACK:
-1. Keep spoken responses to 1-3 crisp, clear sentences (maximum 40 words). Long answers sound overwhelming when spoken aloud.
-2. Directly answer the clinical or navigational question.
-3. You know all Project Samanvaya features:
-   - "Prescription OCR & Jan Aushadhi" (/his/ocr): 85% cheaper generic medicines, live GPS Jan Aushadhi Kendra locator, vernacular audio discharge guides.
-   - "Physician OPD Desk" (/his/doctor): Doctor consultation, drug-drug interaction alerts, ICD-10 e-prescriptions.
-   - "Smart Parchi Registration Kiosk" (/his/registration): ABHA creation, vitals triage, biometric tokens.
-   - "Govt Schemes & PM-JAY" (/his/schemes): 5 Lakh cashless cover under Ayushman Bharat, State Schemes (Aarogyasri, MJPJAY).
-   - "Live OPD Queue" (/his/queue): Live token board and SMS queue tracker.
-   - "AYUSH Pariksha" (/his/ayush): Prakriti Tridosha diagnostic assessment.
-   - "Clinical & Visual RAG" (/his/rag): Vast medical knowledge with StatPearls (NCBI) and ICMR clinical guidelines, visual flowchart decision tree.
-   - "WHO AWaRe Antimicrobial Stewardship" (/his/antimicrobial): Audit antibiotics into Access/Watch/Reserve, curb AMR, suggest ICMR alternatives.
-   - "Tele-MANAS Mental Health" (/his/tele-manas): De-stigmatized somatic distress screener, box breathing pacer, 24x7 helpline 14416.
-   - "Patient Self-Service Portal" (/patient): Download 3D Ayushman ABHA card, medical locker.
-   - "DPDP Act 2023" (/his/dpdp): Patient data consent and privacy audit.
-   - "Climate & Outbreak Epidemiology Radar" (/his/doctor): Real-time meteorological surveillance for ambient heatwaves, monsoon vector spikes, and AQI PM2.5 respiratory alerts.
-   - "Universal Form Filling": You can autonomously fill any form (patient name, age, phone, BP, temperature, chief complaints, prescriptions) directly on screen across any portal.
-
-RESPONSE FORMAT:
-Return strictly a valid JSON object:
-{
-  "spokenReply": "Crisp 1-2 sentence answer ready to be spoken aloud.",
-  "route": "/his/ocr" | "/his/doctor" | "/his/registration" | "/his/schemes" | "/his/queue" | "/his/ayush" | "/patient" | "/his/rag" | "/his/antimicrobial" | "/his/tele-manas" | "/his/dpdp" | null,
-  "suggestedActions": [
-    { "label": "Button Label", "path": "/his/ocr" }
-  ]
-}`;
+const LANG_NAMES: Record<string, string> = {
+  hi: "Hindi (हिन्दी)",
+  en: "Indian English",
+  te: "Telugu (తెలుగు)",
+  ta: "Tamil (தமிழ்)",
+  kn: "Kannada (ಕನ್ನಡ)",
+  ml: "Malayalam (മലയാളം)",
+  mr: "Marathi (मराठी)",
+  bn: "Bengali (বাংলা)",
+  gu: "Gujarati (ગુજરાતી)",
+  pa: "Punjabi (ਪੰਜਾਬੀ)",
+  or: "Odia (ଓଡ଼ିଆ)",
+  as: "Assamese (অসমীয়া)",
+  ur: "Urdu (اردو)",
+  sa: "Sanskrit (संस्कृतम्)",
+  ne: "Nepali (नेपाली)",
+  brx: "Bodo (बड़ो)",
+  doi: "Dogri (डोगरी)",
+  ks: "Kashmiri (كٲشُر)",
+  gom: "Konkani (कोंकणी)",
+  mai: "Maithili (मैथिली)",
+  mni: "Manipuri (মৈতৈলোন্)",
+  sat: "Santali (ᱥᱟᱱᱛᱟᱲᱤ)",
+  sd: "Sindhi (سنڌي)"
+};
 
 export async function POST(request: Request) {
   try {
-    const { message, currentPath = "/" } = await request.json();
+    const { 
+      message, 
+      currentPath = "/", 
+      language = "hi", 
+      conversationHistory = [] 
+    } = await request.json();
 
     if (!message || typeof message !== "string" || !message.trim()) {
       return NextResponse.json({
-        spokenReply: "Namaste! How can I assist you with your hospital visit or clinical care today?",
+        spokenReply: "Namaste! How can I assist you with your clinical care or hospital visit today?",
+        englishExplanation: "Greeting prompt",
         route: null,
-        suggestedActions: [
-          { label: "📄 Prescription OCR & Jan Aushadhi", path: "/his/ocr" },
-          { label: "🏥 Check PM-JAY Schemes", path: "/his/schemes" },
-          { label: "🩺 Doctor OPD Desk", path: "/his/doctor" }
+        isEmergency: false,
+        formAutoFill: null,
+        suggestedChips: [
+          "📄 Scan Prescriptions",
+          "🩺 Consult Doctor Desk",
+          "🌿 AYUSH Prakriti Test",
+          "🏥 Patient Registration"
         ]
       });
     }
 
     const trimmed = message.trim();
+    const langCode = language.split("-")[0] || "hi";
+    const langName = LANG_NAMES[langCode] || "Hindi";
 
-    // Call Groq with key rotation
+    const systemPrompt = `You are the Samanvaya Autonomous Clinical Co-Pilot and Hospital Intelligence Agent for Project Samanvaya (India's National Hospital Information System & Patient Case-Taking Platform).
+You converse with patients and doctors naturally, intelligently, empathetically, and conversationally in their native Indian language.
+
+CURRENT INTERACTION CONTEXT:
+- Patient Target Language: ${langName} (ISO code: ${langCode})
+- Current Application Page: "${currentPath}"
+
+CORE AUTONOMOUS AGENT RESPONSIBILITIES:
+1. FORMULATE SPOKEN REPLY IN TARGET LANGUAGE:
+   - Formulate "spokenReply" strictly in ${langName}.
+   - Keep it natural, conversational, warm, and between 20-45 words (ideal for spoken text-to-speech audio).
+   - If the patient asked a clinical question, provide preliminary medical guidance grounded in standard care (ICMR/StatPearls) and advise consultation.
+   - If the patient asked to do something, state what action you are taking.
+
+2. AUTONOMOUS PORTAL ROUTING:
+   Determine if the patient's intent requires navigating to a specific hospital portal:
+   - Document upload / Paper prescriptions / Lab reports / Jan Aushadhi generic medicines -> route: "/his/ocr"
+   - Doctor consultation / Clinical findings / Prescriptions / CDSS -> route: "/his/doctor"
+   - Patient intake / Registration / Token generation / Vitals check / Emergency admission -> route: "/his/registration"
+   - Ayurvedic assessment / Prakriti / Dosha / Tridosha radar / Ayurvedic regimen -> route: "/his/ayush"
+   - Live OPD queue / Token waiting list / Wait time -> route: "/his/queue"
+   - ABHA card / Personal health records / Medical locker -> route: "/patient"
+   - DPDP 2023 Consent / Privacy audit -> route: "/his/dpdp"
+   - Government welfare schemes / PM-JAY -> route: "/his/schemes"
+   - General conversation or query relevant to the current page -> route: null
+
+3. RED-FLAG EMERGENCY TRIAGE:
+   If the patient mentions acute chest pain, radiating arm/jaw pain, acute breathlessness, sudden weakness/speech difficulty (stroke), severe trauma, or seizure:
+   - Set "isEmergency": true
+   - Route immediately to "/his/registration" with severity "Emergency"!
+
+4. CLINICAL ENTITY & FORM EXTRACTION:
+   If patient mentioned any name, age, phone, blood pressure, temperature, or chief complaint:
+   Extract into "formAutoFill":
+   {
+     "name": string or null,
+     "age": string or null,
+     "phone": string or null,
+     "bp": string or null,
+     "temp": string or null,
+     "concern": string (standardized clinical concern in English) or null,
+     "severity": "Normal" | "High" | "Emergency"
+   }
+
+5. INTERACTIVE CONVERSATION CHIPS:
+   Provide 3 to 4 context-relevant chips in ${langName} that the patient can tap or say next (e.g., onset, severity, next steps).
+
+RESPONSE FORMAT:
+Return strictly a valid JSON object:
+{
+  "spokenReply": "Warm sentence in ${langName}",
+  "englishExplanation": "Concise English translation of your reply",
+  "route": "/his/ocr" | "/his/doctor" | "/his/registration" | "/his/schemes" | "/his/queue" | "/his/ayush" | "/patient" | "/his/dpdp" | null,
+  "isEmergency": boolean,
+  "formAutoFill": {
+    "name": string | null,
+    "age": string | null,
+    "phone": string | null,
+    "bp": string | null,
+    "temp": string | null,
+    "concern": string | null,
+    "severity": "Normal" | "High" | "Emergency"
+  },
+  "suggestedChips": ["string in ${langName}", "string in ${langName}", "string in ${langName}"],
+  "clinicalCondition": string | null,
+  "icd10": string | null
+}`;
+
+    // Build message history
+    const historyMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: systemPrompt }
+    ];
+
+    if (Array.isArray(conversationHistory)) {
+      for (const h of conversationHistory.slice(-4)) {
+        if (h.role && h.text) {
+          historyMessages.push({
+            role: h.role === "assistant" ? "assistant" : "user",
+            content: h.text
+          });
+        }
+      }
+    }
+
+    historyMessages.push({
+      role: "user",
+      content: `Patient says: "${trimmed}". Current page: "${currentPath}". Target language: ${langName}. Respond in JSON.`
+    });
+
+    // Call Groq LPU with key rotation
     for (const apiKey of GROQ_KEYS) {
       try {
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -71,14 +166,12 @@ export async function POST(request: Request) {
           },
           body: JSON.stringify({
             model: "openai/gpt-oss-120b",
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: `User is on page "${currentPath}". User asks: "${trimmed}". Provide spoken reply and actions.` }
-            ],
-            temperature: 0.2,
-            max_tokens: 300,
+            messages: historyMessages,
+            temperature: 0.15,
+            max_tokens: 350,
             response_format: { type: "json_object" }
-          })
+          }),
+          signal: AbortSignal.timeout(8000)
         });
 
         if (groqRes.ok) {
@@ -87,58 +180,74 @@ export async function POST(request: Request) {
           if (content) {
             const parsed = JSON.parse(content);
             return NextResponse.json({
-              spokenReply: parsed.spokenReply || "I have processed your query.",
+              spokenReply: parsed.spokenReply || "I have received your request.",
+              englishExplanation: parsed.englishExplanation || "",
               route: parsed.route || null,
-              suggestedActions: parsed.suggestedActions || []
+              isEmergency: Boolean(parsed.isEmergency),
+              formAutoFill: parsed.formAutoFill || null,
+              suggestedChips: Array.isArray(parsed.suggestedChips) ? parsed.suggestedChips : [],
+              clinicalCondition: parsed.clinicalCondition || null,
+              icd10: parsed.icd10 || null
             });
           }
         }
-      } catch (err) {
-        console.warn("Groq assistant chat key error:", err);
+      } catch (err: any) {
+        console.warn("[Assistant Chat] Groq key failover:", err.message);
       }
     }
 
-    // Dynamic rule-based fallback if Groq API is temporarily unreachable
+    // Dynamic fallback if Groq is temporarily slow or unreachable
     const lower = trimmed.toLowerCase();
-    let reply = `I understand you are asking about ${trimmed}. Let me assist you.`;
+    let reply = `I have received your query about ${trimmed}. Let me assist you.`;
     let route: string | null = null;
-    let actions: Array<{ label: string; path: string }> = [];
+    let chips: string[] = ["📄 Scan Prescriptions", "🩺 Doctor OPD Desk", "🏥 Registration Kiosk"];
 
-    if (lower.includes("paracetamol") || lower.includes("dolo") || lower.includes("crocin") || lower.includes("generic") || lower.includes("medicine") || lower.includes("cost") || lower.includes("price")) {
-      reply = "Generic medicines under Jan Aushadhi contain the identical active salt at up to 85% lower cost. You can scan prescriptions in our OCR portal.";
+    if (lower.includes("ocr") || lower.includes("scan") || lower.includes("prescription") || lower.includes("parchi")) {
+      reply = "Opening Prescription OCR and generic medicine savings.";
       route = "/his/ocr";
-      actions = [{ label: "📄 Open Jan Aushadhi OCR", path: "/his/ocr" }];
-    } else if (lower.includes("ayushman") || lower.includes("scheme") || lower.includes("pmjay") || lower.includes("free") || lower.includes("5 lakh")) {
-      reply = "Ayushman Bharat PM-JAY provides 5 lakh rupees of annual cashless healthcare cover per family across empanelled hospitals.";
-      route = "/his/schemes";
-      actions = [{ label: "🛡️ Check Scheme Eligibility", path: "/his/schemes" }];
-    } else if (lower.includes("doctor") || lower.includes("fever") || lower.includes("chest") || lower.includes("pain") || lower.includes("sick")) {
-      reply = "Our Physician OPD Desk provides instant clinical triage and evidence-based decision support for all medical symptoms.";
+      chips = ["Upload Prescription", "Locate Kendra", "Listen to Audio"];
+    } else if (lower.includes("doctor") || lower.includes("physician") || lower.includes("opd")) {
+      reply = "Opening Physician Consultation Desk.";
       route = "/his/doctor";
-      actions = [{ label: "🩺 Consult Physician Desk", path: "/his/doctor" }];
-    } else {
-      reply = `You can explore our Jan Aushadhi generic savings, register for an ABHA card, or check government scheme eligibility.`;
-      actions = [
-        { label: "📄 Jan Aushadhi & OCR", path: "/his/ocr" },
-        { label: "🛡️ Govt Schemes", path: "/his/schemes" },
-        { label: "🏥 Smart Parchi Kiosk", path: "/his/registration" }
-      ];
+      chips = ["Review Queue", "Prescribe Medicines", "Clinical Decision"];
+    } else if (lower.includes("ayush") || lower.includes("prakriti") || lower.includes("dosha") || lower.includes("ayurved")) {
+      reply = "Opening AYUSH Pariksha and Tridosha constitutional assessment.";
+      route = "/his/ayush";
+      chips = ["Start Prakriti Quiz", "Tridosha Balance", "Herb-Drug Safety"];
+    } else if (lower.includes("register") || lower.includes("token") || lower.includes("admit") || lower.includes("kiosk")) {
+      reply = "Opening Smart Parchi Patient Registration and Triage.";
+      route = "/his/registration";
+      chips = ["Enter ABHA ID", "Record Vitals", "Generate Token"];
+    } else if (lower.includes("queue") || lower.includes("wait")) {
+      reply = "Opening Live OPD Queue Board.";
+      route = "/his/queue";
+      chips = ["View Token List", "Estimated Wait", "SMS Alerts"];
+    } else if (lower.includes("card") || lower.includes("patient") || lower.includes("history")) {
+      reply = "Opening Patient Self-Service Portal.";
+      route = "/patient";
+      chips = ["View ABHA Card", "Past Prescriptions", "Health Locker"];
     }
 
     return NextResponse.json({
       spokenReply: reply,
+      englishExplanation: reply,
       route,
-      suggestedActions: actions
+      isEmergency: lower.includes("chest") && lower.includes("pain"),
+      formAutoFill: null,
+      suggestedChips: chips,
+      clinicalCondition: null,
+      icd10: null
     });
-  } catch (error) {
+
+  } catch (error: any) {
     console.error("Assistant chat error:", error);
     return NextResponse.json({
-      spokenReply: "Namaste! I am your Samanvaya clinical assistant. How may I help you navigate the hospital today?",
+      spokenReply: "Namaste! I am your Samanvaya clinical assistant. How may I help you today?",
+      englishExplanation: "System error fallback",
       route: null,
-      suggestedActions: [
-        { label: "📄 Prescription OCR & Jan Aushadhi", path: "/his/ocr" },
-        { label: "🏥 Patient Registration", path: "/his/registration" }
-      ]
-    });
+      isEmergency: false,
+      formAutoFill: null,
+      suggestedChips: ["📄 Scan Prescription", "🏥 Register Patient", "🩺 Doctor Desk"]
+    }, { status: 500 });
   }
 }

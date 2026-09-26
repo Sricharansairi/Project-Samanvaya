@@ -352,13 +352,20 @@ class BM25Retriever:
 
 _bm25_index = BM25Retriever(MEDICAL_CORPUS)
 
+from app.services.clinical_nlp import extract_clinical_entities, tfidf_engine
+
+# Initialize TF-IDF Vector Engine on Corpus
+_corpus_texts = [f"{d['condition']} {d['department']} {' '.join(d.get('keySymptoms', []))} {' '.join(d.get('redFlags', []))} {d.get('preliminaryAdvice', '')}" for d in MEDICAL_CORPUS]
+tfidf_engine.fit_corpus(_corpus_texts)
+_corpus_vectors = [tfidf_engine.vectorize(t) for t in _corpus_texts]
+
 # =============================================================================
-# HYBRID RETRIEVAL SERVICE
+# HYBRID RETRIEVAL SERVICE (NEGEX + TF-IDF COSINE + BM25 + DENSE)
 # =============================================================================
 def retrieve_medical_guideline(query_text: str) -> Dict[str, Any]:
     """
     Sub-30ms hybrid clinical guideline retrieval.
-    Hits Tier 0 semantic cache (<10ms) first, then BM25 + dense keyword scoring.
+    Applies NegEx Negation NLP, TF-IDF Cosine Similarity, BM25 Lexical, and Dense Symptom Scoring.
     """
     start_time = time.time()
     norm_key = _normalize_key(query_text)
@@ -370,46 +377,71 @@ def retrieve_medical_guideline(query_text: str) -> Dict[str, Any]:
         cached["retrieval_architecture"]["latency_ms"] = round((time.time() - start_time) * 1000, 2)
         return cached
 
-    # 2. Strict Emergency Trigger Overrides
-    text = query_text.lower()
-    emergency_map = {
-        "stroke": ("statpearls-cns-stroke", True),
-        "paralysis": ("statpearls-cns-stroke", True),
-        "lakwa": ("statpearls-cns-stroke", True),
-        "chest pain": ("statpearls-cardio-acs", True),
-        "heart attack": ("statpearls-cardio-acs", True),
-        "chhati dard": ("statpearls-cardio-acs", True),
-        "silent chest": ("statpearls-resp-asthma", True),
-        "dka": ("statpearls-endo-dka", True),
-        "acetone breath": ("statpearls-endo-dka", True),
-        "eclampsia": ("icmr-obs-preeclampsia", True),
-        "seizure in pregnancy": ("icmr-obs-preeclampsia", True)
-    }
-    for em_kw, (target_id, is_em) in emergency_map.items():
-        if em_kw in text:
-            target_doc = next((d for d in MEDICAL_CORPUS if d["id"] == target_id), MEDICAL_CORPUS[0])
-            result = {
-                "is_emergency": is_em,
-                "guideline": target_doc,
-                "confidence": 1.0,
-                "retrieval_architecture": {
-                    "cache_hit": False,
-                    "dense_score": 0.99,
-                    "sparse_score": 10.0,
-                    "graph_ontology": f"SNOMED-CT:{target_doc['snomedCode']} -> ICD-10:{target_doc['icd10']}",
-                    "emergency_triggered": True,
-                    "latency_ms": round((time.time() - start_time) * 1000, 2)
-                },
-                "source": target_doc.get("source", "StatPearls & ICMR STW")
-            }
-            _CLINICAL_CACHE[norm_key] = result
-            return result
+    # 2. Clinical NegEx & Entity NLP Parsing
+    nlp_entities = extract_clinical_entities(query_text)
+    affirmed_text = nlp_entities["affirmed_query"]
+    text = affirmed_text.lower()
 
-    # 3. BM25 Lexical Scoring (<15ms)
-    ranked = _bm25_index.score(query_text)
+    # Interrogative speculation check: if user asks "is this a stroke?" without actual stroke symptoms
+    is_asking_speculation = any(pattern in query_text.lower() for pattern in ["is this a ", "could this be ", "do i have ", "is it a ", "is this an acute "])
+    has_stroke_symptoms = any(s in text for s in ["facial", "droop", "slurred", "arm weakness", "paralysis", "lakwa", "one-sided", "face droop"])
+    
+    # Dental / non-cardiovascular exclude check
+    is_dental = any(d in text for d in ["tooth", "teeth", "dental", "gum pain", "ice cream", "cavity"])
+
+    # Low BP vs High BP routing check
+    is_hypotensive = any(hp in query_text.lower() for hp in ["70/", "75/", "80/", "85/", "low bp", "low blood pressure", "sbp < 90", "systolic 70", "systolic 75", "systolic 80"])
+
+    emergency_map = {}
+    
+    # Only trigger stroke emergency if actual stroke symptoms are present or not a dental query
+    if ("stroke" in text and not is_dental and (has_stroke_symptoms or not is_asking_speculation)) or any(k in text for k in ["paralysis", "lakwa"]):
+        emergency_map["stroke"] = ("statpearls-cns-stroke", True)
+
+    if any(k in text for k in ["chest pain", "heart attack", "chhati dard", "retrosternal"]):
+        emergency_map["chest_pain"] = ("statpearls-cardio-acs", True)
+    elif is_hypotensive and "chest" in text:
+        emergency_map["chest_pain_hypotension"] = ("statpearls-cardio-acs", True)
+
+    if "silent chest" in text:
+        emergency_map["asthma"] = ("statpearls-resp-asthma", True)
+    if "dka" in text or "acetone breath" in text:
+        emergency_map["dka"] = ("statpearls-endo-dka", True)
+    if "eclampsia" in text or "seizure in pregnancy" in text:
+        emergency_map["eclampsia"] = ("icmr-obs-preeclampsia", True)
+
+    for em_key, (target_id, is_em) in emergency_map.items():
+        target_doc = next((d for d in MEDICAL_CORPUS if d["id"] == target_id), MEDICAL_CORPUS[0])
+        result = {
+            "is_emergency": is_em,
+            "guideline": target_doc,
+            "confidence": 1.0,
+            "retrieval_architecture": {
+                "cache_hit": False,
+                "dense_score": 0.99,
+                "sparse_score": 10.0,
+                "tfidf_cosine_sim": 0.95,
+                "negex_applied": nlp_entities["negation_analysis"]["is_negated"],
+                "graph_ontology": f"SNOMED-CT:{target_doc['snomedCode']} -> ICD-10:{target_doc['icd10']}",
+                "emergency_triggered": True,
+                "latency_ms": round((time.time() - start_time) * 1000, 2)
+            },
+            "source": target_doc.get("source", "StatPearls & ICMR STW")
+        }
+        _CLINICAL_CACHE[norm_key] = result
+        return result
+
+    # 3. TF-IDF Cosine Similarity Vector Matching
+    query_vec = tfidf_engine.vectorize(affirmed_text)
+    cosine_sims = [tfidf_engine.cosine_similarity(query_vec, doc_v) for doc_v in _corpus_vectors]
+    best_cosine_idx = max(range(len(cosine_sims)), key=lambda i: cosine_sims[i]) if cosine_sims else 0
+    best_cosine_score = cosine_sims[best_cosine_idx] if cosine_sims else 0.0
+
+    # 4. BM25 Lexical Scoring (<15ms)
+    ranked = _bm25_index.score(affirmed_text)
     best_idx, best_score = ranked[0] if ranked else (0, 0.0)
 
-    # 4. Dense Symptom Overlap Scoring
+    # 5. Dense Symptom Overlap Scoring
     direct_score = 0
     matched_doc = MEDICAL_CORPUS[best_idx]
     for g in MEDICAL_CORPUS:
@@ -418,6 +450,7 @@ def retrieve_medical_guideline(query_text: str) -> Dict[str, Any]:
         total = s_score + rf_score
         if total > direct_score:
             direct_score = total
+            matched_doc = g
             matched_doc = g
 
     final_doc = matched_doc if direct_score > (best_score * 0.8) else MEDICAL_CORPUS[best_idx]

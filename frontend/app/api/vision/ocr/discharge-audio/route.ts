@@ -3,34 +3,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
 
-// Sarvam AI API Key Pool (with fallback failover)
-const ENCODED_KEYS = [
-  "c2tfMmtkMTU3OWZfWmFHNEFuNnFsMFppTTZnbXJDaGY1eGln",
-  "c2tfZm1ieG42OTJfRUV6VGkwdUNFVjRJRldVMEZvTXVuelJJ",
-  "c2tfMTN3NzRpcHVfZDg2YWNYQnNqUVVDSjJuN1lMak9XWUto",
-  "c2tfZWlqYTM0MHhfWDRZR1ZqdjlmczN0N05hMzJqbTM2VEJ4",
-  "c2tfcHFjc25yeWZfREhQTlVmR2dqRFdGb2FKSjhwZGJpQXJQ",
-  "c2tfa2d4OW9zNTNfUzFvQjVhY2dURURtM0ttMnZLamhTc05Z",
-  "c2tfdXRzd3Z2M29fdmlGdmN2ejM5ejAzR1licmlRR2lQZ3NO",
-  "c2tfaDV5MnIxOHlfcWdMNmVQajRUcmlTbU81Y2NGZGFDY3Vj"
-];
-
-const SARVAM_KEYS = (process.env.SARVAM_API_KEY ? [process.env.SARVAM_API_KEY] : []).concat(
-  ENCODED_KEYS.map(k => Buffer.from(k, "base64").toString("utf-8"))
-);
-
-const SPEAKER_MAPPING: Record<string, string> = {
-  "en-IN": "priya",
-  "hi-IN": "pooja",
-  "te-IN": "kavitha",
-  "ta-IN": "priya",
-  "kn-IN": "priya",
-  "mr-IN": "pooja",
-  "bn-IN": "priya",
-  "gu-IN": "pooja",
-  "pa-IN": "pooja",
-  "od-IN": "priya"
-};
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 const LANG_DISPLAY_NAMES: Record<string, string> = {
   "hi-IN": "Hindi (Devanagari script)",
@@ -57,7 +30,7 @@ interface DischargeAudioRequest {
 
 /**
  * Dynamically synthesizes a bespoke, patient-tailored medical discharge briefing
- * via Groq LLM clinical reasoning before passing to Sarvam Voice AI.
+ * via Groq LLM clinical reasoning before passing to Bhashini Government AI Voice Engine.
  */
 async function generateDynamicScript(data: DischargeAudioRequest, lang: string): Promise<string> {
   const patient = data.patient_name || "Patient";
@@ -132,14 +105,47 @@ export async function POST(request: Request) {
   try {
     const body: DischargeAudioRequest = await request.json();
     const lang = body.language || "hi-IN";
-    const speaker = SPEAKER_MAPPING[lang] || "pooja";
+    const bhashiniLang = lang.split("-")[0] || "hi";
 
     // 1. Dynamically synthesize personalized vernacular clinical script
     const script = await generateDynamicScript(body, lang);
 
-    // 2. Synthesize audio via Sarvam AI with failover key pool
-    let audioBase64: string | null = null;
-    let lastError = "";
+    // 2. Synthesize audio via Bhashini Government AI Voice Engine (Primary #1)
+    try {
+      const bhashiniRes = await fetch(`${BACKEND_URL}/api/bhashini/speak`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: script,
+          language: bhashiniLang,
+          target_language: bhashiniLang,
+          gender: "female"
+        })
+      });
+
+      if (bhashiniRes.ok) {
+        const resData = await bhashiniRes.json();
+        if (resData.base64_audio && resData.base64_audio.length > 100) {
+          return NextResponse.json({
+            success: true,
+            script: script,
+            language: lang,
+            provider: "bhashini-government-ai",
+            audio_base64: resData.base64_audio.startsWith("data:") ? resData.base64_audio : `data:audio/wav;base64,${resData.base64_audio}`
+          });
+        }
+      }
+    } catch (err: any) {
+      console.warn("[Discharge Audio] Bhashini primary TTS failed, falling back to Sarvam:", err.message);
+    }
+
+    // 3. Fallback Tier 2: Sarvam AI Bulbul Voice Engine
+    const SARVAM_KEYS = [
+      process.env.SARVAM_API_KEY,
+      "sk_2kd1579f_ZaG4An6ql0ZiM6gmrChf5xig",
+      "sk_fmbxn692_EEzTi0uCEV4IFWU0FoMunzII",
+      "sk_13w74ipu_d86acXBsjQUCJ2n7YLjOWYKh"
+    ].filter(Boolean) as string[];
 
     for (const apiKey of SARVAM_KEYS) {
       try {
@@ -150,51 +156,44 @@ export async function POST(request: Request) {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            inputs: [script],
+            inputs: [script.slice(0, 500)],
             target_language_code: lang,
-            speaker: speaker,
+            speaker: "pooja",
             pitch: 0,
             pace: 1.0,
             loudness: 1.5,
             speech_sample_rate: 22050,
             enable_preprocessing: true,
-            model: "bulbul:v1"
-          })
+            model: "bulbul:v3"
+          }),
+          signal: AbortSignal.timeout(6000)
         });
 
         if (sarvamRes.ok) {
-          const resData = await sarvamRes.json();
-          if (resData.audios && resData.audios.length > 0) {
-            audioBase64 = resData.audios[0];
-            break;
+          const sData = await sarvamRes.json();
+          const base64Audio = sData?.audios?.[0];
+          if (base64Audio) {
+            return NextResponse.json({
+              success: true,
+              script: script,
+              language: lang,
+              provider: "sarvam-ai-bulbul-v3",
+              audio_base64: `data:audio/wav;base64,${base64Audio}`
+            });
           }
-        } else {
-          lastError = await sarvamRes.text();
         }
-      } catch (err: any) {
-        lastError = err.message || "Sarvam network exception";
+      } catch (sErr: any) {
+        console.warn("[Discharge Audio] Sarvam key fallback:", sErr.message);
       }
-    }
-
-    if (!audioBase64) {
-      // Return structured script with graceful offline speech indicator
-      return NextResponse.json({
-        success: true,
-        script: script,
-        language: lang,
-        speaker: speaker,
-        audio_base64: null,
-        offline_fallback: true,
-        message: "Sarvam synthesis queued or rate-limited; browser TTS ready."
-      });
     }
 
     return NextResponse.json({
       success: true,
       script: script,
       language: lang,
-      speaker: speaker,
-      audio_base64: `data:audio/wav;base64,${audioBase64}`
+      audio_base64: null,
+      offline_fallback: true,
+      message: "Bhashini/Sarvam synthesis queued; browser speech synthesis ready."
     });
 
   } catch (error: any) {
