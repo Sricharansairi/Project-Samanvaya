@@ -300,8 +300,12 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
           className="flex items-center gap-3.5 w-full md:w-auto group cursor-pointer hover:opacity-95 transition-opacity"
           title="Return to Project Samanvaya Home"
         >
-          <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[#f37021]/10 via-white to-[#138808]/10 border border-orange-200 text-2xl shadow-xs group-hover:scale-105 transition-transform">
-            🇮🇳
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-gray-200 p-1 shadow-xs group-hover:scale-105 transition-transform shrink-0">
+            <img 
+              src="/logo.png" 
+              alt="Project Samanvaya Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -410,61 +414,21 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
         </div>
       </div>
 
-      {/* 3. SEGREGATED ROLE NAVIGATION BAR */}
+      {/* 3. CITIZEN HEALTH SERVICES NAVIGATION BAR */}
       <div className="w-full bg-[#f8fafc] border-t border-b border-gray-200 px-4 sm:px-8 py-1.5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
         
-        {/* Role Mode Segregation Switcher */}
+        {/* Left Badge: Citizen Services */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider hidden lg:inline">
-            Active Role:
-          </span>
-          <div className="inline-flex items-center p-0.5 bg-slate-200/80 rounded-xl border border-gray-300 shadow-inner">
-            <button
-              type="button"
-              onClick={() => handleRoleChange("patient")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeRole === "patient"
-                  ? "bg-[#0f4c81] text-white shadow-xs"
-                  : "text-gray-700 hover:text-[#0f4c81] hover:bg-white/60"
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Patient & Citizen</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleRoleChange("staff")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeRole === "staff"
-                  ? "bg-[#0f4c81] text-white shadow-xs"
-                  : "text-gray-700 hover:text-[#0f4c81] hover:bg-white/60"
-              }`}
-            >
-              <Stethoscope className="w-3.5 h-3.5" />
-              <span>Doctor & Staff</span>
-              {!staffUser && <Lock className="w-3 h-3 opacity-60 ml-0.5" />}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleRoleChange("all")}
-              className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
-                activeRole === "all"
-                  ? "bg-slate-700 text-white shadow-xs"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-white/60"
-              }`}
-              title="Show all 12 modules"
-            >
-              All (12)
-            </button>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-[#0f4c81] rounded-lg border border-blue-200 text-xs font-bold">
+            <User className="w-3.5 h-3.5" />
+            <span>Citizen Health Services</span>
           </div>
         </div>
 
-        {/* Primary Segregated Navigation Tabs */}
+        {/* Primary Citizen Navigation Tabs */}
         <nav className="flex items-center gap-1 overflow-x-auto text-xs font-medium text-gray-700 py-0.5 flex-1 md:justify-end md:pl-3 md:border-l md:border-gray-200">
           
-          {/* Always Available: Home */}
+          {/* Home */}
           <button
             type="button"
             onClick={() => handleTabClick("home", "/")}
@@ -477,220 +441,89 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
             🏛️ {t("nav.home")}
           </button>
 
-          {/* ======================================================== */}
-          {/* PATIENT & CITIZEN TABS (Visible in "patient" or "all")   */}
-          {/* ======================================================== */}
-          {(activeRole === "patient" || activeRole === "all") && (
-            <>
-              {/* My ABHA Portal */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("patient", "/patient")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "patient"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🪪 My ABHA
-              </button>
+          {/* My ABHA Portal */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("patient", "/patient")}
+            className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              resolvedTab === "patient"
+                ? "bg-[#0f4c81] text-white font-bold shadow-xs"
+                : "hover:bg-slate-200/60 text-gray-700"
+            }`}
+          >
+            🪪 My ABHA
+          </button>
 
-              {/* Govt Schemes */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("schemes", "/his/schemes")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "schemes"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🛡️ {t("nav.schemes")}
-              </button>
+          {/* Govt Schemes */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("schemes", "/his/schemes")}
+            className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              resolvedTab === "schemes"
+                ? "bg-[#0f4c81] text-white font-bold shadow-xs"
+                : "hover:bg-slate-200/60 text-gray-700"
+            }`}
+          >
+            🛡️ {t("nav.schemes")}
+          </button>
 
-              {/* Prescription OCR & Jan Aushadhi Savings */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("ocr", "/his/ocr")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "ocr"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                📄 {activeRole === "patient" ? "Jan Aushadhi Savings" : t("nav.ocr")}
-                <span className="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-300">
-                  85% Off
-                </span>
-              </button>
+          {/* Prescription OCR & Jan Aushadhi Savings */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("ocr", "/his/ocr")}
+            className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              resolvedTab === "ocr"
+                ? "bg-[#0f4c81] text-white font-bold shadow-xs"
+                : "hover:bg-slate-200/60 text-gray-700"
+            }`}
+          >
+            📄 Jan Aushadhi Savings
+            <span className="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-300">
+              85% Off
+            </span>
+          </button>
 
-              {/* Tele-MANAS (14416) */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("telemanas", "/his/tele-manas")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "telemanas"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🧠 Tele-MANAS
-                <span className="text-[9px] bg-teal-100 text-teal-800 font-extrabold px-1.5 py-0.5 rounded-full border border-teal-300">
-                  14416
-                </span>
-              </button>
+          {/* Tele-MANAS (14416) */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("telemanas", "/his/tele-manas")}
+            className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              resolvedTab === "telemanas"
+                ? "bg-[#0f4c81] text-white font-bold shadow-xs"
+                : "hover:bg-slate-200/60 text-gray-700"
+            }`}
+          >
+            🧠 Tele-MANAS
+            <span className="text-[9px] bg-teal-100 text-teal-800 font-extrabold px-1.5 py-0.5 rounded-full border border-teal-300">
+              14416
+            </span>
+          </button>
 
-              {/* AYUSH Health Profile (Patient view) */}
-              {activeRole === "patient" && (
-                <button
-                  type="button"
-                  onClick={() => handleTabClick("ayush", "/his/ayush")}
-                  className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                    resolvedTab === "ayush"
-                      ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                      : "hover:bg-slate-200/60 text-gray-700"
-                  }`}
-                >
-                  🌿 AYUSH Health
-                </button>
-              )}
+          {/* AYUSH Health Profile */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("ayush", "/his/ayush")}
+            className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              resolvedTab === "ayush"
+                ? "bg-[#0f4c81] text-white font-bold shadow-xs"
+                : "hover:bg-slate-200/60 text-gray-700"
+            }`}
+          >
+            🌿 AYUSH Health
+          </button>
 
-              {/* Live OPD Token Status (Patient view) */}
-              {activeRole === "patient" && (
-                <button
-                  type="button"
-                  onClick={() => handleTabClick("queue", "/his/queue")}
-                  className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                    resolvedTab === "queue"
-                      ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                      : "hover:bg-slate-200/60 text-gray-700"
-                  }`}
-                >
-                  📱 My OPD Token
-                </button>
-              )}
-            </>
-          )}
-
-          {/* ======================================================== */}
-          {/* DOCTOR & HOSPITAL STAFF TABS (Visible only when authenticated as staff) */}
-          {/* ======================================================== */}
-          {((activeRole === "staff" || activeRole === "all") && staffUser) && (
-            <>
-              {/* Physician Desk */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("doctor", "/his/doctor")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "doctor"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🩺 {t("nav.doctor")}
-              </button>
-
-              {/* Patient Registration Kiosk */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("kiosk", "/his/registration")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "kiosk"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🏥 {t("nav.kiosk")}
-              </button>
-
-              {/* OPD Queue Management */}
-              <button
-                  type="button"
-                  onClick={() => handleTabClick("queue", "/his/queue")}
-                  className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                    resolvedTab === "queue"
-                      ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                      : "hover:bg-slate-200/60 text-gray-700"
-                  }`}
-                >
-                  📱 {t("nav.queue")}
-                </button>
-
-              {/* Clinical Prescription OCR */}
-              {activeRole === "staff" && (
-                <button
-                  type="button"
-                  onClick={() => handleTabClick("ocr", "/his/ocr")}
-                  className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                    resolvedTab === "ocr"
-                      ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                      : "hover:bg-slate-200/60 text-gray-700"
-                  }`}
-                >
-                  📄 {t("nav.ocr")}
-                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-300">
-                    Digitizer
-                  </span>
-                </button>
-              )}
-
-              {/* Clinical RAG Co-Pilot */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("rag", "/his/rag")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "rag"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🧠 {t("nav.rag")}
-              </button>
-
-              {/* AWaRe Antimicrobial Stewardship */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("antimicrobial", "/his/antimicrobial")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "antimicrobial"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                💊 AWaRe AMR
-                <span className="text-[9px] bg-red-100 text-red-800 font-extrabold px-1.5 py-0.5 rounded-full border border-red-300">
-                  Audit
-                </span>
-              </button>
-
-              {/* AYUSH Pariksha */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("ayush", "/his/ayush")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "ayush"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🌿 {t("nav.ayush")}
-              </button>
-
-              {/* DPDP Consent & Audit */}
-              <button
-                type="button"
-                onClick={() => handleTabClick("dpdp", "/his/dpdp")}
-                className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
-                  resolvedTab === "dpdp"
-                    ? "bg-[#0f4c81] text-white font-bold shadow-xs"
-                    : "hover:bg-slate-200/60 text-gray-700"
-                }`}
-              >
-                🔒 {t("nav.dpdp")}
-              </button>
-            </>
-          )}
-
+          {/* Live OPD Token Status */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("queue", "/his/queue")}
+            className={`px-3 py-1 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              resolvedTab === "queue"
+                ? "bg-[#0f4c81] text-white font-bold shadow-xs"
+                : "hover:bg-slate-200/60 text-gray-700"
+            }`}
+          >
+            📱 My OPD Token
+          </button>
         </nav>
       </div>
 

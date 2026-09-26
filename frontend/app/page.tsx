@@ -16,57 +16,6 @@ import { INDIAN_LANGUAGES } from "@/i18n/translations";
 export default function Home() {
   const { language, setLanguage, t } = useLanguage();
 
-  // Role segregation & Staff Auth state
-  const [activeRole, setActiveRole] = useState<"patient" | "staff" | "all">("patient");
-  const [isStaffAuthenticated, setIsStaffAuthenticated] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedAuth = localStorage.getItem("samanvaya_staff_auth");
-      if (storedAuth) {
-        try {
-          const parsed = JSON.parse(storedAuth);
-          if (parsed && parsed.isAuthenticated) {
-            setIsStaffAuthenticated(true);
-          }
-        } catch (e) {}
-      }
-
-      const saved = localStorage.getItem("samanvaya_role_view");
-      if (saved === "patient" || saved === "staff" || saved === "all") {
-        setActiveRole(saved);
-      }
-      const handleRoleChanged = (e: any) => {
-        if (e.detail?.role) {
-          setActiveRole(e.detail.role);
-        }
-      };
-      const handleAuthChanged = (e: any) => {
-        setIsStaffAuthenticated(!!e.detail?.isAuthenticated);
-      };
-      window.addEventListener("samanvaya:role-changed", handleRoleChanged);
-      window.addEventListener("samanvaya:staff-auth-changed", handleAuthChanged);
-      return () => {
-        window.removeEventListener("samanvaya:role-changed", handleRoleChanged);
-        window.removeEventListener("samanvaya:staff-auth-changed", handleAuthChanged);
-      };
-    }
-  }, []);
-
-  const handleRoleSelect = (role: "patient" | "staff" | "all") => {
-    if (role === "staff" && !isStaffAuthenticated) {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("samanvaya:open-his-modal"));
-      }
-      return;
-    }
-    setActiveRole(role);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("samanvaya_role_view", role);
-      window.dispatchEvent(new CustomEvent("samanvaya:role-changed", { detail: { role } }));
-    }
-  };
-
   // Modals for the 3 UIDAI Informational Cards
   const [docsModalOpen, setDocsModalOpen] = useState(false);
   const [hospitalModalOpen, setHospitalModalOpen] = useState(false);
@@ -81,7 +30,7 @@ export default function Home() {
 
       {/* Subtle Healthcare Atmospheric Background Image */}
       <div 
-        className="fixed inset-0 bg-cover bg-top bg-no-repeat opacity-[0.14] pointer-events-none z-0" 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-[0.18] pointer-events-none z-0" 
         style={{ backgroundImage: "url('/healthcare-bg.jpg')" }} 
       />
 
@@ -132,453 +81,181 @@ export default function Home() {
         {/* UIDAI CORE SERVICE CONTAINER: Access Samanvaya Services (Exact match to screenshot 1) */}
         {/* ============================================================== */}
         <div className="w-full bg-[#eef3f8] border border-blue-100/80 rounded-3xl p-6 sm:p-8 mb-10 shadow-xs">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 pb-4 border-b border-gray-200">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#0f4c81]">
-                  {activeRole === "patient" ? "Citizen & Patient Desk" : activeRole === "staff" ? "Hospital & Clinical Suite" : "Unified Healthcare Gateway"}
+                  Citizen & Patient Services
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#0f4c81] border border-blue-200">
-                  {activeRole === "patient" ? "6 Citizen Services" : activeRole === "staff" ? "8 Clinical Desks" : "12 Modules Active"}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Patient Priority
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#0f2942] tracking-tight">
-                {activeRole === "patient"
-                  ? "Access Samanvaya Citizen Healthcare Services"
-                  : activeRole === "staff"
-                  ? "Access Samanvaya Clinical & Hospital Desks"
-                  : "Access All Samanvaya Healthcare Services"}
+                Access Samanvaya Citizen Healthcare Services
               </h2>
               <p className="text-xs text-gray-500 font-medium mt-1">
-                {activeRole === "patient"
-                  ? "Self-service digital health records, Jan Aushadhi generic medicines, PM-JAY schemes & mental wellness"
-                  : activeRole === "staff"
-                  ? "Point-of-care clinical consultations, Smart Parchi registration, live OPD queue ops & ICMR guidelines"
-                  : "Seamlessly switch between Citizen and Doctor/Staff roles or explore all platform services"}
+                Self-service digital health records, Jan Aushadhi generic medicines, PM-JAY schemes & mental wellness
               </p>
-            </div>
-
-            {/* In-page role filter switcher */}
-            <div className="inline-flex items-center p-1 bg-white rounded-2xl border border-gray-200 shadow-xs self-start md:self-auto flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => handleRoleSelect("patient")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeRole === "patient"
-                    ? "bg-[#0f4c81] text-white shadow-xs"
-                    : "text-gray-600 hover:text-[#0f4c81] hover:bg-slate-50"
-                }`}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Patient & Citizen</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleSelect("staff")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeRole === "staff"
-                    ? "bg-[#0f4c81] text-white shadow-xs"
-                    : "text-gray-600 hover:text-[#0f4c81] hover:bg-slate-50"
-                }`}
-              >
-                <Stethoscope className="w-3.5 h-3.5" />
-                <span>Doctor & Staff</span>
-                {!isStaffAuthenticated && <Lock className="w-3 h-3 text-gray-400" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleSelect("all")}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  activeRole === "all"
-                    ? "bg-slate-700 text-white shadow-xs"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-slate-50"
-                }`}
-              >
-                All (12)
-              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            
-            {/* ======================================================== */}
-            {/* PATIENT & CITIZEN CARDS (Visible for 'patient' or 'all') */}
-            {/* ======================================================== */}
-            {(activeRole === "patient" || activeRole === "all") && (
-              <>
-                {/* Card 1: Download ABHA Card */}
-                <Link 
-                  href="/patient"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#0f4c81] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <QrCode className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Download ABHA Card
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Get your digital Ayushman Bharat Health Account (ABHA) smart card instantly.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      Instant ABHA
-                    </span>
-                  </div>
-                </Link>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* Card 1: Download ABHA Card */}
+            <Link 
+              href="/patient"
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            >
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#0f4c81] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                  <QrCode className="w-6 h-6 stroke-[1.75]" />
+                </div>
+                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
+                  Download ABHA Card
+                </h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Get your digital Ayushman Bharat Health Account (ABHA) smart card instantly.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  Instant ABHA
+                </span>
+              </div>
+            </Link>
 
-                {/* Card 2: Scheme Eligibility & Claims */}
-                <Link 
-                  href="/his/schemes"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-orange-50 text-[#f37021] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <ShieldCheck className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Scheme Eligibility
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Check PM-JAY & 36 State Health Schemes coverage with Aadhaar or Ration Card.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-[#f37021] bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
-                      ₹5 Lakh Cover
-                    </span>
-                  </div>
-                </Link>
+            {/* Card 2: Scheme Eligibility & Claims */}
+            <Link 
+              href="/his/schemes"
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            >
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-orange-50 text-[#f37021] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                  <ShieldCheck className="w-6 h-6 stroke-[1.75]" />
+                </div>
+                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
+                  Scheme Eligibility
+                </h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Check PM-JAY & 36 State Health Schemes coverage with Aadhaar or Ration Card.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[10px] font-bold text-[#f37021] bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
+                  ₹5 Lakh Cover
+                </span>
+              </div>
+            </Link>
 
-                {/* Card 3: Prescription & Jan Aushadhi */}
-                <Link 
-                  href="/his/ocr"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Pill className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Prescription & Jan Aushadhi
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Extract handwritten drugs, unlock 85% cheaper generic salts, and locate nearby Kendras.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      85% Relief
-                    </span>
-                  </div>
-                </Link>
+            {/* Card 3: Prescription & Jan Aushadhi */}
+            <Link 
+              href="/his/ocr"
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            >
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                  <Pill className="w-6 h-6 stroke-[1.75]" />
+                </div>
+                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
+                  Prescription & Jan Aushadhi
+                </h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Extract handwritten drugs, unlock 85% cheaper generic salts, and locate nearby Kendras.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  85% Relief
+                </span>
+              </div>
+            </Link>
 
-                {/* Card 4: My OPD Token & Wait-Time */}
-                <Link 
-                  href="/his/queue"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Activity className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      My OPD Token Pass
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Track your live consultation token, estimated doctor wait-time and digital OPD pass.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-                      Live Token Pass
-                    </span>
-                  </div>
-                </Link>
+            {/* Card 4: My OPD Token & Wait-Time */}
+            <Link 
+              href="/his/queue"
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            >
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                  <Activity className="w-6 h-6 stroke-[1.75]" />
+                </div>
+                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
+                  My OPD Token Pass
+                </h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Track your live consultation token, estimated doctor wait-time and digital OPD pass.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                  Live Token Pass
+                </span>
+              </div>
+            </Link>
 
-                {/* Card 5: Tele-MANAS Mental Wellness */}
-                <Link 
-                  href="/his/tele-manas"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <HeartPulse className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Tele-MANAS Wellness
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Confidential 24x7 Mental Health Helpline (14416), distress screener & calming guide.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                      14416 Toll-Free
-                    </span>
-                  </div>
-                </Link>
+            {/* Card 5: Tele-MANAS Mental Wellness */}
+            <Link 
+              href="/his/tele-manas"
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            >
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                  <HeartPulse className="w-6 h-6 stroke-[1.75]" />
+                </div>
+                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
+                  Tele-MANAS Wellness
+                </h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Confidential 24x7 Mental Health Helpline (14416), distress screener & calming guide.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                  14416 Toll-Free
+                </span>
+              </div>
+            </Link>
 
-                {/* Card 6: AYUSH Health Profile */}
-                <Link 
-                  href="/his/ayush"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Leaf className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      AYUSH Health Profile
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Self-service Prakriti constitution profiler, Tridosha balance & holistic dietary guide.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      Prakriti Check
-                    </span>
-                  </div>
-                </Link>
-              </>
-            )}
-
-            {/* ======================================================== */}
-            {/* DOCTOR & STAFF CARDS (Visible only when staff is authenticated) */}
-            {/* ======================================================== */}
-            {((activeRole === "staff" || activeRole === "all") && isStaffAuthenticated) && (
-              <>
-                {/* Card 7: Physician OPD Desk */}
-                <Link 
-                  href="/his/doctor"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Stethoscope className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Physician OPD Desk
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Track outpatient consultations, drug interaction alerts, and smart e-Prescriptions.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
-                      Point-of-Care CDSS
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Card 8: Smart Parchi Patient Kiosk */}
-                <Link 
-                  href="/his/registration"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <FileText className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Smart Parchi Kiosk
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Self-service registration, instant ABHA creation, vitals triage, and token printing.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                      Patient Intake
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Card 9: Live OPD Queue Board */}
-                <Link 
-                  href="/his/queue"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Activity className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Live OPD Queue Board
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Real-time token display board, doctor wait-time forecasting & audio chime callouts.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-                      Queue Ops
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Card 10: Clinical Decision Support & RAG */}
-                <Link 
-                  href="/his/rag"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Database className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Clinical RAG Co-Pilot
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      ICMR Standard Treatment Workflows, AIIMS protocols, and diagnostic support.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
-                      ICMR Grounded
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Card 11: Clinical Prescription OCR */}
-                <Link 
-                  href="/his/ocr"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#0f4c81] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <FileCheck className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      Prescription OCR Digitizer
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Live camera photo capture & handwriting digitization with optical entity parsing.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                      Vision Digitizer
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Card 12: WHO AWaRe Antimicrobial Audit */}
-                <Link 
-                  href="/his/antimicrobial"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <ShieldAlert className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      WHO AWaRe AMR Audit
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      WHO AWaRe antibiotic stewardship audit & ICMR safer alternative recommendations.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                      AMR Audit
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Card 13: AYUSH Clinical Pariksha */}
-                <Link 
-                  href="/his/ayush"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Leaf className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      AYUSH Clinical Pariksha
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Prakriti assessment, Nadi, Jihva, and Dashavidha cross-system integrative diagnosis.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      Integrative CDSS
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Card 14: DPDP 2023 Consent Manager */}
-                <Link 
-                  href="/his/dpdp"
-                  className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
-                >
-                  <div>
-                    <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                      <Shield className="w-6 h-6 stroke-[1.75]" />
-                    </div>
-                    <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
-                      DPDP Consent & Audit
-                    </h3>
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                      Patient consent withdrawal, purpose-bound access logs, and statutory audit trails.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                      Statutory Privacy
-                    </span>
-                  </div>
-                </Link>
-              </>
-            )}
-
+            {/* Card 6: AYUSH Health Profile */}
+            <Link 
+              href="/his/ayush"
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            >
+              <div>
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                  <Leaf className="w-6 h-6 stroke-[1.75]" />
+                </div>
+                <h3 className="font-bold text-base text-[#0f2942] group-hover:text-[#0f4c81] transition-colors mb-1.5">
+                  AYUSH Health Profile
+                </h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Self-service Prakriti constitution profiler, Tridosha balance & holistic dietary guide.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <div className="w-8 h-8 rounded-full border border-gray-300 group-hover:border-[#0f4c81] flex items-center justify-center text-gray-400 group-hover:text-[#0f4c81] transition-all">
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  Prakriti Check
+                </span>
+              </div>
+            </Link>
           </div>
         </div>
 
@@ -700,99 +377,50 @@ export default function Home() {
         </div>
 
         {/* ============================================================== */}
-        {/* ACTIVE CLINICAL & GOVERNANCE MODULES GRID                      */}
+        {/* ============================================================== */}
+        {/* CITIZEN HEALTHCARE MODULES GRID                                */}
         {/* ============================================================== */}
         <div className="w-full mb-12">
           <div className="flex items-center gap-4 mb-6">
             <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#0f4c81] bg-blue-50 px-3 py-1 rounded-full border border-blue-200 inline-block mb-1">
+                Citizen Healthcare Services
+              </span>
               <h3 className="text-xl font-bold text-[#0f2942]">
-                {activeRole === "patient"
-                  ? "Active Citizen Healthcare Modules"
-                  : activeRole === "staff"
-                  ? "Active Clinical & Hospital Operations Modules"
-                  : "Active Clinical & Governance Modules"}
+                Active Citizen Healthcare Modules
               </h3>
               <p className="text-xs text-gray-500">
-                {activeRole === "patient"
-                  ? "Self-service health checks, scheme eligibility & generic medicines"
-                  : activeRole === "staff"
-                  ? "Point-of-care clinical tools, triage desks, CDSS and statutory compliance"
-                  : "Every module is live, production-ready, and connected to national health ontologies"}
+                Self-service health checks, scheme eligibility & generic medicine savings
               </p>
             </div>
             <div className="h-[1px] flex-1 bg-gray-200"></div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { 
                 icon: "🌿", 
-                title: activeRole === "patient" ? "AYUSH Health Profiler" : "AYUSH Pariksha", 
-                desc: activeRole === "patient" 
-                  ? "Prakriti constitution assessment, Tridosha radar & personalized Ayurvedic dietary guidance"
-                  : "Prakriti assessment, Nadi, Jihva, and Dashavidha cross-system diagnosis", 
+                title: "AYUSH Health Profiler", 
+                desc: "Prakriti constitution assessment, Tridosha radar & personalized Ayurvedic dietary guidance", 
                 href: "/his/ayush",
-                badge: activeRole === "patient" ? "Prakriti Check" : "Ayurveda + Allopathy",
-                color: "border-emerald-200 hover:border-emerald-500",
-                role: "both"
-              },
-              { 
-                icon: "🎙️", 
-                title: "Patient Registration Desk", 
-                desc: "Smart Parchi generation with vernacular voice intake and ABHA creation", 
-                href: "/his/registration",
-                badge: "Voice Enabled",
-                color: "border-purple-200 hover:border-purple-500",
-                role: "staff"
+                badge: "Prakriti Check",
+                color: "border-emerald-200 hover:border-emerald-500"
               },
               { 
                 icon: "📱", 
-                title: activeRole === "patient" ? "Live OPD Token Tracker" : "OPD Queue & Audio Callout", 
-                desc: activeRole === "patient"
-                  ? "Real-time token display, SMS queue pass and multi-lingual voice announcements"
-                  : "Live token tracking, SMS dispatch, and multi-lingual voice announcements", 
+                title: "Live OPD Token Tracker", 
+                desc: "Real-time token display, SMS queue pass and multi-lingual voice announcements", 
                 href: "/his/queue",
-                badge: activeRole === "patient" ? "My OPD Pass" : "Real-Time Calling",
-                color: "border-amber-200 hover:border-amber-500",
-                role: "both"
-              },
-              { 
-                icon: "🧠", 
-                title: "Clinical Decision Support", 
-                desc: "Evidence-grounded medical decision engine querying PubMed, WHO, and ICMR Workflows", 
-                href: "/his/rag",
-                badge: "Clinical Guidelines",
-                color: "border-indigo-200 hover:border-indigo-500",
-                role: "staff"
-              },
-              { 
-                icon: "🔒", 
-                title: "DPDP 2023 Consent Manager", 
-                desc: "Patient consent withdrawal, purpose-bound access logs, and statutory audit trails", 
-                href: "/his/dpdp",
-                badge: "Statutory Compliance",
-                color: "border-rose-200 hover:border-rose-500",
-                role: "staff"
-              },
-              { 
-                icon: "🩺", 
-                title: "Physician OPD Consultation", 
-                desc: "Clinical consultation, drug-drug interaction guard, and e-Prescriptions", 
-                href: "/his/doctor",
-                badge: "CDSS Active",
-                color: "border-sky-200 hover:border-sky-500",
-                role: "staff"
+                badge: "My OPD Pass",
+                color: "border-amber-200 hover:border-amber-500"
               },
               { 
                 icon: "📄", 
-                title: activeRole === "patient" ? "Jan Aushadhi Generic Savings" : "Clinical Prescription OCR", 
-                desc: activeRole === "patient"
-                  ? "Extract handwritten drugs from prescriptions and discover 85% cheaper Jan Aushadhi generic salts"
-                  : "Live camera photo capture & handwriting digitization with optical entity parsing", 
+                title: "Jan Aushadhi Generic Savings", 
+                desc: "Extract handwritten drugs from prescriptions and discover 85% cheaper Jan Aushadhi generic salts", 
                 href: "/his/ocr",
-                badge: activeRole === "patient" ? "85% Savings" : "Optical Vision",
-                color: "border-blue-200 hover:border-blue-500",
-                role: "both"
+                badge: "85% Savings",
+                color: "border-blue-200 hover:border-blue-500"
               },
               { 
                 icon: "🛡️", 
@@ -800,17 +428,7 @@ export default function Home() {
                 desc: "Real-time PM-JAY & State Scheme Checker across all 36 States/UTs with claim guidance", 
                 href: "/his/schemes",
                 badge: "36 States Active",
-                color: "border-orange-200 hover:border-orange-500",
-                role: "both"
-              },
-              { 
-                icon: "💊", 
-                title: "WHO AWaRe Antimicrobial Audit", 
-                desc: "Real-time prescription audit categorizing into Access/Watch/Reserve, curbing AMR overuse with ICMR alternatives", 
-                href: "/his/antimicrobial",
-                badge: "WHO Stewardship",
-                color: "border-red-200 hover:border-red-500",
-                role: "staff"
+                color: "border-orange-200 hover:border-orange-500"
               },
               { 
                 icon: "🧠", 
@@ -818,17 +436,17 @@ export default function Home() {
                 desc: "De-stigmatized somatic distress screener, calming pranayama guide & confidential 24x7 helpline linkage", 
                 href: "/his/tele-manas",
                 badge: "24x7 Helpline",
-                color: "border-teal-200 hover:border-teal-500",
-                role: "both"
+                color: "border-teal-200 hover:border-teal-500"
               },
-            ]
-            .filter((feature) => {
-              if (activeRole === "all") return isStaffAuthenticated ? true : (feature.role === "both" || feature.role === "patient");
-              if (activeRole === "patient") return feature.role === "both" || feature.role === "patient";
-              if (activeRole === "staff") return isStaffAuthenticated ? (feature.role === "both" || feature.role === "staff") : (feature.role === "both" || feature.role === "patient");
-              return true;
-            })
-            .map((feature, idx) => (
+              { 
+                icon: "🪪", 
+                title: "Smart Case-Taking & ABHA", 
+                desc: "Vernacular symptom assessment interview, voice assistant and digital ABHA ID generation", 
+                href: "/patient",
+                badge: "Instant ABHA",
+                color: "border-indigo-200 hover:border-indigo-500"
+              },
+            ].map((feature, idx) => (
               <Link 
                 key={idx} 
                 href={feature.href}
@@ -850,7 +468,7 @@ export default function Home() {
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#0f4c81]">
-                  <span>Open Module</span>
+                  <span>Open Service</span>
                   <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                 </div>
               </Link>
@@ -1137,7 +755,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <p className="font-semibold text-gray-200 flex items-center gap-2">
-              <span>🇮🇳</span>
+              <img src="/logo.png" alt="Samanvaya Logo" className="w-5 h-5 object-contain" />
               <span>समन्वय • Project Samanvaya</span>
             </p>
             <p className="text-gray-400 text-[11px] mt-1.5 leading-relaxed">
