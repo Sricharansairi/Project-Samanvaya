@@ -522,11 +522,22 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
         }
 
         // Autonomous Portal Navigation
-        if (data.route && data.route !== pathname) {
-          setLastActionExecuted(`Autonomous Navigation -> ${data.route}`);
-          setTimeout(() => {
-            router.push(data.route);
-          }, 600);
+        if (data.route) {
+          const target = data.route.trim();
+          const current = (pathname || "").trim();
+          if (target && target !== current) {
+            setLastActionExecuted(`Navigating to ${target}...`);
+            try {
+              router.push(target);
+            } catch (err) {
+              window.location.href = target;
+            }
+            setTimeout(() => {
+              if (typeof window !== "undefined" && window.location.pathname !== target) {
+                window.location.href = target;
+              }
+            }, 350);
+          }
         }
 
         // Interactive Chips
@@ -595,9 +606,22 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       fallbackRoute = "/his/schemes";
     }
 
-    if (fallbackRoute && fallbackRoute !== pathname) {
-      router.push(fallbackRoute);
-      setLastActionExecuted(`Navigated to ${fallbackRoute}`);
+    if (fallbackRoute) {
+      const target = fallbackRoute.trim();
+      const current = (pathname || "").trim();
+      if (target && target !== current) {
+        setLastActionExecuted(`Navigating to ${target}...`);
+        try {
+          router.push(target);
+        } catch (e) {
+          window.location.href = target;
+        }
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location.pathname !== target) {
+            window.location.href = target;
+          }
+        }, 350);
+      }
     }
 
     const fallbackChips = ["📄 Scan Prescriptions", "🩺 Doctor Desk", "🏥 Registration", "🌿 AYUSH"];
