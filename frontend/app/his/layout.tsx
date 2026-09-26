@@ -2,13 +2,23 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Lock, ShieldAlert, ArrowLeft, Stethoscope, UserCheck, Sparkles, Building2 } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Lock, ArrowLeft, Stethoscope, UserCheck, ShieldCheck } from "lucide-react";
 import HISAuthModal from "@/components/HISAuthModal";
 
+// Strictly restricted clinical/administrative routes requiring Doctor/Staff auth
+const RESTRICTED_CLINICAL_ROUTES = [
+  "/his/doctor",
+  "/his/registration",
+  "/his/rag",
+  "/his/antimicrobial",
+  "/his/dpdp",
+];
+
 export default function HISLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [staffInfo, setStaffInfo] = useState<{ role: string; name: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   const checkAuth = () => {
@@ -16,9 +26,8 @@ export default function HISLayout({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem("samanvaya_staff_auth");
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.isAuthenticated) {
+        if (parsed?.isAuthenticated) {
           setIsAuthenticated(true);
-          setStaffInfo({ role: parsed.role, name: parsed.name });
           return;
         }
       }
@@ -26,7 +35,6 @@ export default function HISLayout({ children }: { children: React.ReactNode }) {
       // ignore parsing error
     }
     setIsAuthenticated(false);
-    setStaffInfo(null);
   };
 
   useEffect(() => {
@@ -50,8 +58,15 @@ export default function HISLayout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-[#f8fafc]" />;
   }
 
-  // If authenticated as Doctor or Staff, render the protected HIS children
-  if (isAuthenticated) {
+  // Check if current route is a clinical restricted route
+  const isRestricted =
+    pathname === "/his" ||
+    pathname === "/his/" ||
+    RESTRICTED_CLINICAL_ROUTES.some((route) => pathname?.startsWith(route));
+
+  // If the route is a public citizen service (e.g. /his/schemes, /his/ocr, /his/tele-manas, /his/ayush, /his/queue),
+  // OR the user is already authenticated as staff, render children directly!
+  if (!isRestricted || isAuthenticated) {
     return (
       <>
         {children}
@@ -64,73 +79,80 @@ export default function HISLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If unauthenticated (Patient or anonymous visitor), show restricted gate
+  // If unauthenticated patient/visitor on a restricted doctor/staff desk, show clean white/light gate matching the rest of the UI
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col relative overflow-hidden font-sans">
       {/* Subtle Healthcare Atmospheric Backdrop */}
       <div 
         className="fixed inset-0 bg-cover bg-center opacity-10 pointer-events-none"
         style={{ backgroundImage: "url('/healthcare-bg.jpg')" }}
       />
       
-      {/* Top Banner */}
-      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur px-6 py-4 flex items-center justify-between z-10">
+      {/* Official Government Top Header */}
+      <header className="border-b border-gray-200 bg-white/90 backdrop-blur px-6 py-3.5 flex items-center justify-between z-10 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold">
-            🏥
+          <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center shadow-xs shrink-0">
+            <img 
+              src="/logo.png" 
+              alt="Project Samanvaya Logo" 
+              className="w-full h-full object-contain" 
+            />
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-slate-100 flex items-center gap-2">
-              National Health Authority &bull; MoHFW
-              <span className="text-[10px] uppercase font-semibold bg-emerald-950 border border-emerald-800/80 text-emerald-300 px-2 py-0.5 rounded">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-[#f37021] uppercase tracking-wide">MoHFW &bull; AYUSH</span>
+              <span className="text-gray-300">|</span>
+              <span className="text-[10px] uppercase font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded-full">
                 ABDM Compliant
               </span>
+            </div>
+            <h1 className="text-sm font-bold text-[#0f2942] tracking-tight">
+              Hospital Information System (HIS) &bull; Clinical Gateway
             </h1>
-            <p className="text-xs text-slate-400">Hospital Information System (HIS) Secure Enclave</p>
           </div>
         </div>
 
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/70 hover:bg-slate-800 px-3.5 py-2 rounded-lg border border-slate-700 transition"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-[#0f4c81] hover:text-[#0b3860] bg-blue-50/70 hover:bg-blue-100/70 px-3.5 py-2 rounded-xl border border-blue-200 transition shadow-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Return to Citizen Portal
         </Link>
       </header>
 
-      {/* Main Centered Gate */}
+      {/* Main Centered White Gate Card */}
       <main className="flex-1 flex items-center justify-center p-6 z-10">
-        <div className="max-w-xl w-full bg-slate-950/90 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-md text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mb-5">
+        <div className="max-w-xl w-full bg-white border border-slate-200/90 rounded-3xl p-8 sm:p-10 shadow-xl text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 mb-5 shadow-xs">
             <Lock className="w-8 h-8" />
           </div>
 
-          <div className="inline-block mb-3 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-800 text-amber-300 text-xs font-semibold uppercase tracking-wider">
+          <div className="inline-block mb-3 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold uppercase tracking-wider">
             Clinical Authorization Required
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-3">
+          <h2 className="text-2xl font-extrabold text-[#0f2942] mb-3 tracking-tight">
             Hospital & Staff (HIS) Enclave
           </h2>
 
-          <p className="text-sm text-slate-300 mb-6 leading-relaxed">
-            In accordance with <strong className="text-white">ABDM Security Guidelines</strong> and the{" "}
-            <strong className="text-white">DPDP Act 2023</strong>, access to clinical dashboards, prescription writing, 
+          <p className="text-xs sm:text-sm text-gray-600 mb-6 leading-relaxed">
+            In accordance with <strong className="text-[#0f2942]">ABDM Security Guidelines</strong> and the{" "}
+            <strong className="text-[#0f2942]">DPDP Act 2023</strong>, access to clinical dashboards, prescription writing, 
             and hospital operations is strictly restricted to authenticated hospital personnel and doctors.
           </p>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 mb-6 text-left space-y-2">
-            <div className="flex items-start gap-2.5 text-xs text-slate-300">
-              <UserCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-7 text-left space-y-2.5">
+            <div className="flex items-start gap-2.5 text-xs text-slate-700">
+              <UserCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <span>
-                <strong className="text-slate-100">Patients & Citizens:</strong> Please access services via the Patient Kiosk, ABHA generation, PM-JAY schemes, and Jan Aushadhi generic search.
+                <strong className="text-[#0f2942]">Patients & Citizens:</strong> Please access public services via the Citizen Portal (ABHA Card, PM-JAY Schemes, Jan Aushadhi generic savings, and OPD Token Pass).
               </span>
             </div>
-            <div className="flex items-start gap-2.5 text-xs text-slate-300">
-              <Stethoscope className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 text-xs text-slate-700">
+              <Stethoscope className="w-4 h-4 text-[#0f4c81] shrink-0 mt-0.5" />
               <span>
-                <strong className="text-slate-100">Doctors & Hospital Staff:</strong> Sign in with your NUID or Staff ID to access triage, OPD queues, and AI diagnostics.
+                <strong className="text-[#0f2942]">Doctors & Hospital Staff:</strong> Sign in with your NUID or Staff ID to access triage, OPD queues, and AI diagnostics.
               </span>
             </div>
           </div>
@@ -138,7 +160,7 @@ export default function HISLayout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => setShowModal(true)}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-900/30 transition transform active:scale-95"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#0f4c81] hover:bg-[#0b3860] text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-900/20 transition transform active:scale-95 cursor-pointer"
             >
               <Stethoscope className="w-4 h-4" />
               Sign In as Doctor / Staff
@@ -146,7 +168,7 @@ export default function HISLayout({ children }: { children: React.ReactNode }) {
 
             <Link
               href="/"
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-sm transition"
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white hover:bg-slate-50 border border-gray-300 text-gray-700 font-bold text-xs sm:text-sm transition shadow-2xs cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               Go to Patient Portal
@@ -155,8 +177,8 @@ export default function HISLayout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
-      {/* Footer Notice */}
-      <footer className="border-t border-slate-800/80 bg-slate-950/60 px-6 py-3 text-center text-xs text-slate-500 z-10">
+      {/* Official Footer Notice */}
+      <footer className="border-t border-gray-200 bg-white/80 backdrop-blur px-6 py-3.5 text-center text-xs text-gray-500 z-10">
         Project Samanvaya &bull; National Health Stack (ABDM / NHA) &bull; DPDP 2023 Compliant Zero-Knowledge Clinical Gateway
       </footer>
 

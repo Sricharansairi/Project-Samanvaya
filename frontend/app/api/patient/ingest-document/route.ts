@@ -427,39 +427,39 @@ OUTPUT JSON SCHEMA:
     // Try Groq 120B if Gemini didn't parse already
     if (!parsedStructured) {
       for (const apiKey of GROQ_KEYS) {
-      try {
-        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-120b",
-            messages: [
-              { role: "system", content: "You are an ABDM Clinical Data Extraction Engine. Output strict JSON only." },
-              { role: "user", content: extractionPrompt }
-            ],
-            temperature: 0.1,
-            response_format: { type: "json_object" }
-          }),
-          signal: AbortSignal.timeout(12000)
-        });
+        try {
+          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: "openai/gpt-oss-120b",
+              messages: [
+                { role: "system", content: "You are an ABDM Clinical Data Extraction Engine. Output strict JSON only." },
+                { role: "user", content: extractionPrompt }
+              ],
+              temperature: 0.1,
+              response_format: { type: "json_object" }
+            }),
+            signal: AbortSignal.timeout(12000)
+          });
 
-        if (groqRes.ok) {
-          const data = await groqRes.json();
-          const text = data.choices?.[0]?.message?.content;
-          if (text) {
-            parsedStructured = JSON.parse(text);
-            console.log("[Ingestion Groq 120B] Successfully structured clinical record.");
-            break;
+          if (groqRes.ok) {
+            const data = await groqRes.json();
+            const text = data.choices?.[0]?.message?.content;
+            if (text) {
+              parsedStructured = JSON.parse(text);
+              console.log("[Ingestion Groq 120B] Successfully structured clinical record.");
+              break;
+            }
           }
+        } catch (err: any) {
+          console.warn("Groq 120B ingestion attempt failed:", err.message);
         }
-      } catch (err: any) {
-        console.warn("Groq 120B ingestion attempt failed:", err.message);
       }
     }
-  }
 
     // Try NVIDIA 70B Fallback
     if (!parsedStructured && visionKeys.length > 0) {

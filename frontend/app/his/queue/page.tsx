@@ -32,6 +32,7 @@ export default function QueueTrackerPage() {
   const [showAddWalkIn, setShowAddWalkIn] = useState(false);
   const [newPatientName, setNewPatientName] = useState("");
   const [newPatientDept, setNewPatientDept] = useState("General Medicine");
+  const [isStaffAuthenticated, setIsStaffAuthenticated] = useState(false);
 
   // Dynamic queue loading from backend and browser local storage
   const loadQueue = async () => {
@@ -78,7 +79,36 @@ export default function QueueTrackerPage() {
   useEffect(() => {
     loadQueue();
     const interval = setInterval(loadQueue, 15000);
-    return () => clearInterval(interval);
+
+    try {
+      const stored = localStorage.getItem("samanvaya_staff_auth");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.isAuthenticated) {
+          setIsStaffAuthenticated(true);
+        }
+      }
+    } catch {}
+
+    const handleAuth = () => {
+      try {
+        const stored = localStorage.getItem("samanvaya_staff_auth");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setIsStaffAuthenticated(!!parsed?.isAuthenticated);
+        } else {
+          setIsStaffAuthenticated(false);
+        }
+      } catch {
+        setIsStaffAuthenticated(false);
+      }
+    };
+
+    window.addEventListener("samanvaya:staff-auth-changed", handleAuth);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("samanvaya:staff-auth-changed", handleAuth);
+    };
   }, []);
 
   const issueLiveToken = (name?: string, dept?: string) => {
@@ -348,13 +378,20 @@ export default function QueueTrackerPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowAddWalkIn(!showAddWalkIn)}
-              className="bg-[#0f4c81] hover:bg-blue-900 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
-            >
-              + Issue Walk-in Token
-            </button>
+            {isStaffAuthenticated ? (
+              <button
+                type="button"
+                onClick={() => setShowAddWalkIn(!showAddWalkIn)}
+                className="bg-[#0f4c81] hover:bg-blue-900 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                + Issue Walk-in Token
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-[#0f4c81] text-[11px] font-bold px-2.5 py-1 rounded-lg">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Citizen View &bull; Live Status</span>
+              </div>
+            )}
             <div className="text-xs text-gray-500 font-medium">
               Waiting in Queue: <span className="font-bold text-gray-900">{waitingTokens.length} patients</span>
             </div>
@@ -487,29 +524,39 @@ export default function QueueTrackerPage() {
                       </td>
 
                       <td className="p-4 text-right">
-                        {t.status === "WAITING" && (
-                          <button
-                            type="button"
-                            onClick={() => handleCallNext(t)}
-                            className="bg-[#0f4c81] hover:bg-blue-900 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
-                          >
-                            Call Token
-                          </button>
-                        )}
-                        {t.status === "CALLED" && (
-                          <button
-                            type="button"
-                            onClick={() => handleMarkComplete(t.tokenNumber)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
-                          >
-                            Done
-                          </button>
-                        )}
-                        {t.status === "IN_CONSULT" && (
-                          <span className="text-purple-700 font-bold text-xs">With Doctor</span>
-                        )}
-                        {t.status === "COMPLETED" && (
-                          <span className="text-emerald-700 font-bold text-xs">Closed</span>
+                        {isStaffAuthenticated ? (
+                          <>
+                            {t.status === "WAITING" && (
+                              <button
+                                type="button"
+                                onClick={() => handleCallNext(t)}
+                                className="bg-[#0f4c81] hover:bg-blue-900 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
+                              >
+                                Call Token
+                              </button>
+                            )}
+                            {t.status === "CALLED" && (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkComplete(t.tokenNumber)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition-colors cursor-pointer"
+                              >
+                                Done
+                              </button>
+                            )}
+                            {t.status === "IN_CONSULT" && (
+                              <span className="text-purple-700 font-bold text-xs">With Doctor</span>
+                            )}
+                            {t.status === "COMPLETED" && (
+                              <span className="text-emerald-700 font-bold text-xs">Closed</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className={`text-[11px] font-semibold ${
+                            t.status === "CALLED" ? "text-amber-700 font-bold animate-pulse" : "text-gray-500"
+                          }`}>
+                            {t.status === "WAITING" ? "Waiting in Queue" : t.status === "CALLED" ? "Now Consulting" : t.status}
+                          </span>
                         )}
                       </td>
                     </tr>

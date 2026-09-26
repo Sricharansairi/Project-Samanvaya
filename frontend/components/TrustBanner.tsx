@@ -239,9 +239,13 @@ export default function TrustBanner({ currentTab, onTabChange, onLanguageChange 
     { title: "DPDP 2023 Consent Manager & Audit", path: "/his/dpdp", role: "staff", icon: "🔒", desc: "Statutory purpose binding & SHA-256 logs" },
   ];
 
+  const availableFeatures = staffUser 
+    ? SEARCH_FEATURES 
+    : SEARCH_FEATURES.filter(f => f.role === "patient");
+
   const filteredFeatures = searchQuery.trim() 
-    ? SEARCH_FEATURES.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()) || f.desc.toLowerCase().includes(searchQuery.toLowerCase()))
-    : SEARCH_FEATURES;
+    ? availableFeatures.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()) || f.desc.toLowerCase().includes(searchQuery.toLowerCase()))
+    : availableFeatures;
 
   return (
     <header className="w-full flex flex-col bg-white border-b border-gray-200 shadow-xs sticky top-0 z-50">
