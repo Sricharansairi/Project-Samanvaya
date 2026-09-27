@@ -114,6 +114,11 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     "Namaste! I am your Samanvaya Autonomous Clinical Co-Pilot. I can answer medical queries, navigate to any hospital desk, and auto-fill patient details."
   );
 
+  // Pending form fill & universal action queues — stores payload when navigating to a new page
+  const pendingFillRef = useRef<any>(null);
+  const pendingActionsRef = useRef<Array<{ type: string; target: string; value?: string }> | null>(null);
+  const pendingFillRetryRef = useRef<NodeJS.Timeout | null>(null);
+
   // Multi-turn conversation messages state
   const [chatMessages, setChatMessages] = useState<AssistantChatMessage[]>([
     {
@@ -146,6 +151,235 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   const silenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const speechDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastTranscriptRef = useRef<string>("");
+
+  // -------------------------------------------------------------
+  // DEEP SEMANTIC DOM INTROSPECTION ENGINE
+  // Builds a structured element map for Universal Action Protocol
+  // -------------------------------------------------------------
+  const scanPageContext = (): string => {
+    if (typeof document === "undefined") return "Page context unavailable.";
+
+    const lines: string[] = [];
+
+    // 1. Headings — understand what section is visible
+    const headings = document.querySelectorAll("main h1, main h2, main h3, [role='main'] h1, [role='main'] h2, h1, h2, h3");
+    const headingTexts: string[] = [];
+    headings.forEach(h => {
+      const txt = (h as HTMLElement).innerText?.trim();
+      if (txt && txt.length < 120 && !(h as HTMLElement).closest(".fixed")) headingTexts.push(txt);
+    });
+    if (headingTexts.length > 0) {
+      lines.push(`Page Sections: ${headingTexts.slice(0, 6).join(" > ")}`);
+    }
+
+    // 2. DEEP Form Element Index — structured semantic map for Universal Actions
+    const inputs = document.querySelectorAll(
+      "input:not([type='hidden']):not([type='submit']):not([type='button']), textarea, select"
+    );
+    const fieldEntries: string[] = [];
+    let fieldIndex = 0;
+    inputs.forEach(el => {
+      const input = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+      // Skip the assistant's own input field
+      if (input.closest(".fixed") || input.closest("[data-assistant-ui]")) return;
+      // Skip invisible elements
+      if (input.offsetParent === null && input.getAttribute("type") !== "hidden") return;
+
+      fieldIndex++;
+      const id = input.id || input.name || "";
+      const type = input.tagName === "SELECT" ? "select" : (input as HTMLInputElement).type || "text";
+      const placeholder = input.getAttribute("placeholder") || "";
+      const ariaLabel = input.getAttribute("aria-label") || "";
+      
+      // Walk up to find the label
+      const parentLabel = input.closest("label")?.innerText?.trim() || "";
+      const associatedLabel = id ? document.querySelector(`label[for="${id}"]`)?.textContent?.trim() || "" : "";
+      // Find sibling label text (common pattern)
+      const prevSibling = input.previousElementSibling;
+      const siblingLabel = prevSibling?.tagName === "LABEL" || prevSibling?.tagName === "SPAN" || prevSibling?.tagName === "P"
+        ? (prevSibling as HTMLElement).innerText?.trim() || "" : "";
+      
+      const bestLabel = (parentLabel || associatedLabel || siblingLabel || ariaLabel || placeholder || id || `field_${fieldIndex}`)
+        .replace(/\n/g, " ").slice(0, 60);
+      
+      const val = input.value?.trim() || "";
+      const status = val ? "FILLED" : "EMPTY";
+      
+      // Build target selector for the Universal Actuator
+      const targetSelector = id ? `#${id}` : input.name ? `[name="${input.name}"]` : `field_${fieldIndex}`;
+      
+      // For selects, show available options
+      let optionsStr = "";
+      if (input.tagName === "SELECT") {
+        const opts = Array.from((input as HTMLSelectElement).options).map(o => o.text.trim()).filter(t => t.length > 0 && t.length < 50);
+        optionsStr = ` options=[${opts.slice(0, 8).join("|")}]`;
+      }
+      
+      // For range/number, show min/max
+      let rangeStr = "";
+      if (type === "range" || type === "number") {
+        const min = input.getAttribute("min") || "";
+        const max = input.getAttribute("max") || "";
+        if (min || max) rangeStr = ` range=[${min}-${max}]`;
+      }
+
+      fieldEntries.push(`  F${fieldIndex}[${status}] target="${targetSelector}" type=${type} label="${bestLabel}" value="${val.slice(0, 40)}"${rangeStr}${optionsStr}`);
+    });
+    if (fieldEntries.length > 0) {
+      const emptyCount = fieldEntries.filter(f => f.includes("[EMPTY]")).length;
+      const filledCount = fieldEntries.filter(f => f.includes("[FILLED]")).length;
+      lines.push(`Interactive Fields (${emptyCount} empty, ${filledCount} filled):`);
+      fieldEntries.slice(0, 15).forEach(f => lines.push(f));
+    }
+
+    // 3. Buttons & Actionable Elements — know available actions with targets
+    const buttons = document.querySelectorAll("button, [role='button'], a[href]");
+    const btnEntries: string[] = [];
+    buttons.forEach((btn, idx) => {
+      const el = btn as HTMLElement;
+      if (el.closest(".fixed") || el.closest("[data-assistant-ui]")) return;
+      if (el.offsetParent === null) return;
+      const txt = el.innerText?.trim().replace(/\n/g, " ");
+      if (txt && txt.length > 1 && txt.length < 60) {
+        const isActive = el.classList.contains("bg-[#0f4c81]") || el.getAttribute("aria-selected") === "true" || el.getAttribute("data-active") === "true";
+        const activeTag = isActive ? " [ACTIVE]" : "";
+        btnEntries.push(`  B${idx}: "${txt}"${activeTag}`);
+      }
+    });
+    if (btnEntries.length > 0) {
+      lines.push(`Clickable Actions (${btnEntries.length}):`);
+      [...new Map(btnEntries.map(b => [b.split('"')[1], b])).values()].slice(0, 10).forEach(b => lines.push(b));
+    }
+
+    // 4. Active Tabs / Toggles — understand current UI state
+    const activeTabs = document.querySelectorAll("[aria-selected='true'], .bg-\\[\\#0f4c81\\], [data-state='active']");
+    const tabTexts: string[] = [];
+    activeTabs.forEach(t => {
+      const txt = (t as HTMLElement).innerText?.trim();
+      if (txt && txt.length < 50) tabTexts.push(txt);
+    });
+    if (tabTexts.length > 0) {
+      lines.push(`Active Tab/Selection: ${tabTexts.slice(0, 3).join(", ")}`);
+    }
+
+    // 5. Visible data cards / tables
+    const tables = document.querySelectorAll("table");
+    if (tables.length > 0) {
+      lines.push(`Data Tables: ${tables.length} table(s) visible.`);
+    }
+
+    // 6. Result summaries — visible large numbers/badges
+    const badges = document.querySelectorAll("[class*='font-extrabold'], [class*='text-4xl'], [class*='text-3xl']");
+    const summaryTexts: string[] = [];
+    badges.forEach(b => {
+      const el = b as HTMLElement;
+      if (el.closest(".fixed")) return;
+      const txt = el.innerText?.trim();
+      if (txt && txt.length > 1 && txt.length < 80 && /[₹\d]/.test(txt)) {
+        summaryTexts.push(txt);
+      }
+    });
+    if (summaryTexts.length > 0) {
+      lines.push(`Visible Results: ${summaryTexts.slice(0, 3).join(" | ")}`);
+    }
+
+    // 7. Visible alerts/status indicators
+    const alerts = document.querySelectorAll("[role='alert'], .animate-pulse");
+    if (alerts.length > 0) {
+      const alertTexts: string[] = [];
+      alerts.forEach(a => {
+        const el = a as HTMLElement;
+        if (el.closest(".fixed")) return;
+        const txt = el.innerText?.trim();
+        if (txt && txt.length < 100) alertTexts.push(txt);
+      });
+      if (alertTexts.length > 0) {
+        lines.push(`Active Alerts: ${alertTexts.slice(0, 3).join("; ")}`);
+      }
+    }
+
+    return lines.length > 0 ? lines.join("\n") : "No interactive elements detected on page.";
+  };
+
+  // -------------------------------------------------------------
+  // PAGE-READY LISTENER — Retries pending fill after navigation
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const handlePageReady = (e: any) => {
+      const readyPath = e.detail?.path;
+      if ((pendingActionsRef.current || pendingFillRef.current) && readyPath) {
+        // Small delay to let React components and DOM settle
+        setTimeout(() => {
+          // 1. Execute Universal Actions if queued
+          if (pendingActionsRef.current && pendingActionsRef.current.length > 0) {
+            const results = executeUniversalActions(pendingActionsRef.current);
+            if (results.length > 0) {
+              setLastActionExecuted(results.join(" • "));
+            }
+            pendingActionsRef.current = null;
+          }
+
+          // 2. Execute Form Auto-Fill if queued
+          const fill = pendingFillRef.current;
+          if (fill) {
+            dispatchInAppAction("fill_form", fill);
+
+            setTimeout(() => {
+              if (fill.name) autoFillDOMInput('input[placeholder*="Patient" i], input[placeholder*="Name" i], input[name="name"], input[id*="name" i]', fill.name);
+              if (fill.age) autoFillDOMInput('input[placeholder*="Age" i], input[name="age"], input[id*="age" i]', fill.age);
+              if (fill.income) autoFillDOMInput('input[id*="income" i], input[name*="income" i], input[type="range"]', fill.income);
+              if (fill.rationCard) autoFillDOMInput('select[id*="ration" i], select[name*="ration" i]', fill.rationCard);
+              if (fill.gender) autoFillDOMInput('select[id*="gender" i], select[name*="gender" i]', fill.gender);
+              if (fill.phone) autoFillDOMInput('input[placeholder*="Mobile" i], input[placeholder*="Phone" i], input[name="phone"], input[type="tel"]', fill.phone);
+              if (fill.bp) autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i], input[name*="bp" i]', fill.bp);
+              if (fill.temp) autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i], input[name*="temp" i]', fill.temp);
+              if (fill.concern) autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i], input[placeholder*="complaint" i]', fill.concern);
+              
+              const filledItems = Object.entries(fill).filter(([k, v]) => v && k !== "severity").map(([k, v]) => `${k}: ${v}`);
+              if (filledItems.length > 0) {
+                setLastActionExecuted(`Auto-filled: ${filledItems.join(", ")}`);
+              }
+            }, 300);
+
+            pendingFillRef.current = null;
+          }
+        }, 250);
+      }
+    };
+
+    window.addEventListener("samanvaya:page-ready", handlePageReady);
+    return () => window.removeEventListener("samanvaya:page-ready", handlePageReady);
+  }, []);
+
+  // -------------------------------------------------------------
+  // PROACTIVE SMART HYBRID GREETING — First visit auto-open
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasVisited = localStorage.getItem("samanvaya_has_visited");
+    if (!hasVisited && pathname === "/") {
+      // First visit: Auto-open assistant after 1.5 seconds
+      const timer = setTimeout(() => {
+        setIsOpen(true);
+        localStorage.setItem("samanvaya_has_visited", "true");
+        const persona = VOICE_PERSONAS.find(p => p.id === selectedPersona) || VOICE_PERSONAS[0];
+        const greeting = persona.nativeGreeting;
+        setChatMessages(prev => [
+          ...prev,
+          {
+            id: "proactive-" + Date.now(),
+            sender: "assistant",
+            text: greeting + " How may I help you today? You can tell me your name, symptoms, or ask about government health schemes.",
+            englishExplanation: "Proactive greeting for first-time visitor",
+            timestamp: Date.now(),
+            chips: ["Register as Patient", "Check PM-JAY Schemes", "Upload Prescription", "Consult Doctor"]
+          }
+        ]);
+        speakResponse(greeting);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname]);
 
   // MUTUAL EXCLUSION REF: Stops mic echo loops & double/triple speaking
   const isAssistantSpeakingRef = useRef<boolean>(false);
@@ -334,7 +568,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
   };
 
   // -------------------------------------------------------------
-  // AUTONOMOUS WEB FORM AUTO-FILLER
+  // AUTONOMOUS WEB FORM AUTO-FILLER (Legacy Compatibility)
   // -------------------------------------------------------------
   const autoFillDOMInput = (selector: string, value: string): boolean => {
     if (typeof document === "undefined") return false;
@@ -356,6 +590,159 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
       return true;
     }
     return false;
+  };
+
+  // -------------------------------------------------------------
+  // UNIVERSAL ACTION PROTOCOL EXECUTOR
+  // Handles dynamic LLM-generated actions: SET_VALUE, CLICK, SELECT, TOGGLE
+  // Zero hardcoded selectors — resolves targets semantically
+  // -------------------------------------------------------------
+  const findElementByTarget = (target: string): HTMLElement | null => {
+    if (typeof document === "undefined") return null;
+    
+    // 1. Direct CSS selector (starts with # or [ or .)
+    if (/^[#\[.]/.test(target)) {
+      try { return document.querySelector(target) as HTMLElement; } catch { /* invalid selector */ }
+    }
+    
+    // 2. By ID
+    const byId = document.getElementById(target);
+    if (byId) return byId;
+    
+    // 3. By name attribute
+    const byName = document.querySelector(`[name="${target}"]`) as HTMLElement;
+    if (byName) return byName;
+    
+    // 4. By placeholder (case-insensitive substring)
+    const byPlaceholder = document.querySelector(`input[placeholder*="${target}" i], textarea[placeholder*="${target}" i]`) as HTMLElement;
+    if (byPlaceholder) return byPlaceholder;
+    
+    // 5. By label text — fuzzy match across all labels
+    const labels = document.querySelectorAll("label");
+    for (const lbl of labels) {
+      const lblText = (lbl as HTMLElement).innerText?.toLowerCase().trim() || "";
+      if (lblText.includes(target.toLowerCase())) {
+        const forAttr = lbl.getAttribute("for");
+        if (forAttr) {
+          const linkedEl = document.getElementById(forAttr);
+          if (linkedEl) return linkedEl;
+        }
+        // Check for nested input
+        const nestedInput = lbl.querySelector("input, select, textarea") as HTMLElement;
+        if (nestedInput) return nestedInput;
+      }
+    }
+    
+    // 6. By aria-label
+    const byAria = document.querySelector(`[aria-label*="${target}" i]`) as HTMLElement;
+    if (byAria) return byAria;
+    
+    // 7. Fuzzy button text match
+    const buttons = document.querySelectorAll("button, [role='button'], a");
+    const targetLower = target.toLowerCase();
+    for (const btn of buttons) {
+      const btnText = (btn as HTMLElement).innerText?.toLowerCase().trim() || "";
+      if (btnText === targetLower || btnText.includes(targetLower)) {
+        return btn as HTMLElement;
+      }
+    }
+    
+    return null;
+  };
+
+  const executeUniversalActions = (actions: Array<{ type: string; target: string; value?: string }>): string[] => {
+    const results: string[] = [];
+    
+    for (const action of actions) {
+      const { type, target, value } = action;
+      
+      switch (type) {
+        case "SET_VALUE": {
+          // 1. Direct DOM actuator with native setter & events
+          const el = findElementByTarget(target);
+          if (el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) {
+            const proto = el instanceof HTMLSelectElement ? window.HTMLSelectElement.prototype
+              : el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype
+              : window.HTMLInputElement.prototype;
+            const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+            if (setter) {
+              setter.call(el, value || "");
+            } else {
+              el.value = value || "";
+            }
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+            el.classList.add("ring-2", "ring-emerald-500", "bg-emerald-50/30");
+            setTimeout(() => el.classList.remove("ring-2", "ring-emerald-500", "bg-emerald-50/30"), 3000);
+            results.push(`✓ Set ${target} = "${value}"`);
+          }
+          // 2. Also always dispatch via event bus for controlled React components
+          dispatchInAppAction("fill_form", { [target]: value });
+          if (!el) {
+            results.push(`→ Dispatched ${target} = "${value}" via event bus`);
+          }
+          break;
+        }
+        
+        case "CLICK": {
+          const el = findElementByTarget(target);
+          if (el) {
+            el.click();
+            el.classList.add("ring-2", "ring-blue-500");
+            setTimeout(() => el.classList.remove("ring-2", "ring-blue-500"), 2000);
+            results.push(`✓ Clicked "${target}"`);
+          } else {
+            results.push(`✗ Could not find clickable "${target}"`);
+          }
+          break;
+        }
+        
+        case "SELECT": {
+          const el = findElementByTarget(target);
+          if (el && el instanceof HTMLSelectElement) {
+            // Find option by text or value
+            const option = Array.from(el.options).find(o => 
+              o.text.toLowerCase().includes((value || "").toLowerCase()) ||
+              o.value.toLowerCase() === (value || "").toLowerCase()
+            );
+            if (option) {
+              el.value = option.value;
+              el.dispatchEvent(new Event("change", { bubbles: true }));
+              el.classList.add("ring-2", "ring-emerald-500", "bg-emerald-50/30");
+              setTimeout(() => el.classList.remove("ring-2", "ring-emerald-500", "bg-emerald-50/30"), 3000);
+              results.push(`✓ Selected "${option.text}" in ${target}`);
+            } else {
+              results.push(`✗ Option "${value}" not found in ${target}`);
+            }
+          }
+          dispatchInAppAction("fill_form", { [target]: value });
+          if (!el) {
+            results.push(`→ Dispatched select ${target} = "${value}" via event bus`);
+          }
+          break;
+        }
+        
+        case "TOGGLE": {
+          const el = findElementByTarget(target);
+          if (el && el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
+            el.checked = !el.checked;
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+            results.push(`✓ Toggled ${target} → ${el.checked}`);
+          } else if (el) {
+            el.click();
+            results.push(`✓ Clicked toggle "${target}"`);
+          } else {
+            results.push(`✗ Toggle target "${target}" not found`);
+          }
+          break;
+        }
+        
+        default:
+          results.push(`✗ Unknown action type: ${type}`);
+      }
+    }
+    
+    return results;
   };
 
   const dispatchInAppAction = (action: string, payload?: any) => {
@@ -434,7 +821,10 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
     const bhashiniLang = persona.bhashiniCode || "hi";
 
     try {
-      // 2. PRIMARY: DYNAMIC NLP CHAT + AUTONOMOUS ROUTING + ENTITY EXTRACTION
+      // 2. DOM INTROSPECTION: Scan the live page to provide context to the LLM
+      const pageContext = scanPageContext();
+
+      // 3. PRIMARY: DYNAMIC NLP CHAT + AUTONOMOUS ROUTING + ENTITY EXTRACTION
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -442,6 +832,7 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
           message: rawCmd,
           currentPath: pathname,
           language: bhashiniLang,
+          pageContext,
           conversationHistory: chatMessages.slice(-6).map(m => ({
             role: m.sender === "user" ? "user" : "assistant",
             text: m.text
@@ -489,46 +880,105 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
           setClinicalNlpResult(clinResult);
         }
 
-        // Form Entity Extraction & DOM Auto-filling
-        if (data.formAutoFill) {
+        // Universal Action Protocol & Form Entity Extraction
+        const hasActions = Array.isArray(data.actions) && data.actions.length > 0;
+        const hasFill = Boolean(data.formAutoFill);
+
+        if (hasActions || hasFill) {
           const fill = data.formAutoFill;
-          const filledItems: string[] = [];
+          const target = data.route?.trim();
+          const current = (pathname || "").trim();
+          const needsNavigation = target && target !== current;
 
-          if (fill.name) {
-            autoFillDOMInput('input[placeholder*="Patient" i], input[placeholder*="Name" i], input[name="name"], input[id*="name" i]', fill.name);
-            filledItems.push(`Name: ${fill.name}`);
-          }
-          if (fill.age) {
-            autoFillDOMInput('input[placeholder*="Age" i], input[name="age"], input[id*="age" i]', fill.age);
-            filledItems.push(`Age: ${fill.age}`);
-          }
-          if (fill.phone) {
-            autoFillDOMInput('input[placeholder*="Mobile" i], input[placeholder*="Phone" i], input[name="phone"], input[type="tel"]', fill.phone);
-            filledItems.push(`Phone: ${fill.phone}`);
-          }
-          if (fill.bp) {
-            autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i], input[name*="bp" i]', fill.bp);
-            filledItems.push(`BP: ${fill.bp}`);
-          }
-          if (fill.temp) {
-            autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i], input[name*="temp" i]', fill.temp);
-            filledItems.push(`Temp: ${fill.temp}°F`);
-          }
-          if (fill.concern) {
-            autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i], input[placeholder*="complaint" i]', fill.concern);
-          }
+          if (needsNavigation) {
+            // Queue pending actions and form fill for post-navigation execution
+            if (hasActions) pendingActionsRef.current = data.actions;
+            if (hasFill) {
+              pendingFillRef.current = fill;
+              sessionStorage.setItem("samanvaya_pending_fill", JSON.stringify(fill));
+            }
+            setLastActionExecuted(`Navigating to ${target} and executing action...`);
 
-          // Persist for page navigation intake
-          sessionStorage.setItem("samanvaya_pending_fill", JSON.stringify(fill));
-          dispatchInAppAction("fill_form", fill);
+            try {
+              router.push(target!);
+            } catch (err) {
+              window.location.href = target!;
+            }
 
-          if (filledItems.length > 0) {
-            setLastActionExecuted(`Auto-filled: ${filledItems.join(", ")}`);
+            // Safety fallback: if page-ready doesn't fire within 2.5s, execute
+            if (pendingFillRetryRef.current) clearTimeout(pendingFillRetryRef.current);
+            pendingFillRetryRef.current = setTimeout(() => {
+              if (pendingActionsRef.current) {
+                executeUniversalActions(pendingActionsRef.current);
+                pendingActionsRef.current = null;
+              }
+              if (pendingFillRef.current) {
+                const f = pendingFillRef.current;
+                dispatchInAppAction("fill_form", f);
+                if (f.name) autoFillDOMInput('input[placeholder*="Patient" i], input[placeholder*="Name" i], input[name="name"], input[id*="name" i]', f.name);
+                if (f.age) autoFillDOMInput('input[placeholder*="Age" i], input[name="age"], input[id*="age" i]', f.age);
+                if (f.income) autoFillDOMInput('input[id*="income" i], input[name*="income" i], input[type="range"]', f.income);
+                if (f.rationCard) autoFillDOMInput('select[id*="ration" i], select[name*="ration" i]', f.rationCard);
+                if (f.gender) autoFillDOMInput('select[id*="gender" i], select[name*="gender" i]', f.gender);
+                if (f.phone) autoFillDOMInput('input[placeholder*="Mobile" i], input[placeholder*="Phone" i], input[name="phone"], input[type="tel"]', f.phone);
+                if (f.bp) autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i], input[name*="bp" i]', f.bp);
+                if (f.temp) autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i], input[name*="temp" i]', f.temp);
+                if (f.concern) autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i], input[placeholder*="complaint" i]', f.concern);
+                pendingFillRef.current = null;
+              }
+            }, 2500);
+          } else {
+            // Already on the target page — execute immediately
+            const results: string[] = [];
+            
+            // 1. Execute Universal Actions
+            if (hasActions) {
+              const actResults = executeUniversalActions(data.actions);
+              results.push(...actResults);
+            }
+
+            // 2. Execute Form Auto-Fill Adapter
+            if (hasFill && fill) {
+              dispatchInAppAction("fill_form", fill);
+
+              if (fill.name) {
+                autoFillDOMInput('input[placeholder*="Patient" i], input[placeholder*="Name" i], input[name="name"], input[id*="name" i]', fill.name);
+              }
+              if (fill.age) {
+                autoFillDOMInput('input[placeholder*="Age" i], input[name="age"], input[id*="age" i]', fill.age);
+              }
+              if (fill.income) {
+                autoFillDOMInput('input[id*="income" i], input[name*="income" i], input[type="range"]', fill.income);
+              }
+              if (fill.rationCard) {
+                autoFillDOMInput('select[id*="ration" i], select[name*="ration" i]', fill.rationCard);
+              }
+              if (fill.gender) {
+                autoFillDOMInput('select[id*="gender" i], select[name*="gender" i]', fill.gender);
+              }
+              if (fill.phone) {
+                autoFillDOMInput('input[placeholder*="Mobile" i], input[placeholder*="Phone" i], input[name="phone"], input[type="tel"]', fill.phone);
+              }
+              if (fill.bp) {
+                autoFillDOMInput('input[placeholder*="120/80" i], input[placeholder*="BP" i], input[name*="bp" i]', fill.bp);
+              }
+              if (fill.temp) {
+                autoFillDOMInput('input[placeholder*="98.6" i], input[placeholder*="Temp" i], input[name*="temp" i]', fill.temp);
+              }
+              if (fill.concern) {
+                autoFillDOMInput('textarea, input[placeholder*="fever" i], input[placeholder*="concern" i], input[placeholder*="complaint" i]', fill.concern);
+              }
+            }
+
+            if (results.length > 0) {
+              setLastActionExecuted(results.join(" • "));
+            } else if (hasFill && fill) {
+              const filledItems = Object.entries(fill).filter(([k, v]) => v && k !== "severity").map(([k, v]) => `${k}: ${v}`);
+              if (filledItems.length > 0) setLastActionExecuted(`Auto-filled: ${filledItems.join(", ")}`);
+            }
           }
-        }
-
-        // Autonomous Portal Navigation
-        if (data.route) {
+        } else if (data.route) {
+          // Navigation only (no actions or form fill)
           const target = data.route.trim();
           const current = (pathname || "").trim();
           if (target && target !== current) {
@@ -538,11 +988,6 @@ export default function FloatingAssistant({ onNavigate, onAction, onLanguageChan
             } catch (err) {
               window.location.href = target;
             }
-            setTimeout(() => {
-              if (typeof window !== "undefined" && window.location.pathname !== target) {
-                window.location.href = target;
-              }
-            }, 350);
           }
         }
 

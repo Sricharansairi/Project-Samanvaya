@@ -216,6 +216,13 @@ export default function QueueTrackerPage() {
 
   // Omnipresent Assistant Action Listener
   useEffect(() => {
+    // Emit page-ready signal for FloatingAssistant
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("samanvaya:page-ready", {
+        detail: { path: "/his/queue", timestamp: Date.now() }
+      }));
+    }
+
     const handleAssistantAction = (e: any) => {
       if (e.detail?.action === "call_next_token") {
         const nextWaiting = tokens.find(t => t.status === "WAITING");

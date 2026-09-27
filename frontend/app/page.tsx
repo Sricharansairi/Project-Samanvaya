@@ -23,6 +23,15 @@ export default function Home() {
   const [grievanceSubmitted, setGrievanceSubmitted] = useState(false);
   const [grievanceData, setGrievanceData] = useState({ name: "", phone: "", issue: "" });
 
+  // Citizen Self-Service Modals (No Hospital Staff Leakage)
+  const [tokenPassModalOpen, setTokenPassModalOpen] = useState(false);
+  const [tokenQuery, setTokenQuery] = useState("TK-101");
+  const [janAushadhiModalOpen, setJanAushadhiModalOpen] = useState(false);
+  const [janSearch, setJanSearch] = useState("");
+  const [schemeModalOpen, setSchemeModalOpen] = useState(false);
+  const [schemeQuery, setSchemeQuery] = useState("");
+  const [schemeChecked, setSchemeChecked] = useState(false);
+
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans selection:bg-[#0f4c81] selection:text-white relative overflow-hidden" id="main-content">
       {/* Official Top Navigation Header */}
@@ -128,9 +137,10 @@ export default function Home() {
             </Link>
 
             {/* Card 2: Scheme Eligibility & Claims */}
-            <Link 
-              href="/his/schemes"
-              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            <button 
+              type="button"
+              onClick={() => setSchemeModalOpen(true)}
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer text-left w-full"
             >
               <div>
                 <div className="w-11 h-11 rounded-xl bg-orange-50 text-[#f37021] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
@@ -151,12 +161,13 @@ export default function Home() {
                   ₹5 Lakh Cover
                 </span>
               </div>
-            </Link>
+            </button>
 
             {/* Card 3: Prescription & Jan Aushadhi */}
-            <Link 
-              href="/his/ocr"
-              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            <button 
+              type="button"
+              onClick={() => setJanAushadhiModalOpen(true)}
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer text-left w-full"
             >
               <div>
                 <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
@@ -177,12 +188,13 @@ export default function Home() {
                   85% Relief
                 </span>
               </div>
-            </Link>
+            </button>
 
             {/* Card 4: My OPD Token & Wait-Time */}
-            <Link 
-              href="/his/queue"
-              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer"
+            <button 
+              type="button"
+              onClick={() => setTokenPassModalOpen(true)}
+              className="group bg-white rounded-2xl p-6 border border-gray-200 hover:border-[#0f4c81] shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[190px] cursor-pointer text-left w-full"
             >
               <div>
                 <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
@@ -203,7 +215,7 @@ export default function Home() {
                   Live Token Pass
                 </span>
               </div>
-            </Link>
+            </button>
 
             {/* Card 5: Tele-MANAS Mental Wellness */}
             <Link 
@@ -376,105 +388,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ============================================================== */}
-        {/* ============================================================== */}
-        {/* CITIZEN HEALTHCARE MODULES GRID                                */}
-        {/* ============================================================== */}
-        <div className="w-full mb-12">
-          <div className="flex items-center gap-4 mb-6">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#0f4c81] bg-blue-50 px-3 py-1 rounded-full border border-blue-200 inline-block mb-1">
-                Citizen Healthcare Services
-              </span>
-              <h3 className="text-xl font-bold text-[#0f2942]">
-                Active Citizen Healthcare Modules
-              </h3>
-              <p className="text-xs text-gray-500">
-                Self-service health checks, scheme eligibility & generic medicine savings
-              </p>
-            </div>
-            <div className="h-[1px] flex-1 bg-gray-200"></div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { 
-                icon: "🌿", 
-                title: "AYUSH Health Profiler", 
-                desc: "Prakriti constitution assessment, Tridosha radar & personalized Ayurvedic dietary guidance", 
-                href: "/his/ayush",
-                badge: "Prakriti Check",
-                color: "border-emerald-200 hover:border-emerald-500"
-              },
-              { 
-                icon: "📱", 
-                title: "Live OPD Token Tracker", 
-                desc: "Real-time token display, SMS queue pass and multi-lingual voice announcements", 
-                href: "/his/queue",
-                badge: "My OPD Pass",
-                color: "border-amber-200 hover:border-amber-500"
-              },
-              { 
-                icon: "📄", 
-                title: "Jan Aushadhi Generic Savings", 
-                desc: "Extract handwritten drugs from prescriptions and discover 85% cheaper Jan Aushadhi generic salts", 
-                href: "/his/ocr",
-                badge: "85% Savings",
-                color: "border-blue-200 hover:border-blue-500"
-              },
-              { 
-                icon: "🛡️", 
-                title: "Scheme Eligibility & Claims", 
-                desc: "Real-time PM-JAY & State Scheme Checker across all 36 States/UTs with claim guidance", 
-                href: "/his/schemes",
-                badge: "36 States Active",
-                color: "border-orange-200 hover:border-orange-500"
-              },
-              { 
-                icon: "🧠", 
-                title: "Tele-MANAS Mental Wellness (14416)", 
-                desc: "De-stigmatized somatic distress screener, calming pranayama guide & confidential 24x7 helpline linkage", 
-                href: "/his/tele-manas",
-                badge: "24x7 Helpline",
-                color: "border-teal-200 hover:border-teal-500"
-              },
-              { 
-                icon: "🪪", 
-                title: "Smart Case-Taking & ABHA", 
-                desc: "Vernacular symptom assessment interview, voice assistant and digital ABHA ID generation", 
-                href: "/patient",
-                badge: "Instant ABHA",
-                color: "border-indigo-200 hover:border-indigo-500"
-              },
-            ].map((feature, idx) => (
-              <Link 
-                key={idx} 
-                href={feature.href}
-                className={`bg-white border ${feature.color} rounded-2xl p-5 hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-3xl group-hover:scale-110 transition-transform block">{feature.icon}</span>
-                    <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
-                      {feature.badge}
-                    </span>
-                  </div>
-                  <h4 className="font-bold text-[#0f2942] text-sm mb-1.5 group-hover:text-[#0f4c81] transition-colors">
-                    {feature.title}
-                  </h4>
-                  <p className="text-xs text-gray-500 leading-relaxed font-medium">
-                    {feature.desc}
-                  </p>
-                </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#0f4c81]">
-                  <span>Open Service</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
 
       </div>
 
@@ -745,6 +659,378 @@ export default function Home() {
                   </div>
                 </form>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================== */}
+      {/* MODAL 4: CITIZEN MY OPD TOKEN PASS MODAL                       */}
+      {/* ============================================================== */}
+      <AnimatePresence>
+        {tokenPassModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-gray-200 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-[#0f2942]">My Live OPD Token Pass</h3>
+                    <p className="text-xs text-gray-500">Real-Time Doctor Consultation Tracker</p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setTokenPassModalOpen(false)}
+                  className="p-1 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tokenQuery}
+                    onChange={(e) => setTokenQuery(e.target.value)}
+                    placeholder="Enter Token Number (e.g. TK-101)"
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-mono font-bold focus:ring-2 focus:ring-[#0f4c81] outline-none"
+                  />
+                  <button
+                    type="button"
+                    className="px-4 py-2.5 rounded-xl bg-[#0f4c81] text-white text-xs font-bold hover:bg-blue-900 transition-colors"
+                  >
+                    Track
+                  </button>
+                </div>
+
+                {/* Digital Token Ticket */}
+                <div className="bg-gradient-to-br from-slate-50 to-teal-50/50 border border-teal-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-100/70 px-2 py-0.5 rounded-md">
+                        Active Consultation Pass
+                      </span>
+                      <h4 className="text-2xl font-black text-[#0f2942] mt-1 font-mono">{tokenQuery || "TK-101"}</h4>
+                      <p className="text-xs text-gray-600 font-medium">Rajesh Kumar • Male (45 Yrs)</p>
+                    </div>
+                    <div className="w-16 h-16 bg-white p-1 rounded-xl border border-gray-200 flex items-center justify-center">
+                      <QrCode className="w-14 h-14 text-slate-800" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-3 border-t border-teal-200/60 text-xs">
+                    <div>
+                      <span className="text-gray-500 text-[10px] block font-bold">DEPARTMENT</span>
+                      <span className="font-extrabold text-[#0f2942]">General Medicine OPD</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 text-[10px] block font-bold">ASSIGNED CLINIC</span>
+                      <span className="font-extrabold text-[#0f4c81]">Room 101</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 text-[10px] block font-bold">PHYSICIAN</span>
+                      <span className="font-bold text-gray-800">Dr. Vikram Seth (MD)</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 text-[10px] block font-bold">ESTIMATED WAIT</span>
+                      <span className="font-extrabold text-amber-600">~10 - 12 Minutes</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-teal-200/60 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span>2 Patients Ahead of You</span>
+                    </div>
+                    <span className="text-[10px] text-gray-500 font-medium">Auto-refreshed 10s ago</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Link
+                    href="/patient"
+                    className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0f2942] text-xs font-bold text-center transition-all border border-slate-300"
+                  >
+                    Open Patient Health Locker
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setTokenPassModalOpen(false)}
+                    className="px-5 py-2.5 rounded-xl bg-[#0f4c81] text-white text-xs font-bold hover:bg-blue-900 transition-all cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================== */}
+      {/* MODAL 5: CITIZEN JAN AUSHADHI GENERIC SAVINGS MODAL            */}
+      {/* ============================================================== */}
+      <AnimatePresence>
+        {janAushadhiModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-gray-200 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <Pill className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-[#0f2942]">Jan Aushadhi Generic Medicine Savings</h3>
+                    <p className="text-xs text-gray-500">Government of India PMBJP Price Comparator</p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setJanAushadhiModalOpen(false)}
+                  className="p-1 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Search Branded Medicine to find Generic Equivalent</label>
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                    <input
+                      type="text"
+                      value={janSearch}
+                      onChange={(e) => setJanSearch(e.target.value)}
+                      placeholder="e.g. Crocin, Augmentin, Pantocid, Lipitor..."
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-300 text-xs font-semibold focus:ring-2 focus:ring-[#0f4c81] outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Savings Comparisons */}
+                <div className="space-y-2.5">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-gray-500 block">
+                    Verified Jan Aushadhi Substitutes & Price Relief
+                  </span>
+
+                  {[
+                    {
+                      brand: "Augmentin 625 Duo (10 Tabs)",
+                      salt: "Amoxycillin + Pot. Clavulanate 625mg",
+                      mrp: "₹223.50",
+                      janPrice: "₹42.00",
+                      savings: "81% Relief",
+                      saveAmount: "₹181.50"
+                    },
+                    {
+                      brand: "Crocin 650 Advance (15 Tabs)",
+                      salt: "Paracetamol 650mg Tablets",
+                      mrp: "₹34.00",
+                      janPrice: "₹6.80",
+                      savings: "80% Relief",
+                      saveAmount: "₹27.20"
+                    },
+                    {
+                      brand: "Pantocid 40mg (15 Tabs)",
+                      salt: "Pantoprazole Gastro-Resistant 40mg",
+                      mrp: "₹162.00",
+                      janPrice: "₹22.50",
+                      savings: "86% Relief",
+                      saveAmount: "₹139.50"
+                    },
+                    {
+                      brand: "Lipitor 10mg (10 Tabs)",
+                      salt: "Atorvastatin 10mg Tablets",
+                      mrp: "₹110.00",
+                      janPrice: "₹14.00",
+                      savings: "87% Relief",
+                      saveAmount: "₹96.00"
+                    }
+                  ]
+                    .filter(m => !janSearch || m.brand.toLowerCase().includes(janSearch.toLowerCase()) || m.salt.toLowerCase().includes(janSearch.toLowerCase()))
+                    .map((item, idx) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-[#0f2942] block">{item.brand}</span>
+                          <span className="text-[11px] text-gray-500 font-mono">{item.salt}</span>
+                        </div>
+                        <div className="flex items-center gap-3 self-end sm:self-auto">
+                          <div className="text-right">
+                            <span className="text-xs text-gray-400 line-through block">{item.mrp}</span>
+                            <span className="text-sm font-extrabold text-emerald-700">{item.janPrice}</span>
+                          </div>
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg border border-emerald-200">
+                            Save {item.saveAmount} ({item.savings})
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Nearby Kendra Locator */}
+                <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[#0f4c81] flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-[#0f4c81]" /> Nearest Jan Aushadhi Kendra
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Open Now
+                    </span>
+                  </div>
+                  <p className="text-gray-700 font-medium">PMBJP Kendra #1084 • Civil Hospital Campus, Near Gate 2</p>
+                  <p className="text-gray-500 text-[11px]">Distance: 450 meters • Open 8:00 AM - 9:00 PM</p>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setJanAushadhiModalOpen(false)}
+                    className="px-5 py-2.5 rounded-xl bg-[#0f4c81] text-white text-xs font-bold hover:bg-blue-900 transition-all cursor-pointer"
+                  >
+                    Close Comparator
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================== */}
+      {/* MODAL 6: CITIZEN PM-JAY & STATE SCHEME CHECKER MODAL           */}
+      {/* ============================================================== */}
+      <AnimatePresence>
+        {schemeModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-gray-200 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#f37021] flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-[#0f2942]">PM-JAY & State Health Scheme Checker</h3>
+                    <p className="text-xs text-gray-500">Universal Cashless Hospitalization Coverage</p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setSchemeModalOpen(false)}
+                  className="p-1 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Enter 12-Digit Aadhaar Card or Ration Card Number
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={schemeQuery}
+                      onChange={(e) => setSchemeQuery(e.target.value)}
+                      placeholder="e.g. 2938 1092 8492 or BPL-9820194"
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-mono font-bold focus:ring-2 focus:ring-[#0f4c81] outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSchemeChecked(true)}
+                      className="px-4 py-2.5 rounded-xl bg-[#f37021] text-white text-xs font-bold hover:bg-orange-600 transition-colors cursor-pointer"
+                    >
+                      Verify
+                    </button>
+                  </div>
+                </div>
+
+                {schemeChecked ? (
+                  <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                        Eligible for Cashless Care
+                      </span>
+                      <span className="text-xs font-extrabold text-emerald-800">₹5,00,000 / Year</span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-extrabold text-base text-[#0f2942]">
+                        Ayushman Bharat Pradhan Mantri Jan Arogya Yojana (PM-JAY)
+                      </h4>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        Linked with SECC 2011 & NFSA National Food Security Database
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-emerald-200 text-xs">
+                      <div>
+                        <span className="text-gray-500 text-[10px] block font-bold">GOLDEN CARD STATUS</span>
+                        <span className="font-extrabold text-emerald-800">Active & Verified</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 text-[10px] block font-bold">FAMILY MEMBERS</span>
+                        <span className="font-bold text-gray-800">4 Registered</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <Link
+                        href="/patient"
+                        className="w-full block py-2.5 rounded-xl bg-[#0f4c81] text-white text-xs font-bold text-center hover:bg-blue-900 transition-colors shadow-xs"
+                      >
+                        Download Official Ayushman Smart Card
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-gray-600 space-y-2">
+                    <p className="font-bold text-[#0f2942]">Quick Demo Records:</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSchemeQuery("2938 1092 8492");
+                          setSchemeChecked(true);
+                        }}
+                        className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-mono font-bold hover:bg-orange-50 cursor-pointer"
+                      >
+                        Try Sample Aadhaar (2938-1092-8492)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setSchemeModalOpen(false)}
+                    className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-gray-800 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

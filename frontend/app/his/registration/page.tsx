@@ -37,6 +37,13 @@ export default function RegistrationDashboard() {
 
   // Omnipresent Assistant Action Listener & OCR Intake Pre-fill
   useEffect(() => {
+    // Emit page-ready signal for FloatingAssistant sequential fill
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("samanvaya:page-ready", {
+        detail: { path: "/his/registration", timestamp: Date.now() }
+      }));
+    }
+
     // Check for OCR intake from sessionStorage
     if (typeof window !== "undefined") {
       const ocrRaw = sessionStorage.getItem("samanvaya_ocr_intake");
@@ -94,6 +101,7 @@ export default function RegistrationDashboard() {
         if (payload?.concern) setChiefConcern(payload.concern);
         if (payload?.bp) setVitals(v => ({ ...v, bp: payload.bp }));
         if (payload?.temp) setVitals(v => ({ ...v, temp: payload.temp }));
+        if (payload?.weight) setVitals(v => ({ ...v, weight: payload.weight }));
       } else if (action === "generate_abha") {
         generateMockAbha();
       }

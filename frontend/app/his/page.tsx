@@ -56,7 +56,7 @@ export default function HisSelectionPage() {
       href: "/his/schemes",
       title: "Arogya Mitra & Schemes Desk",
       desc: "Evaluate 36 States/UTs + Central schemes (PM-JAY, Aarogyasri, MJPJAY) for cashless pre-auth.",
-      icon: <span className="text-2xl">🏛️</span>,
+      icon: <Building2 className="w-8 h-8" />,
       color: "emerald",
       badge: "Cashless Health"
     },

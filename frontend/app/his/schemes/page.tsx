@@ -27,6 +27,13 @@ export default function SchemeNavigatorPage() {
 
   // Autonomous Assistant Form Fill & Filter Listener
   useEffect(() => {
+    // Emit page-ready signal for FloatingAssistant sequential fill
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("samanvaya:page-ready", {
+        detail: { path: "/his/schemes", timestamp: Date.now() }
+      }));
+    }
+
     if (typeof window !== "undefined") {
       const pendingRaw = sessionStorage.getItem("samanvaya_pending_fill");
       if (pendingRaw) {
@@ -308,6 +315,9 @@ export default function SchemeNavigatorPage() {
                       Age (Years) {age >= 70 && <span className="text-amber-600 font-bold">★ 70+ Senior</span>}
                     </label>
                     <input
+                      id="age"
+                      name="age"
+                      placeholder="Age (Years)"
                       type="number"
                       value={age}
                       min={0}
@@ -320,6 +330,8 @@ export default function SchemeNavigatorPage() {
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Gender</label>
                     <select
+                      id="gender"
+                      name="gender"
                       value={gender}
                       onChange={(e) => setGender(e.target.value as any)}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-300 rounded-xl font-medium text-gray-800 focus:ring-2 focus:ring-[#0f4c81] focus:outline-none"
@@ -337,6 +349,8 @@ export default function SchemeNavigatorPage() {
                     Ration Card / NFSA Category
                   </label>
                   <select
+                    id="rationCard"
+                    name="rationCard"
                     value={rationCard}
                     onChange={(e) => setRationCard(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-gray-300 rounded-xl font-medium text-gray-800 focus:ring-2 focus:ring-[#0f4c81] focus:outline-none"
@@ -357,6 +371,8 @@ export default function SchemeNavigatorPage() {
                     <span className="text-xs font-extrabold text-[#0f4c81]">₹{income.toLocaleString("en-IN")}</span>
                   </div>
                   <input
+                    id="income"
+                    name="income"
                     type="range"
                     min={30000}
                     max={1000000}

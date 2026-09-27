@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertCircle, RefreshCw, SwitchCamera, Sparkles, HeartPulse,
   Edit3, Save, Plus, Trash2, ChevronDown, ChevronUp, Copy, Check, Clock,
   Sun, ZoomIn, ShieldAlert, Activity, Volume2, Play, Pause, Share2, MapPin, 
-  IndianRupee, Pill, PhoneCall, Store, X, ExternalLink
+  IndianRupee, Pill, PhoneCall, Store, X, ExternalLink, Search
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -55,6 +55,35 @@ export default function OCRScanner() {
   const [liveKendras, setLiveKendras] = useState<any[]>([]);
   const [isLoadingKendras, setIsLoadingKendras] = useState<boolean>(false);
   const [liveCoords, setLiveCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [kendraSearchQuery, setKendraSearchQuery] = useState<string>("");
+  const [kendraLocationName, setKendraLocationName] = useState<string>("");
+
+  const handleSearchKendras = async (queryText?: string) => {
+    const q = (queryText !== undefined ? queryText : kendraSearchQuery).trim();
+    if (!q) return;
+    setIsLoadingKendras(true);
+    try {
+      const res = await fetch("/api/vision/ocr/locate-kendras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, radius: 10000 })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.kendras)) {
+        setLiveKendras(data.kendras);
+        if (data.origin_coordinates) {
+          setLiveCoords({ lat: data.origin_coordinates.latitude, lon: data.origin_coordinates.longitude });
+        }
+        if (data.location_name) {
+          setKendraLocationName(data.location_name);
+        }
+      }
+    } catch (err) {
+      console.error("Live Kendra search error:", err);
+    } finally {
+      setIsLoadingKendras(false);
+    }
+  };
 
   const fetchLiveKendras = async () => {
     setShowKendraModal(true);
@@ -85,6 +114,9 @@ export default function OCRScanner() {
       const data = await res.json();
       if (data.success && Array.isArray(data.kendras)) {
         setLiveKendras(data.kendras);
+        if (data.location_name) {
+          setKendraLocationName(data.location_name);
+        }
       }
     } catch (err) {
       console.error("Live Kendra fetch error:", err);
@@ -1419,11 +1451,46 @@ export default function OCRScanner() {
               </div>
 
               <div className="p-4 space-y-3 max-h-[65vh] overflow-y-auto">
+                {/* Real-Time City / Pincode Search Bar */}
+                <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-xl border border-slate-200">
+                  <input
+                    type="text"
+                    value={kendraSearchQuery}
+                    onChange={(e) => setKendraSearchQuery(e.target.value)}
+                    placeholder="Enter City, Town, or Pincode (e.g. Hyderabad, Bengaluru, 500001)..."
+                    className="flex-1 bg-white px-3 py-2 text-xs border border-slate-300 rounded-lg font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSearchKendras(); }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSearchKendras()}
+                    disabled={isLoadingKendras}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <Search className="w-3.5 h-3.5" /> Search
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fetchLiveKendras}
+                    disabled={isLoadingKendras}
+                    title="Detect GPS"
+                    className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold p-2 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  </button>
+                </div>
+
+                {kendraLocationName && (
+                  <p className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 flex items-center gap-1.5">
+                    <MapPin className="w-3 h-3 text-emerald-600" /> Showing real Kendras near: <strong>{kendraLocationName}</strong>
+                  </p>
+                )}
+
                 {isLoadingKendras ? (
                   <div className="py-12 flex flex-col items-center justify-center text-center space-y-2">
                     <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
                     <p className="text-xs font-bold text-slate-700">Connecting to Live OpenStreetMap Healthcare Grid...</p>
-                    <p className="text-[11px] text-slate-400">Locating active government pharmacies within 8 km</p>
+                    <p className="text-[11px] text-slate-400">Locating active government pharmacies within 10 km</p>
                   </div>
                 ) : (
                   <>

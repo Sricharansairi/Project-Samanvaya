@@ -41,3 +41,5 @@ Thumbs.db
 # Temporary and Media Storage
 .tempmediaStorage/
 *.log
+
+.vercel
